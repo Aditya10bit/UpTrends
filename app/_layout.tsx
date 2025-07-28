@@ -1,29 +1,63 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import 'react-native-reanimated';
-
-import { useColorScheme } from '@/hooks/useColorScheme';
+import { Stack } from "expo-router";
+import { AuthProvider } from '../contexts/AuthContext';
+import { ThemeProvider } from '../contexts/ThemeContext';
+import "../global.css";
+import "../polyfills"; // Import polyfill to fix BackHandler compatibility
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
-  const [loaded] = useFonts({
-    SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
-  });
-
-  if (!loaded) {
-    // Async font loading only occurs in development.
-    return null;
-  }
-
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="+not-found" />
-      </Stack>
-      <StatusBar style="auto" />
+    <ThemeProvider>
+      <AuthProvider>
+        <Stack 
+          screenOptions={{ 
+            headerShown: false,
+            animation: 'slide_from_right',
+            gestureEnabled: true,
+          }}
+        >
+          <Stack.Screen 
+            name="index" 
+            options={{
+              title: 'UpTrends',
+            }}
+          />
+          <Stack.Screen 
+            name="auth" 
+            options={{
+              title: 'Authentication',
+              gestureEnabled: false,
+            }}
+          />
+          <Stack.Screen 
+            name="fashion" 
+            options={{
+              title: 'Fashion Categories',
+              presentation: 'card',
+            }}
+          />
+          <Stack.Screen 
+            name="profile" 
+            options={{
+              title: 'Profile',
+              presentation: 'card',
+            }}
+          />
+          <Stack.Screen 
+            name="category/[slug]" 
+            options={{  
+              title: 'Category',
+              presentation: 'card',
+            }}
+          />
+          <Stack.Screen 
+            name="profile-edit/[uid]" 
+            options={{ 
+              title: 'Edit Profile', 
+              presentation: 'modal' 
+            }} 
+          />
+        </Stack>
+      </AuthProvider>
     </ThemeProvider>
   );
 }
