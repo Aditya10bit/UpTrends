@@ -1,50 +1,44 @@
-# Welcome to your Expo app 👋
+# UpTrends
+Uptrends: AI-Powered Personalized Fashion Recommendation Platform
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Uptrends is an innovative mobile fashion application leveraging advanced AI and machine learning to deliver highly personalized and context-aware outfit recommendations. Designed for both male and female users, the platform aims to revolutionize personal styling by integrating real-world trends with individual user attributes and situational needs.
 
-## Get started
+Key Features and Technological Highlights:
 
-1. Install dependencies
+Contextual Outfit Curation:
 
-   ```bash
-   npm install
-   ```
+Trend-Driven Discovery: Users can explore curated outfit collections based on popular fashion trends and specific occasions (e.g., "Old Money Aesthetics," "Gym Wear," "Formal Events").
 
-2. Start the app
+Dynamic Web-Sourced Lookbooks: Utilizes web scraping and image recognition to aggregate relevant fashion looks, providing a vast and continually updated style library.
 
-   ```bash
-   npx expo start
-   ```
+Intelligent Price Filtering & Optimization: Implements advanced filtering capabilities allowing users to specify budget constraints. Features a sophisticated recommendation engine that suggests optimal price adjustments for broader outfit availability when initial filters yield limited results.
 
-In the output, you'll find options to open the app in a
+Location-Based Aesthetic Matching (Computer Vision & NLP):
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+Visual Environment Analysis: Users can upload images of specific venues (e.g., restaurants, cafes). The platform employs Computer Vision (CV) and Natural Language Processing (NLP) to analyze the visual aesthetics and ambiance of the location.
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+Aesthetic-Aligned Outfit Suggestions: Based on the analyzed aesthetics, the system recommends outfits that complement the venue's style, ensuring users are impeccably dressed for any setting.
 
-## Get a fresh project
+Hyper-Personalized Style Advisory (Machine Learning & User Profiling):
 
-When you're ready, run:
+Attribute-Based Recommendations: Integrates user-provided data (e.g., height, body type, skin tone) with a proprietary recommendation algorithm.
 
-```bash
-npm run reset-project
-```
+Tailored Fashion Guidance: Provides specific, actionable style advice (e.g., "monochromatic outfits for perceived height enhancement," "strategic layering for body compensation," "color palette suggestions for various skin tones") to empower users to dress confidently.
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+"Make Me An Outfit" (Generative AI & Image Recognition):
 
-## Learn more
+Personal Wardrobe Integration: Users can upload photos of their existing clothing items (e.g., pants, shirts).
 
-To learn more about developing your project with Expo, look at the following resources:
+Intelligent Outfit Composition: Leverages advanced image recognition and generative AI to suggest complete, cohesive outfits from the user's wardrobe, taking into account their personal attributes for optimal styling.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+Collaborative Styling & Twinning:
 
-## Join the community
+Couple Outfit Recommendations: Offers a unique feature for couples, suggesting coordinated or "twinning" outfits suitable for various occasions.
 
-Join our community of developers creating universal apps.
+Shared Experience Integration: Extends location-based recommendations to facilitate shared styling experiences for multiple users.
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Current Development Status:
+The core application infrastructure is established, including robust authentication, a dynamic fashion discovery screen, comprehensive user profiles, and category-specific content views, all seamlessly integrated with a scalable database.
+
+Technological Foundation:
+The application's AI capabilities are being developed using a hybrid approach, integrating cutting-edge models and APIs from leading platforms such as Hugging Face, OpenAI, and Google AI, ensuring cost-effective and high-performance intelligent features. Initial UI development utilized dummy data, with full AI integration slated for the next phase.
