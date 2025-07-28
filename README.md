@@ -42,3 +42,30 @@ The core application infrastructure is established, including robust authenticat
 
 Technological Foundation:
 The application's AI capabilities are being developed using a hybrid approach, integrating cutting-edge models and APIs from leading platforms such as Hugging Face, OpenAI, and Google AI, ensuring cost-effective and high-performance intelligent features. Initial UI development utilized dummy data, with full AI integration slated for the next phase.
+
+
+#HomeScreen
+![WhatsApp Image 2025-07-28 at 14 01 37_d316b439](https://github.com/user-attachments/assets/44f865e9-277e-4e30-8e0c-18c3fa773acf)
+#ProfileSCreen
+#EditDetailsScreen
+![WhatsApp Image 2025-07-28 at 14 01 37_2d5d8984](https://github.com/user-attachments/assets/4682b97c-d5ca-4106-8767-bd88970e6b1c)
+
+#FasionScreen
+![WhatsApp Image 2025-07-28 at 14 01 38_c4623e76](https://github.com/user-attachments/assets/8792eb3f-bbf5-4ec4-b2fd-f727f052674f)
+
+#CategoryScreen
+![WhatsApp Image 2025-07-28 at 14 01 37_9500a621](https://github.com/user-attachments/assets/5bad0bbe-0c62-4b66-8209-17bbb1bc2787)
+
+#AiTip
+![WhatsApp Image 2025-07-28 at 14 01 38_4e2a1e82](https://github.com/user-attachments/assets/7c54c64d-965e-4f08-929e-e110980ab6f0)
+
+#UploadAesthetic
+![WhatsApp Image 2025-07-28 at 14 01 39_2e44749a](https://github.com/user-attachments/assets/c283dba1-5daa-43b8-8013-c4c3e205fc3c)
+
+![WhatsApp Image 2025-07-28 at 14 01 39_0d367371](https://github.com/user-attachments/assets/7aea8e5c-f8af-487d-9fa2-afabab32e4fc)
+
+#MakeMeAnOutfit
+![WhatsApp Image 2025-07-28 at 14 01 38_fa7c6dfe](https://github.com/user-attachments/assets/be10b36c-52fb-4145-b077-4e5c5a607866)
+
+
+
