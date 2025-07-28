@@ -8,6 +8,7 @@ module.exports = function (api) {
     ],
     plugins: [
       'react-native-reanimated/plugin', // ← Add this line
+        ['module:react-native-dotenv']
     ],
   };
 };
