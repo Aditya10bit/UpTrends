@@ -31,32 +31,50 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const rootNavigationState = useRootNavigationState();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      console.log('Auth state changed:', user ? 'User logged in' : 'User logged out');
-      setUser(user);
-      setLoading(false);
-    });
+    try {
+      const unsubscribe = onAuthStateChanged(auth, (user) => {
+        console.log('Auth state changed:', user ? 'User logged in' : 'User logged out');
+        setUser(user);
+        setLoading(false);
+      }, (error) => {
+        console.error('Firebase auth error:', error);
+        setUser(null);
+        setLoading(false);
+      });
 
-    return unsubscribe;
+      return unsubscribe;
+    } catch (error) {
+      console.error('Firebase initialization error:', error);
+      setUser(null);
+      setLoading(false);
+    }
   }, []);
 
-  // 🔥 SINGLE NAVIGATION EFFECT - Only for initial load
+  // Navigation effect - production-safe
   useEffect(() => {
-    if (!rootNavigationState?.key || loading || hasNavigated) return;
+    if (!rootNavigationState?.key || loading) return;
     
     console.log('AuthContext navigation - User:', user ? 'exists' : 'null');
     
-    setTimeout(() => {
-      if (user) {
-        console.log('AuthContext: Navigating to main dashboard');
-        router.replace('/');
-      } else {
-        console.log('AuthContext: Navigating to auth screen');
-        router.replace('/auth');
+    // Add timeout to prevent race conditions in production
+    const navigationTimeout = setTimeout(() => {
+      try {
+        if (user && !hasNavigated) {
+          console.log('AuthContext: Navigating to main dashboard');
+          router.replace('/');
+          setHasNavigated(true);
+        } else if (!user && !hasNavigated) {
+          console.log('AuthContext: Navigating to auth screen');
+          router.replace('/auth');
+          setHasNavigated(true);
+        }
+      } catch (error) {
+        console.error('Navigation error:', error);
       }
-      setHasNavigated(true);
-    }, 200);
-  }, [user, loading, rootNavigationState?.key, hasNavigated]);
+    }, 100);
+
+    return () => clearTimeout(navigationTimeout);
+  }, [user, loading, rootNavigationState?.key]);
 
   const logout = async () => {
     try {

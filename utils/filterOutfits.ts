@@ -3,7 +3,7 @@ type UserProfile = {
   height: string;         // e.g. "170" (cm)
   bodyType: string;       // e.g. "Slim"
   skinTone: string;       // e.g. "Fair"
-  preferredStyle?: string;// e.g. "Casual"
+  // preferredStyle removed - now using gender instead
   city?: string;          // optional
   gender?: string;        // optional ("male"/"female")
 };
@@ -39,7 +39,7 @@ function getUserFields(user: UserProfile, category: string): string[] {
   if (user.height) fields.push(normalizeHeight(user.height));
   if (user.bodyType) fields.push(user.bodyType.toLowerCase());
   if (user.skinTone) fields.push(user.skinTone.toLowerCase());
-  if (user.preferredStyle) fields.push(user.preferredStyle.toLowerCase());
+  if (user.gender) fields.push(user.gender.toLowerCase());
   if (category) fields.push(category.replace(/-/g, ' ').replace('male ', '').replace('female ', '').toLowerCase());
   return fields;
 }
@@ -60,11 +60,11 @@ export function filterOutfits(
     if (appearance.height && appearance.height.map(h => h.toLowerCase()).includes(normalizeHeight(userProfile.height))) score++;
     if (appearance.bodyType && appearance.bodyType.map(b => b.toLowerCase()).includes(userProfile.bodyType?.toLowerCase() || '')) score++;
     if (appearance.skinTone && appearance.skinTone.map(s => s.toLowerCase()).includes(userProfile.skinTone?.toLowerCase() || '')) score++;
-    // Category/tags match
-    if (userProfile.preferredStyle) {
+    // Gender-based filtering
+    if (userProfile.gender) {
       const cat = (outfit.category || '').toLowerCase();
       const tags = (outfit.tags || []).map(t => t.toLowerCase());
-      if (userProfile.preferredStyle.toLowerCase() === cat || tags.includes(userProfile.preferredStyle.toLowerCase())) score++;
+      if (cat.includes(userProfile.gender.toLowerCase()) || tags.includes(userProfile.gender.toLowerCase())) score++;
     }
     // City/zone match (optional)
     if (userProfile.city && (outfit.city || outfit.zone)) {

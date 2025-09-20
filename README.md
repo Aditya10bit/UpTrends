@@ -1,75 +1,216 @@
-# UpTrends
-Uptrends: AI-Powered Personalized Fashion Recommendation Platform
+# UpTrends - AI-Powered Fashion Assistant
 
-Uptrends is an innovative mobile fashion application leveraging advanced AI and machine learning to deliver highly personalized and context-aware outfit recommendations. Designed for both male and female users, the platform aims to revolutionize personal styling by integrating real-world trends with individual user attributes and situational needs.
+A React Native app that provides personalized outfit recommendations using Google's Gemini AI, with body-type awareness and venue-specific styling suggestions.
 
-Key Features and Technological Highlights:
+## 🚀 Features
 
-Contextual Outfit Curation:
+- **Smart Wardrobe Analysis**: Upload your clothes and get AI-powered outfit combinations
+- **Body-Type Intelligence**: Personalized recommendations based on height, weight, skin tone, and body type
+- **Venue-Specific Styling**: Upload venue photos and get outfit suggestions that match the ambiance
+- **Color Harmony Analysis**: AI analyzes venue colors and suggests complementary outfit colors
+- **Real-time Profile Integration**: Considers user preferences and physical attributes
+- **Rate-Limited API Usage**: Optimized for free tier usage with built-in rate limiting
 
-Trend-Driven Discovery: Users can explore curated outfit collections based on popular fashion trends and specific occasions (e.g., "Old Money Aesthetics," "Gym Wear," "Formal Events").
+## 🛡️ Security Features
 
-Dynamic Web-Sourced Lookbooks: Utilizes web scraping and image recognition to aggregate relevant fashion looks, providing a vast and continually updated style library.
+- Environment variable protection for API keys
+- Rate limiting to prevent API quota exhaustion
+- Input validation and sanitization
+- Secure error handling without exposing sensitive data
 
-Intelligent Price Filtering & Optimization: Implements advanced filtering capabilities allowing users to specify budget constraints. Features a sophisticated recommendation engine that suggests optimal price adjustments for broader outfit availability when initial filters yield limited results.
+## 📱 Screens
 
-Location-Based Aesthetic Matching (Computer Vision & NLP):
+1. **Authentication**: Secure login/signup
+2. **Home Dashboard**: Navigation to main features
+3. **Fashion Explorer**: Browse outfit categories
+4. **Upload Aesthetic**: Venue-based outfit suggestions
+5. **Make Outfit**: Wardrobe-based outfit generation
+6. **Profile Management**: User preferences and body measurements
 
-Visual Environment Analysis: Users can upload images of specific venues (e.g., restaurants, cafes). The platform employs Computer Vision (CV) and Natural Language Processing (NLP) to analyze the visual aesthetics and ambiance of the location.
+## 🔧 Setup Instructions
 
-Aesthetic-Aligned Outfit Suggestions: Based on the analyzed aesthetics, the system recommends outfits that complement the venue's style, ensuring users are impeccably dressed for any setting.
+### Prerequisites
 
-Hyper-Personalized Style Advisory (Machine Learning & User Profiling):
+- Node.js (v16 or higher)
+- Expo CLI
+- React Native development environment
 
-Attribute-Based Recommendations: Integrates user-provided data (e.g., height, body type, skin tone) with a proprietary recommendation algorithm.
+### Installation
 
-Tailored Fashion Guidance: Provides specific, actionable style advice (e.g., "monochromatic outfits for perceived height enhancement," "strategic layering for body compensation," "color palette suggestions for various skin tones") to empower users to dress confidently.
+1. **Clone the repository**
+   ```bash
+   git clone <your-repo-url>
+   cd uptrends
+   ```
 
-"Make Me An Outfit" (Generative AI & Image Recognition):
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
 
-Personal Wardrobe Integration: Users can upload photos of their existing clothing items (e.g., pants, shirts).
+3. **Environment Setup**
+   Create a `.env` file in the root directory:
+   ```env
+   EXPO_PUBLIC_GEMINI_API_KEY=your_gemini_api_key_here
+   ```
 
-Intelligent Outfit Composition: Leverages advanced image recognition and generative AI to suggest complete, cohesive outfits from the user's wardrobe, taking into account their personal attributes for optimal styling.
+4. **Firebase Configuration**
+   - Create a Firebase project
+   - Enable Authentication and Firestore
+   - Download the configuration file
+   - Update `firebaseConfig.ts` with your credentials
 
-Collaborative Styling & Twinning:
+5. **Start the development server**
+   ```bash
+   npm start
+   ```
 
-Couple Outfit Recommendations: Offers a unique feature for couples, suggesting coordinated or "twinning" outfits suitable for various occasions.
+## 🔑 Security & API Setup
 
-Shared Experience Integration: Extends location-based recommendations to facilitate shared styling experiences for multiple users.
+### 🛡️ Security First
+This app implements comprehensive security measures. Before setup, please review our [Security Guide](SECURITY.md).
 
-Current Development Status:
-The core application infrastructure is established, including robust authentication, a dynamic fashion discovery screen, comprehensive user profiles, and category-specific content views, all seamlessly integrated with a scalable database.
+### Getting API Keys
 
-Technological Foundation:
-The application's AI capabilities are being developed using a hybrid approach, integrating cutting-edge models and APIs from leading platforms such as Hugging Face, OpenAI, and Google AI, ensuring cost-effective and high-performance intelligent features. Initial UI development utilized dummy data, with full AI integration slated for the next phase.
+1. **Gemini API Key**
+   - Go to [Google AI Studio](https://makersuite.google.com/app/apikey)
+   - Create a new API key
+   - The free tier includes:
+     - 15 requests per minute
+     - 1,500 requests per day
+     - 1 million tokens per month
 
+2. **Firebase Configuration**
+   - Create a Firebase project at [Firebase Console](https://console.firebase.google.com)
+   - Enable Authentication and Firestore
+   - Get your Firebase configuration values
 
-# HomeScreen  
-![WhatsApp Image 2025-07-28 at 14 01 37_d316b439](https://github.com/user-attachments/assets/44f865e9-277e-4e30-8e0c-18c3fa773acf)
+### 🔒 Secure Environment Setup
 
-# ProfileScreen  
-![WhatsApp Image 2025-07-28 at 14 17 57_f8ed5907](https://github.com/user-attachments/assets/9a72a4d9-e9f0-494f-a882-24c7789bdfb1)
+1. Copy the environment template:
+   ```bash
+   cp .env.example .env
+   ```
 
-# EditDetailsScreen  
-![WhatsApp Image 2025-07-28 at 14 01 37_2d5d8984](https://github.com/user-attachments/assets/4682b97c-d5ca-4106-8767-bd88970e6b1c)
+2. Fill in your actual API keys in `.env`:
+   ```env
+   EXPO_PUBLIC_GEMINI_API_KEY=your_actual_gemini_key
+   FIREBASE_API_KEY=your_firebase_api_key
+   FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
+   # ... other Firebase values
+   ```
 
-# FasionScreen  
-![WhatsApp Image 2025-07-28 at 14 01 38_c4623e76](https://github.com/user-attachments/assets/8792eb3f-bbf5-4ec4-b2fd-f727f052674f)
+3. **Validate Security** (Important!):
+   ```bash
+   node scripts/validate-security.js
+   ```
 
-# CategoryScreen  
-![WhatsApp Image 2025-07-28 at 14 01 37_9500a621](https://github.com/user-attachments/assets/5bad0bbe-0c62-4b66-8209-17bbb1bc2787)
+### 🎨 Enhanced Theme System
 
-# AiTip  
-![WhatsApp Image 2025-07-28 at 14 01 38_4e2a1e82](https://github.com/user-attachments/assets/7c54c64d-965e-4f08-929e-e110980ab6f0)
+The app now features a dynamic theme system with:
+- **Enhanced Light Mode**: Modern colors, gradients, and dynamic status bar
+- **Rich Dark Mode**: Comfortable dark backgrounds with vibrant accents
+- **Screen-Specific Colors**: Different accent colors for each screen
+- **Dynamic Status Bar**: Changes color based on current screen
 
-# UploadAesthetic  
-![WhatsApp Image 2025-07-28 at 14 01 39_2e44749a](https://github.com/user-attachments/assets/c283dba1-5daa-43b8-8013-c4c3e205fc3c)
+### Security Best Practices
 
-![WhatsApp Image 2025-07-28 at 14 01 39_0d367371](https://github.com/user-attachments/assets/7aea8e5c-f8af-487d-9fa2-afabab32e4fc)
+- ✅ All credentials secured in environment variables
+- ✅ Comprehensive security validation script
+- ✅ No hardcoded API keys in source code
+- ✅ Proper .gitignore configuration
+- ✅ Rate limiting and error handling
+- Use HTTPS for all network requests
 
-# MakeMeAnOutfit  
-![WhatsApp Image 2025-07-28 at 14 01 38_fa7c6dfe](https://github.com/user-attachments/assets/be10b36c-52fb-4145-b077-4e5c5a607866)
+## 📊 Usage Optimization
 
+The app is optimized for free tier usage:
 
+- **Efficient Prompting**: Minimizes token usage
+- **Smart Caching**: Reduces redundant API calls
+- **Rate Limiting**: Prevents quota exhaustion
+- **Fallback Responses**: Handles API failures gracefully
 
+**Estimated Usage for 3-4 Users:**
+- Daily requests: ~15-20
+- Monthly requests: ~450-600
+- Quota utilization: <1% of free tier
 
+## 🎨 Key Technologies
+
+- **React Native**: Cross-platform mobile development
+- **Expo**: Development platform and tools
+- **Google Gemini AI**: Advanced AI for image and text analysis
+- **Firebase**: Authentication and database
+- **TypeScript**: Type-safe development
+- **Animated API**: Smooth animations and transitions
+
+## 🧠 AI Intelligence Features
+
+### Body Type Analysis
+- **Slim**: Volume-adding layers, horizontal patterns
+- **Athletic**: Waist emphasis, softer fabrics
+- **Heavy**: Monochromatic looks, vertical lines
+- **Average**: Versatile styling options
+
+### Skin Tone Matching
+- **Fair**: Pastels, jewel tones, navy
+- **Wheatish**: Earth tones, warm colors
+- **Dusky**: Rich vibrant colors, jewel tones
+- **Dark**: Bright bold colors, high contrast
+
+### Height Considerations
+- **Petite**: High-waisted pieces, vertical lines
+- **Average**: Balanced proportions
+- **Tall**: Longer pieces, horizontal elements
+
+## 🔒 Security Measures
+
+1. **API Key Protection**
+   - Environment variables only
+   - Validation on startup
+   - No hardcoded keys in source
+
+2. **Rate Limiting**
+   - 15 calls per minute maximum
+   - Automatic throttling
+   - User-friendly error messages
+
+3. **Input Validation**
+   - Sanitized user inputs
+   - Image format validation
+   - Prompt length limits
+
+4. **Error Handling**
+   - Graceful degradation
+   - No sensitive data exposure
+   - Fallback responses
+
+## 📝 Development Notes
+
+- All sensitive data is in environment variables
+- Rate limiting prevents API quota issues
+- Comprehensive error handling for production use
+- Optimized for free tier usage patterns
+- Ready for GitHub deployment
+
+## 🚀 Deployment
+
+The app is configured for secure deployment:
+
+1. All API keys are in environment variables
+2. `.gitignore` excludes sensitive files
+3. Rate limiting prevents quota exhaustion
+4. Error handling is production-ready
+
+## 📞 Support
+
+For issues or questions:
+1. Check the error logs for rate limiting messages
+2. Verify environment variables are set correctly
+3. Ensure Firebase configuration is complete
+4. Monitor API usage in Google Cloud Console
+
+---
+
+**Note**: This app is optimized for small user groups (3-4 people) and will stay well within free tier limits. The AI provides sophisticated fashion advice while maintaining cost efficiency.

@@ -7,10 +7,8 @@ node_modules/
 .expo/
 dist/
 web-build/
-expo-env.d.ts
 
 # Native
-.kotlin/
 *.orig.*
 *.jks
 *.p8
@@ -37,4 +35,21 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
-app-example
+# @generated expo modules
+expo-modules-autolinking/
+
+# Security - API Keys and sensitive data
+.env
+.env.local
+.env.production
+.env.staging
+*.env
+config/keys.js
+config/config.json
+
+# Firebase (when using environment variables)
+# firebaseConfig.js (uncomment if using env vars)
+
+# Google Services
+google-services.json
+GoogleService-Info.plist

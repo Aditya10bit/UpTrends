@@ -1,51 +1,19 @@
 // app/auth.tsx
-import { makeRedirectUri, useAuthRequest } from 'expo-auth-session';
 import { useRouter } from 'expo-router';
-import * as WebBrowser from 'expo-web-browser';
-import { createUserWithEmailAndPassword, GoogleAuthProvider, sendPasswordResetEmail, signInWithCredential, signInWithEmailAndPassword } from 'firebase/auth';
-import React, { useEffect, useState } from 'react';
+import { createUserWithEmailAndPassword, sendPasswordResetEmail, signInWithEmailAndPassword } from 'firebase/auth';
+import React, { useState } from 'react';
 import { Alert, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { auth } from '../firebaseConfig';
 import { checkUserProfile, createUserProfile } from '../services/userService';
 
-WebBrowser.maybeCompleteAuthSession();
-
-const discovery = {
-  authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
-  tokenEndpoint: 'https://www.googleapis.com/oauth2/v4/token',
-};
-
 export default function AuthScreen() {
-     const { theme } = useTheme();
+  const { theme } = useTheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-
-
-  // Google Auth Setup
-  const [request, response, promptAsync] = useAuthRequest(
-    {
-      clientId: '734945715091-3lnodgg97tat9fkqs7r3kp8p78o7avbb.apps.googleusercontent.com',
-      scopes: ['openid', 'profile', 'email'],
-      redirectUri: makeRedirectUri({
-        scheme: 'uptrends',
-      }),
-    },
-    discovery
-  );
-
-  // Handle Google auth response
-  useEffect(() => {
-    if (response?.type === 'success') {
-      const { authentication } = response;
-      if (authentication?.accessToken) {
-        handleGoogleSignIn(authentication.accessToken);
-      }
-    }
-  }, [response]);
 
   const handleEmailAuth = async () => {
     if (!email || !password) {
@@ -57,20 +25,20 @@ export default function AuthScreen() {
     try {
       if (isLogin) {
         await signInWithEmailAndPassword(auth, email, password);
-        
+
         const profileExists = await checkUserProfile();
         if (!profileExists) {
           await createUserProfile();
         }
       } else {
         await createUserWithEmailAndPassword(auth, email, password);
-        
+
         await createUserProfile({
           username: email.split('@')[0]
         });
       }
-      
-      router.replace('/'); 
+
+      router.replace('/');
     } catch (error: any) {
       Alert.alert('Error', error.message);
     } finally {
@@ -80,58 +48,15 @@ export default function AuthScreen() {
 
   const handleForgotPassword = async () => {
     if (!email) {
-      Alert.alert('Error', 'Pehle email enter kar bhai!');
+      Alert.alert('Error', 'Please enter your email first!');
       return;
     }
 
     try {
       await sendPasswordResetEmail(auth, email);
-      Alert.alert('Success', 'Password reset email bhej diya! Check kar inbox mein! 📧');
+      Alert.alert('Success', 'Password reset email sent! Check your inbox! 📧');
     } catch (error: any) {
       Alert.alert('Error', error.message);
-    }
-  };
-
-  const handleGoogleAuth = async () => {
-    try {
-      setLoading(true);
-      await promptAsync();
-    } catch (error) {
-      console.error('Google auth error:', error);
-      Alert.alert('Error', 'Failed to sign in with Google');
-      setLoading(false);
-    }
-  };
-
-  const handleGoogleSignIn = async (accessToken: string) => {
-    try {
-      const userInfoResponse = await fetch(
-        `https://www.googleapis.com/oauth2/v1/userinfo?access_token=${accessToken}`,
-        {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        }
-      );
-      
-      const userInfo = await userInfoResponse.json();
-      
-      const credential = GoogleAuthProvider.credential(null, accessToken);
-      
-      await signInWithCredential(auth, credential);
-      
-      const profileExists = await checkUserProfile();
-      if (!profileExists) {
-        await createUserProfile({
-          username: userInfo.name || userInfo.email?.split('@')[0]
-        });
-      }
-      
-      Alert.alert('Success', `Welcome ${userInfo.name}!`);
-      router.replace('/');
-    } catch (error: any) {
-      console.error('Firebase Google sign-in error:', error);
-      Alert.alert('Error', 'Failed to complete Google sign-in');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -207,24 +132,7 @@ export default function AuthScreen() {
             {loading ? 'Loading...' : isLogin ? 'Sign In' : 'Sign Up'}
           </Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={{
-            borderWidth: 1,
-            borderColor: theme.border,
-            borderRadius: 8,
-            paddingVertical: 16,
-            flexDirection: 'row',
-            justifyContent: 'center',
-            alignItems: 'center',
-            opacity: loading ? 0.5 : 1,
-          }}
-          onPress={handleGoogleAuth}
-          disabled={loading}
-        >
-          <Text style={{ color: theme.text, fontWeight: 'bold', fontSize: 18 }}>
-            Continue with Google
-          </Text>
-        </TouchableOpacity>
+
         <TouchableOpacity style={{ paddingVertical: 16 }} onPress={() => setIsLogin(!isLogin)}>
           <Text style={{ textAlign: 'center', color: theme.primary, fontWeight: '500' }}>
             {isLogin ? "Don't have an account? Sign Up" : 'Already have an account? Sign In'}

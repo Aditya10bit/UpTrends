@@ -1,22 +1,35 @@
 {
   "expo": {
     "name": "UpTrends",
-    "slug": "UpTrends",
-    "version": "1.0.0",
+    "slug": "uptrends",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "uptrends",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
+    "description": "AI-powered fashion styling app that helps you create perfect outfits for any occasion",
+    "privacy": "public",
+    "platforms": ["ios", "android", "web"],
+    "githubUrl": "https://github.com/aditya10das/uptrends",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.aditya10das.uptrends"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#667eea"
       },
-      "edgeToEdgeEnabled": true
+      "package": "com.aditya10das.uptrends",
+      "versionCode": 2,
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE", 
+        "WRITE_EXTERNAL_STORAGE",
+        "INTERNET",
+        "ACCESS_NETWORK_STATE"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -31,10 +44,25 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff"
+          "backgroundColor": "#667eea"
         }
       ],
-      "expo-web-browser"
-    ]
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "The app accesses your photos to let you share them with your outfits.",
+          "cameraPermission": "The app accesses your camera to let you take photos for outfit analysis."
+        }
+      ]
+    ],
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "cf6d1cfe-ce05-470d-85d7-f721c607d414"
+      }
+    },
+    "owner": "aditya10das"
   }
 }

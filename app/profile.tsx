@@ -1,21 +1,21 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
-  Alert,
-  Dimensions,
-  Image,
-  Platform,
-  RefreshControl,
-  ScrollView,
-  StatusBar,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    Alert,
+    Dimensions,
+    Image,
+    Platform,
+    RefreshControl,
+    ScrollView,
+    StatusBar,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
@@ -23,26 +23,18 @@ import { useTheme } from '../contexts/ThemeContext';
 import { storage } from '../firebaseConfig';
 
 import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withDelay,
-  withSpring,
-  withTiming
+    useAnimatedStyle,
+    useSharedValue,
+    withDelay,
+    withSpring,
+    withTiming
 } from 'react-native-reanimated';
-import { getUserFavorites, getUserProfile, removeFavoriteOutfit, updateUserProfile } from '../services/userService';
+import { getUserAnalytics, syncAnalyticsWithFirebase, UserAnalytics } from '../services/analyticsService';
+import { getUserProfile, updateUserProfile } from '../services/userService';
 
 const { width } = Dimensions.get('window');
 
-interface FavoriteItem {
-  name: string;
-  category: string;
-  categorySlug: string;
-  items: string;
-  price: string;
-  gender: string;
-  savedAt: any;
-  id?: string;
-}
+// FavoriteItem interface removed - no longer using saved outfits
 
 interface UserProfile {
   displayName?: string;
@@ -53,7 +45,8 @@ interface UserProfile {
   uid?: string;
   username?: string;
   gender?: string;
-  favorites?: any[];
+
+  // favorites removed - no longer using saved outfits
   sharedOutfits?: any[];
   viewHistory?: any[];
   createdAt?: any;
@@ -64,7 +57,6 @@ interface UserProfile {
   skinTone?: string;
   bodyType?: string;
   city?: string;
-  preferredStyle?: string;
 }
 
 const getStatusBarHeight = () => {
@@ -77,48 +69,83 @@ const getStatusBarHeight = () => {
 export default function ProfileScreen() {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
-  const [favorites, setFavorites] = useState<FavoriteItem[]>([]);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [userAnalytics, setUserAnalytics] = useState<UserAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'favorites' | 'history'>('favorites');
+  // Removed favorites and tabs - focusing on profile info only
   const [isEditingName, setIsEditingName] = useState(false);
   const [tempDisplayName, setTempDisplayName] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [isNavigating, setIsNavigating] = useState(false);
+  const [isExiting, setIsExiting] = useState(false);
   const { user, logout } = useAuth();
 
   // Animation values
   const scale = useSharedValue(1);
   const profileCardOpacity = useSharedValue(0);
   const profileCardTranslateY = useSharedValue(50);
-  const tabsOpacity = useSharedValue(0);
-  const tabsTranslateY = useSharedValue(30);
   const contentOpacity = useSharedValue(0);
   const contentTranslateY = useSharedValue(40);
   const backButtonOpacity = useSharedValue(0);
   const settingsButtonOpacity = useSharedValue(0);
+  const screenOpacity = useSharedValue(1);
+  const screenTranslateY = useSharedValue(0);
 
   useEffect(() => {
     loadUserData();
-    // Start entrance animations
-    startEntranceAnimations();
   }, []);
+
+  // Use useFocusEffect to handle screen focus properly
+  useFocusEffect(
+    useCallback(() => {
+      // Reset animation values when screen comes into focus
+      resetAnimationValues();
+      startEntranceAnimations();
+
+      return () => {
+        // Cleanup when screen loses focus
+        setIsExiting(false);
+        setIsNavigating(false);
+      };
+    }, [])
+  );
+
+  const resetAnimationValues = () => {
+    screenOpacity.value = 1;
+    screenTranslateY.value = 0;
+    profileCardOpacity.value = 0;
+    profileCardTranslateY.value = 50;
+    contentOpacity.value = 0;
+    contentTranslateY.value = 40;
+    backButtonOpacity.value = 0;
+    settingsButtonOpacity.value = 0;
+  };
+
+  const startExitAnimation = (callback: () => void) => {
+    if (isExiting) return;
+    setIsExiting(true);
+
+    // Animate screen exit
+    screenOpacity.value = withTiming(0, { duration: 250 });
+    screenTranslateY.value = withTiming(-30, { duration: 250 });
+
+    setTimeout(() => {
+      callback();
+    }, 250);
+  };
 
   const startEntranceAnimations = () => {
     // Animate back button first
     backButtonOpacity.value = withDelay(100, withTiming(1, { duration: 300 }));
-    
+
     // Animate settings button
     settingsButtonOpacity.value = withDelay(200, withTiming(1, { duration: 300 }));
-    
+
     // Animate profile card
     profileCardOpacity.value = withDelay(300, withTiming(1, { duration: 500 }));
     profileCardTranslateY.value = withDelay(300, withSpring(0, { damping: 20, stiffness: 200 }));
-    
-    // Animate tabs
-    tabsOpacity.value = withDelay(600, withTiming(1, { duration: 400 }));
-    tabsTranslateY.value = withDelay(600, withSpring(0, { damping: 15, stiffness: 180 }));
-    
+
     // Animate content
     contentOpacity.value = withDelay(800, withTiming(1, { duration: 400 }));
     contentTranslateY.value = withDelay(800, withSpring(0, { damping: 15, stiffness: 180 }));
@@ -127,10 +154,12 @@ export default function ProfileScreen() {
   const loadUserData = async () => {
     try {
       if (user?.uid) {
-        const userFavorites = await getUserFavorites(user.uid);
-        setFavorites(userFavorites || []);
+        // Load profile and analytics in parallel
+        const [profile, analytics] = await Promise.all([
+          getUserProfile(),
+          getUserAnalytics(user.uid)
+        ]);
 
-        const profile = await getUserProfile();
         if (profile) {
           const profileWithEmail: UserProfile = {
             ...profile,
@@ -147,10 +176,14 @@ export default function ProfileScreen() {
           };
           setUserProfile(basicProfile);
         }
+
+        setUserAnalytics(analytics);
+
+        // Sync analytics in the background
+        syncAnalyticsWithFirebase(user.uid);
       }
     } catch (error) {
       console.error('Error loading user data:', error);
-      setFavorites([]);
     } finally {
       setLoading(false);
     }
@@ -186,12 +219,7 @@ export default function ProfileScreen() {
     };
   });
 
-  const tabsAnimatedStyle = useAnimatedStyle(() => {
-    return {
-      opacity: tabsOpacity.value,
-      transform: [{ translateY: tabsTranslateY.value }],
-    };
-  });
+  // tabsAnimatedStyle removed - no longer using tabs
 
   const contentAnimatedStyle = useAnimatedStyle(() => {
     return {
@@ -236,17 +264,17 @@ export default function ProfileScreen() {
       }
       const result = source === 'camera'
         ? await ImagePicker.launchCameraAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            allowsEditing: true,
-            aspect: [1, 1],
-            quality: 0.7,
-          })
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 0.7,
+        })
         : await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            allowsEditing: true,
-            aspect: [1, 1],
-            quality: 0.7,
-          });
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 0.7,
+        });
       if (!result.canceled && result.assets[0]) {
         await uploadProfileImage(result.assets[0].uri);
       }
@@ -259,17 +287,36 @@ export default function ProfileScreen() {
   const uploadProfileImage = async (imageUri: string) => {
     try {
       setUploading(true);
+
+      // Check if user is authenticated
+      if (!user?.uid) {
+        Alert.alert('Error', 'Please log in to upload profile photo');
+        return;
+      }
+
       const response = await fetch(imageUri);
       const blob = await response.blob();
-      const imageRef = ref(storage, `profile-images/${user?.uid}`);
+
+      // Create a unique filename to avoid conflicts
+      const timestamp = Date.now();
+      const imageRef = ref(storage, `profile-images/${user.uid}_${timestamp}`);
+
       await uploadBytes(imageRef, blob);
       const downloadURL = await getDownloadURL(imageRef);
-      await updateUserProfile(user?.uid!, { photoURL: downloadURL });
+      await updateUserProfile(user.uid, { photoURL: downloadURL });
       await loadUserData();
       Alert.alert('Success', 'Profile photo updated successfully!');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error uploading image:', error);
-      Alert.alert('Info', 'Photo upload will work in APK build');
+
+      if (error.code === 'storage/unauthorized') {
+        Alert.alert(
+          'Upload Permission Error',
+          'Please update Firebase Storage rules to allow profile image uploads. This is a configuration issue, not an Expo vs APK issue.'
+        );
+      } else {
+        Alert.alert('Upload Error', `Failed to upload image: ${error.message}`);
+      }
     } finally {
       setUploading(false);
     }
@@ -303,50 +350,36 @@ export default function ProfileScreen() {
     setTempDisplayName('');
   };
 
-  const removeFavorite = async (index: number) => {
-    const item = favorites[index];
-    Alert.alert(
-      'Remove Favorite',
-      'Are you sure you want to remove this outfit?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              if (item.id && user?.uid) {
-                const success = await removeFavoriteOutfit(user.uid, item.id);
-                if (success) {
-                  const newFavorites = favorites.filter((_, i) => i !== index);
-                  setFavorites(newFavorites);
-                } else {
-                  Alert.alert('Error', 'Failed to remove from database');
-                }
-              } else {
-                const newFavorites = favorites.filter((_, i) => i !== index);
-                setFavorites(newFavorites);
-              }
-            } catch (error) {
-              console.error('Error removing favorite:', error);
-              Alert.alert('Error', 'Failed to remove favorite');
-            }
-          }
-        },
-      ]
-    );
-  };
+  // removeFavorite function removed - no longer using saved outfits
 
   const displayName = userProfile?.displayName || user?.displayName || 'Fashion Enthusiast';
   const profileImageUrl = userProfile?.photoURL || user?.photoURL ||
     `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=6366f1&color=fff&size=120`;
 
-  const savedCount = favorites.length;
-  const totalOutfits = userProfile?.viewHistory?.length || savedCount;
-  const sharedCount = userProfile?.sharedOutfits?.length || 0;
+  // Dynamic stats from analytics service
+  const totalOutfits = userAnalytics?.aiRequestsCount || 0;
+  const sharedCount = userAnalytics?.sharedOutfitsCount || 0;
+
+  const screenAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: screenOpacity.value,
+    transform: [{ translateY: screenTranslateY.value }],
+  }));
+
+  // Don't render anything until data is loaded to prevent lag
+  if (loading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: theme.background, justifyContent: 'center', alignItems: 'center' }}>
+        <StatusBar barStyle={theme.background === '#18181b' ? "light-content" : "dark-content"} backgroundColor={theme.primary} />
+        <Ionicons name="sparkles" size={48} color={theme.primary} />
+        <Text style={{ color: theme.text, fontSize: 18, fontWeight: '600', marginTop: 16 }}>
+          Loading your profile...
+        </Text>
+      </View>
+    );
+  }
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.background }}>
+    <Animated.View style={[{ flex: 1, backgroundColor: theme.background }, screenAnimatedStyle]}>
       <StatusBar barStyle={theme.background === '#18181b' ? "light-content" : "dark-content"} backgroundColor={theme.primary} />
       {/* Back Button */}
       <Animated.View style={[
@@ -358,7 +391,14 @@ export default function ProfileScreen() {
         },
         backButtonAnimatedStyle
       ]}>
-        <TouchableOpacity onPress={() => router.back()} style={{
+        <TouchableOpacity onPress={() => {
+          if (isNavigating || isExiting) return;
+          setIsNavigating(true);
+          startExitAnimation(() => {
+            router.back();
+            setTimeout(() => setIsNavigating(false), 500);
+          });
+        }} style={{
           backgroundColor: theme.card,
           borderRadius: 20,
           padding: 8,
@@ -480,8 +520,12 @@ export default function ProfileScreen() {
                   {/* --- EDIT PROFILE BUTTON --- */}
                   <TouchableOpacity
                     onPress={() => {
-                       if (!userProfile || !userProfile.uid) return;
-                      router.push(`/profile-edit/${userProfile.uid}`);
+                      if (isNavigating || isExiting || !userProfile || !userProfile.uid) return;
+                      setIsNavigating(true);
+                      startExitAnimation(() => {
+                        router.push(`/profile-edit/${userProfile.uid}`);
+                        setTimeout(() => setIsNavigating(false), 500);
+                      });
                     }}
                     style={{
                       marginLeft: 12,
@@ -567,7 +611,7 @@ export default function ProfileScreen() {
                   </Text>
                 </View>
               </View>
-              {/* City & Preferred Style */}
+              {/* City & Gender */}
               <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                   <Ionicons name="location-outline" size={18} color={theme.primary} />
@@ -581,204 +625,116 @@ export default function ProfileScreen() {
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                   <Ionicons name="shirt-outline" size={18} color={theme.primary} />
                   <Text style={{ marginLeft: 6, color: theme.text, fontWeight: 'bold' }}>
-                    Style:
+                    Gender:
                   </Text>
                   <Text style={{ marginLeft: 4, color: theme.textSecondary }}>
-                    {userProfile?.preferredStyle || '—'}
+                    {userProfile?.gender || '—'}
                   </Text>
                 </View>
               </View>
             </View>
             {/* Stats */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-              <View style={{ alignItems: 'center', paddingHorizontal: 20 }}>
-                <Text style={{ fontSize: 20, fontWeight: 'bold', color: theme.primary }}>{savedCount}</Text>
-                <Text style={{ fontSize: 12, color: theme.textSecondary, marginTop: 2 }}>Saved</Text>
-              </View>
-              <View style={{ width: 1, height: 30, backgroundColor: theme.borderLight, opacity: 0.3 }} />
-              <View style={{ alignItems: 'center', paddingHorizontal: 20 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12, justifyContent: 'center' }}>
+              <View style={{ alignItems: 'center', paddingHorizontal: 30 }}>
                 <Text style={{ fontSize: 20, fontWeight: 'bold', color: theme.primary }}>{totalOutfits}</Text>
-                <Text style={{ fontSize: 12, color: theme.textSecondary, marginTop: 2 }}>Viewed</Text>
+                <Text style={{ fontSize: 12, color: theme.textSecondary, marginTop: 2 }}>AI Requests</Text>
               </View>
               <View style={{ width: 1, height: 30, backgroundColor: theme.borderLight, opacity: 0.3 }} />
-              <View style={{ alignItems: 'center', paddingHorizontal: 20 }}>
+              <View style={{ alignItems: 'center', paddingHorizontal: 30 }}>
                 <Text style={{ fontSize: 20, fontWeight: 'bold', color: theme.primary }}>{sharedCount}</Text>
                 <Text style={{ fontSize: 12, color: theme.textSecondary, marginTop: 2 }}>Shared</Text>
               </View>
             </View>
           </View>
         </Animated.View>
-        {/* Tabs */}
+        {/* AI Fashion Section */}
         <Animated.View style={[
           {
-            flexDirection: 'row',
             backgroundColor: theme.card,
             marginHorizontal: 20,
             marginTop: 24,
-            borderRadius: 12,
-            padding: 4,
+            borderRadius: 16,
+            padding: 20,
             shadowColor: theme.shadow,
             shadowOffset: { width: 0, height: 2 },
             shadowOpacity: 0.1,
             shadowRadius: 8,
             elevation: 4,
           },
-          tabsAnimatedStyle
+          contentAnimatedStyle
         ]}>
-          <TouchableOpacity
-            style={[
-              { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: 8 },
-              activeTab === 'favorites' && { backgroundColor: theme.background }
-            ]}
-            onPress={() => setActiveTab('favorites')}
-          >
-            <Ionicons
-              name="heart"
-              size={20}
-              color={activeTab === 'favorites' ? theme.primary : theme.textTertiary}
-            />
-            <Text style={[
-              { marginLeft: 8, fontSize: 16, fontWeight: '500' },
-              activeTab === 'favorites' && { color: theme.primary }
-            ]}>
-              Favorites
+          <View style={{ alignItems: 'center', paddingVertical: 20 }}>
+            <Ionicons name="sparkles" size={64} color={theme.primary} />
+            <Text style={{ fontSize: 24, fontWeight: 'bold', color: theme.text, marginTop: 16, marginBottom: 8 }}>
+              AI Fashion Assistant
             </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: 8 },
-              activeTab === 'history' && { backgroundColor: theme.background }
-            ]}
-            onPress={() => setActiveTab('history')}
-          >
-            <Ionicons
-              name="time"
-              size={20}
-              color={activeTab === 'history' ? theme.primary : theme.textTertiary}
-            />
-            <Text style={[
-              { marginLeft: 8, fontSize: 16, fontWeight: '500' },
-              activeTab === 'history' && { color: theme.primary }
-            ]}>
-              History
+            <Text style={{ fontSize: 16, color: theme.textSecondary, textAlign: 'center', marginBottom: 24, lineHeight: 24 }}>
+              Get personalized outfit recommendations powered by AI. Upload venue photos or describe your occasion to receive tailored style advice.
             </Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={{
+                backgroundColor: theme.primary,
+                paddingHorizontal: 32,
+                paddingVertical: 16,
+                borderRadius: 25,
+                shadowColor: theme.primary,
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.3,
+                shadowRadius: 8,
+                elevation: 6,
+              }}
+              onPress={() => {
+                if (isNavigating || isExiting) return;
+                setIsNavigating(true);
+                startExitAnimation(() => {
+                  router.push('/fashion');
+                  setTimeout(() => setIsNavigating(false), 500);
+                });
+              }}
+            >
+              <Text style={{ color: '#fff', fontSize: 18, fontWeight: '600' }}>Explore AI Fashion</Text>
+            </TouchableOpacity>
+          </View>
         </Animated.View>
-        {/* Content */}
-        {activeTab === 'favorites' && (
-          <Animated.View style={[
-            { paddingHorizontal: 20, marginTop: 20 },
-            contentAnimatedStyle
-          ]}>
-            {loading ? (
-              <View style={{ alignItems: 'center', paddingVertical: 60 }}>
-                <Text style={{ fontSize: 16, color: theme.textSecondary }}>Loading your style...</Text>
-              </View>
-            ) : favorites.length > 0 ? (
-              favorites.map((item: any, index: number) => (
-                <View
-                  key={`${item.categorySlug}-${index}`}
-                  style={{
-                    marginBottom: 16,
-                    borderRadius: 16,
-                    overflow: 'hidden',
-                    backgroundColor: theme.card,
-                    borderColor: theme.borderLight,
-                    borderWidth: 1,
-                    shadowColor: theme.shadow,
-                    shadowOffset: { width: 0, height: 2 },
-                    shadowOpacity: 0.1,
-                    shadowRadius: 8,
-                    elevation: 3,
-                  }}
-                >
-                  <LinearGradient
-                    colors={[theme.card, theme.background]}
-                    style={{ padding: 16 }}
-                  >
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                      <View style={{ backgroundColor: theme.primary, paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12 }}>
-                        <Text style={{ color: '#fff', fontSize: 12, fontWeight: '600' }}>
-                          {item.category || 'Fashion'}
-                        </Text>
-                      </View>
-                      <TouchableOpacity onPress={() => removeFavorite(index)}>
-                        <Ionicons name="heart" size={20} color={theme.error} />
-                      </TouchableOpacity>
-                    </View>
-                    <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.text, marginBottom: 4 }}>
-                      {item.name || 'Stylish Outfit'}
-                    </Text>
-                    <Text style={{ fontSize: 14, color: theme.textSecondary, marginBottom: 16 }}>
-                      {item.items || 'Fashion Items'}
-                    </Text>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Text style={{ fontSize: 16, fontWeight: 'bold', color: theme.success }}>
-                        {item.price || '₹500-1000'}
-                      </Text>
-                      <TouchableOpacity style={{ backgroundColor: theme.primary, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 }}>
-                        <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600' }}>Try Again</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </LinearGradient>
-                </View>
-              ))
-            ) : (
-              <View style={{ alignItems: 'center', paddingVertical: 60, paddingHorizontal: 40 }}>
-                <Ionicons name="heart-outline" size={64} color={theme.textTertiary} />
-                <Text style={{ fontSize: 20, fontWeight: 'bold', color: theme.text, marginTop: 16, marginBottom: 8 }}>No Saved Outfits</Text>
-                <Text style={{ fontSize: 16, color: theme.textSecondary, textAlign: 'center', marginBottom: 24 }}>
-                  Start exploring and save your favorite looks!
-                </Text>
-                <TouchableOpacity
-                  style={{ backgroundColor: theme.primary, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 }}
-                  onPress={() => router.push('/fashion')}
-                >
-                  <Text style={{ color: '#fff', fontSize: 16, fontWeight: '600' }}>Explore Fashion</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </Animated.View>
-        )}
-        {activeTab === 'history' && (
-          <Animated.View style={[
-            { alignItems: 'center', paddingVertical: 60, paddingHorizontal: 40, marginTop: 20 },
-            contentAnimatedStyle
-          ]}>
-            <Ionicons name="time-outline" size={64} color={theme.textTertiary} />
-            <Text style={{ fontSize: 20, fontWeight: 'bold', color: theme.text, marginTop: 16, marginBottom: 8 }}>Coming Soon</Text>
-            <Text style={{ fontSize: 16, color: theme.textSecondary, textAlign: 'center', marginBottom: 24 }}>
-              Your fashion history will appear here
-            </Text>
-          </Animated.View>
-        )}
-      </ScrollView>
-      {/* Settings Icon */}
-      <Animated.View style={[
-        {
-          position: 'absolute',
-          top: insets.top + 16,
-          right: 16,
-          zIndex: 100,
-        },
-        settingsButtonAnimatedStyle
-      ]}>
-        <TouchableOpacity
-          style={{
+
+        {/* Settings Section */}
+        <Animated.View style={[
+          {
             backgroundColor: theme.card,
-            borderRadius: 20,
-            padding: 8,
+            marginHorizontal: 20,
+            marginTop: 20,
+            borderRadius: 16,
+            padding: 20,
             shadowColor: theme.shadow,
             shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.15,
+            shadowOpacity: 0.1,
             shadowRadius: 8,
             elevation: 4,
-          }}
-          onPress={handleLogout}
-        >
-          <Ionicons name="settings-outline" size={24} color={theme.primary} />
-        </TouchableOpacity>
-      </Animated.View>
-    </View>
+          },
+          contentAnimatedStyle
+        ]}>
+          <TouchableOpacity
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingVertical: 16,
+              borderBottomWidth: 1,
+              borderBottomColor: theme.borderLight,
+            }}
+            onPress={handleLogout}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Ionicons name="log-out-outline" size={24} color={theme.error} />
+              <Text style={{ marginLeft: 12, fontSize: 16, fontWeight: '500', color: theme.text }}>
+                Logout
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={theme.textTertiary} />
+          </TouchableOpacity>
+        </Animated.View>
+      </ScrollView>
+
+    </Animated.View>
   );
 }

@@ -3,12 +3,12 @@ module.exports = function (api) {
   api.cache(true);
   return {
     presets: [
-      ["babel-preset-expo", { jsxImportSource: "nativewind" }],
-      "nativewind/babel",
+      "babel-preset-expo",
+      "@babel/preset-typescript"
     ],
     plugins: [
       'react-native-reanimated/plugin', // ← Add this line
-        ['module:react-native-dotenv']
+      ['module:react-native-dotenv']
     ],
   };
 };

@@ -5,19 +5,22 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  Animated,
-  Dimensions,
-  Easing,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  View
+    Alert,
+    Animated,
+    Dimensions,
+    Easing,
+    Modal,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
-import { getUserProfile } from '../services/userService';
+import { getUserProfile, updateUserProfile } from '../services/userService';
 
 const { width: screenWidth } = Dimensions.get('window');
 const getResponsiveSize = (size: number) => (screenWidth / 375) * size;
@@ -29,24 +32,26 @@ const getResponsiveFontSize = (size: number) => {
 
 const categoriesByGender = {
   male: [
+    { id: 0, name: "Today's Outfit", icon: '🌤️', colors: ['#FF6B35', '#F7931E'], trend: 'Weather', description: 'Perfect for today' },
     { id: 1, name: 'Street Style', icon: '🕶️', colors: ['#667eea', '#764ba2'], trend: 'Hot', description: 'Urban vibes' },
     { id: 2, name: 'Formal Wear', icon: '👔', colors: ['#2c3e50', '#34495e'], trend: 'Classic', description: 'Professional look' },
     { id: 3, name: 'Gym Wear', icon: '💪', colors: ['#ff6b6b', '#ee5a24'], trend: 'Trending', description: 'Fitness first' },
     { id: 4, name: 'Date Night', icon: '💕', colors: ['#ff9ff3', '#f368e0'], trend: 'Popular', description: 'Romance ready' },
     { id: 5, name: 'Party Wear', icon: '🎉', colors: ['#feca57', '#ff9ff3'], trend: 'Hot', description: 'Party perfect' },
     { id: 6, name: 'Old Money', icon: '💎', colors: ['#3c6382', '#40739e'], trend: 'Luxury', description: 'Timeless elegance' },
-{ id: 7, name: 'Twinning', icon: '👫', colors: ['#ff6b9d', '#c44569'], trend: 'New', description: 'Couple goals' },
+    { id: 7, name: 'Twinning', icon: '👫', colors: ['#ff6b9d', '#c44569'], trend: 'New', description: 'Couple goals' },
     { id: 8, name: 'Make Me an Outfit', icon: '👗', colors: ['#ff9ff3', '#f368e0'], trend: 'Custom', description: 'Create your look' },
     { id: 9, name: 'Upload Aesthetic', icon: '🎨', colors: ['#667eea', '#764ba2'], trend: 'Trendy', description: 'Style for venues' }
   ],
   female: [
+    { id: 0, name: "Today's Outfit", icon: '🌤️', colors: ['#FF6B35', '#F7931E'], trend: 'Weather', description: 'Perfect for today' },
     { id: 1, name: 'Street Style', icon: '👗', colors: ['#667eea', '#764ba2'], trend: 'Hot', description: 'Chic & edgy' },
     { id: 2, name: 'Office Wear', icon: '👩‍💼', colors: ['#2c3e50', '#34495e'], trend: 'Classic', description: 'Boss babe' },
     { id: 3, name: 'Gym Wear', icon: '🏃‍♀️', colors: ['#ff6b6b', '#ee5a24'], trend: 'Trending', description: 'Fit & fabulous' },
     { id: 4, name: 'Date Night', icon: '💃', colors: ['#ff9ff3', '#f368e0'], trend: 'Popular', description: 'Date ready' },
     { id: 5, name: 'Party Wear', icon: '✨', colors: ['#feca57', '#ff9ff3'], trend: 'Hot', description: 'Sparkle & shine' },
     { id: 6, name: 'Elegant', icon: '👑', colors: ['#3c6382', '#40739e'], trend: 'Luxury', description: 'Royal vibes' },
-{ id: 7, name: 'Twinning', icon: '👫', colors: ['#ff6b9d', '#c44569'], trend: 'New', description: 'Match made' },
+    { id: 7, name: 'Twinning', icon: '👫', colors: ['#ff6b9d', '#c44569'], trend: 'New', description: 'Match made' },
     { id: 8, name: 'Make Me an Outfit', icon: '👗', colors: ['#ff9ff3', '#f368e0'], trend: 'Custom', description: 'Create your look' },
     { id: 9, name: 'Upload Aesthetic', icon: '🎨', colors: ['#667eea', '#764ba2'], trend: 'Trendy', description: 'Style for venues' }
   ]
@@ -99,13 +104,13 @@ const ScrollSafeTouchable = ({ onPress, onLongPress, children, style }: any) => 
   const timeThreshold = 300;
   const longPressThreshold = 500;
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
-  
+
   const handleTouchStart = (e: any) => {
     const { pageX, pageY } = e.nativeEvent;
     setTouchStart({ x: pageX, y: pageY, time: Date.now() });
     setIsValidTap(true);
     setLongPressTriggered(false);
-    
+
     if (onLongPress) {
       longPressTimer.current = setTimeout(() => {
         if (isValidTap && !longPressTriggered) {
@@ -115,7 +120,7 @@ const ScrollSafeTouchable = ({ onPress, onLongPress, children, style }: any) => 
       }, longPressThreshold);
     }
   };
-  
+
   const handleTouchMove = (e: any) => {
     if (!isValidTap) return;
     const { pageX, pageY } = e.nativeEvent;
@@ -129,13 +134,13 @@ const ScrollSafeTouchable = ({ onPress, onLongPress, children, style }: any) => 
       }
     }
   };
-  
+
   const handleTouchEnd = () => {
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current);
       longPressTimer.current = null;
     }
-    
+
     const duration = Date.now() - touchStart.time;
     if (isValidTap && !longPressTriggered && duration < timeThreshold && duration > 50) {
       onPress();
@@ -197,7 +202,7 @@ const ScrollSafeCategoryCard = ({
 
   const handleLongPress = async () => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-    
+
     // Pulse animation
     Animated.sequence([
       Animated.timing(pulseValue, {
@@ -270,8 +275,8 @@ const ScrollSafeCategoryCard = ({
   };
   return (
     <Animated.View style={[styles.categoryCard, animatedStyle]}>
-      <ScrollSafeTouchable 
-        onPress={handleValidPress} 
+      <ScrollSafeTouchable
+        onPress={handleValidPress}
         onLongPress={handleLongPress}
         style={styles.touchableCard}
       >
@@ -284,7 +289,7 @@ const ScrollSafeCategoryCard = ({
           <View style={styles.floatingElements}>
             <Animated.View style={[styles.floatingDot, styles.dot1, { opacity: shimmerOpacity }]} />
             <Animated.View style={[styles.floatingDot, styles.dot2, { opacity: shimmerOpacity }]} />
-            <Animated.View 
+            <Animated.View
               style={[styles.shimmerOverlay, {
                 opacity: shimmerValue.interpolate({
                   inputRange: [0, 0.5, 1],
@@ -324,11 +329,17 @@ export default function Fashion() {
   const insets = useSafeAreaInsets();
   const [selectedGender, setSelectedGender] = useState<'male' | 'female'>('male');
   const [userProfile, setUserProfile] = useState<any>(null);
+  const [isNavigating, setIsNavigating] = useState(false);
+  const [isExiting, setIsExiting] = useState(false);
+  const [showGenderPrompt, setShowGenderPrompt] = useState(false);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
 
   // Animations
   const animatedValue = useRef(new Animated.Value(0)).current;
   const headerOpacity = useRef(new Animated.Value(0)).current;
   const welcomeScale = useRef(new Animated.Value(0.8)).current;
+  const contentSlideAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(1)).current;
 
   const userName = userProfile?.displayName ||
     user?.displayName ||
@@ -343,21 +354,91 @@ export default function Fashion() {
 
   useFocusEffect(
     React.useCallback(() => {
+      // Ensure header is visible immediately when screen comes into focus
+      headerOpacity.setValue(1);
+      // Reset other animation values
+      fadeAnim.setValue(1);
+      contentSlideAnim.setValue(0);
+      welcomeScale.setValue(1);
+      
       loadUserProfile();
-      startEntranceAnimations();
+
+      return () => {
+        // Cleanup when screen loses focus
+        setIsExiting(false);
+        setIsNavigating(false);
+      };
     }, [])
   );
 
+  const resetAnimationValues = () => {
+    fadeAnim.setValue(1);
+    contentSlideAnim.setValue(0);
+    headerOpacity.setValue(1); // Keep header visible
+    welcomeScale.setValue(0.8);
+  };
+
   const loadUserProfile = async () => {
     try {
+      setIsLoadingProfile(true);
       const profile = await getUserProfile();
-      if (profile) setUserProfile(profile);
+      if (profile) {
+        setUserProfile(profile);
+        // Set gender based on user profile BEFORE showing UI
+        if (profile.gender) {
+          const userGender = profile.gender.toLowerCase();
+          if (userGender === 'male' || userGender === 'female') {
+            setSelectedGender(userGender as 'male' | 'female');
+          } else {
+            // If gender is 'Other', show prompt to choose
+            setShowGenderPrompt(true);
+          }
+        } else {
+          // No gender in profile, show prompt
+          setShowGenderPrompt(true);
+        }
+      } else {
+        setShowGenderPrompt(true);
+      }
     } catch (error) {
       console.error('Error loading user profile:', error);
+      setShowGenderPrompt(true);
+    } finally {
+      setIsLoadingProfile(false);
     }
   };
 
+  const startExitAnimation = (callback: () => void) => {
+    if (isExiting) return;
+    setIsExiting(true);
+
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: true,
+      }),
+      Animated.timing(contentSlideAnim, {
+        toValue: -30,
+        duration: 250,
+        easing: Easing.in(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.timing(headerOpacity, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      callback();
+    });
+  };
+
   const startEntranceAnimations = () => {
+    // Reset values for entrance
+    fadeAnim.setValue(1);
+    contentSlideAnim.setValue(0);
+
     Animated.parallel([
       Animated.timing(headerOpacity, {
         toValue: 1,
@@ -393,19 +474,44 @@ export default function Fashion() {
   };
 
   const handleCategoryPress = (categoryName: string) => {
-    if (categoryName === 'Make Me an Outfit') {
-      router.push('/make-outfit');
-      return;
-    }
-    if (categoryName === 'Upload Aesthetic') {
-      router.push('/upload-aesthetic');
-      return;
-    }
-    const categorySlug = `${selectedGender}-${categoryName.toLowerCase().replace(/\s+/g, '-')}`;
-    router.push(`/category/${categorySlug}`);
+    if (isNavigating || isExiting) return; // Prevent double-tap
+    setIsNavigating(true);
+
+    startExitAnimation(() => {
+      if (categoryName === 'Make Me an Outfit') {
+        router.push('/make-outfit');
+      } else if (categoryName === 'Upload Aesthetic') {
+        router.push('/upload-aesthetic');
+      } else if (categoryName === "Today's Outfit") {
+        router.push('/todays-outfit');
+      } else if (categoryName === 'Twinning') {
+        router.push('/twinning');
+      } else {
+        const categorySlug = `${selectedGender}-${categoryName.toLowerCase().replace(/\s+/g, '-')}`;
+        router.push(`/category/${categorySlug}`);
+      }
+      setTimeout(() => setIsNavigating(false), 500);
+    });
   };
 
   const handleGenderChange = (gender: 'male' | 'female') => setSelectedGender(gender);
+
+  const handleGenderSelection = async (gender: 'male' | 'female') => {
+    try {
+      setSelectedGender(gender);
+      setShowGenderPrompt(false);
+
+      // Update user profile with selected gender
+      if (user?.uid) {
+        await updateUserProfile(user.uid, { gender: gender === 'male' ? 'Male' : 'Female' });
+        // Reload profile to get updated data
+        await loadUserProfile();
+      }
+    } catch (error) {
+      console.error('Error updating gender:', error);
+      Alert.alert('Error', 'Failed to save gender preference. Please try again.');
+    }
+  };
 
   // DYNAMIC BACKGROUND COLORS (theme-based)
   const backgroundColor1 = animatedValue.interpolate({
@@ -421,9 +527,42 @@ export default function Fashion() {
     ],
   });
 
+  // Show loading screen while profile is loading to prevent gender toggle flash
+  if (isLoadingProfile) {
+    return (
+      <View style={[styles.safeArea, { backgroundColor: theme.background, paddingTop: insets.top }]}>
+        <StatusBar barStyle={theme.background === '#0f172a' ? "light-content" : "dark-content"} backgroundColor={theme.background} />
+        <View style={styles.loadingContainer}>
+          <View style={[styles.loadingCard, { backgroundColor: theme.card }]}>
+            <Text style={styles.loadingIcon}>✨</Text>
+            <Text style={[styles.loadingText, { color: theme.text }]}>Loading Fashion Categories</Text>
+            <View style={[styles.loadingBar, { backgroundColor: theme.borderLight }]}>
+              <Animated.View 
+                style={[
+                  styles.loadingProgress, 
+                  { backgroundColor: theme.primary }
+                ]} 
+              />
+            </View>
+          </View>
+        </View>
+      </View>
+    );
+  }
+
   return (
-    <View style={[styles.safeArea, { backgroundColor: theme.background, paddingTop: insets.top }]}>
-      <StatusBar barStyle={theme.background === '#18181b' ? "light-content" : "dark-content"} backgroundColor={theme.background} />
+    <Animated.View
+      style={[
+        styles.safeArea,
+        {
+          backgroundColor: theme.background,
+          paddingTop: insets.top,
+          opacity: fadeAnim,
+          transform: [{ translateY: contentSlideAnim }]
+        }
+      ]}
+    >
+      <StatusBar barStyle={theme.background === '#0f172a' ? "light-content" : "dark-content"} backgroundColor={theme.background} />
       <Animated.View style={[styles.container, { backgroundColor: backgroundColor1 }]}>
         <Animated.View style={[styles.header, { opacity: headerOpacity }]}>
           <View style={styles.headerBackground}>
@@ -431,15 +570,20 @@ export default function Fashion() {
               <ScrollSafeTouchable
                 style={styles.backButton}
                 onPress={async () => {
+                  if (isNavigating || isExiting) return;
+                  setIsNavigating(true);
                   await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  router.back();
+                  startExitAnimation(() => {
+                    router.back();
+                    setTimeout(() => setIsNavigating(false), 500);
+                  });
                 }}
               >
                 <LinearGradient
-                  colors={[theme.primary + '11', theme.secondary + '11']}
+                  colors={[theme.card, 'rgba(255,255,255,0.9)']}
                   style={styles.backButtonGradient}
                 >
-                  <Ionicons name="arrow-back" size={getResponsiveSize(24)} color={theme.primary} />
+                  <Ionicons name="arrow-back" size={getResponsiveSize(24)} color={theme.text} />
                 </LinearGradient>
               </ScrollSafeTouchable>
               <View style={styles.headerTitleContainer}>
@@ -460,52 +604,54 @@ export default function Fashion() {
           removeClippedSubviews={true}
           keyboardShouldPersistTaps="handled"
         >
-          {/* GENDER TOGGLE */}
-          <View style={styles.genderToggleContainer}>
-            <LinearGradient
-              colors={[theme.card, theme.background]}
-              style={styles.genderToggle}
-            >
-              <ScrollSafeTouchable
-                style={[
-                  styles.toggleButton,
-                  selectedGender === 'male'
-                    ? { backgroundColor: theme.primary }
-                    : { backgroundColor: theme.card }
-                ]}
-                onPress={async () => {
-                  await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  handleGenderChange('male');
-                }}
+          {/* GENDER TOGGLE - Only show if user has 'Other' gender or wants to switch */}
+          {(userProfile?.gender === 'Other' || !userProfile?.gender) && (
+            <View style={styles.genderToggleContainer}>
+              <LinearGradient
+                colors={[theme.card, theme.background]}
+                style={styles.genderToggle}
               >
-                <Text style={{
-                  color: selectedGender === 'male' ? '#fff' : theme.text,
-                  fontWeight: 'bold'
-                }}>
-                  👨 Men
-                </Text>
-              </ScrollSafeTouchable>
-              <ScrollSafeTouchable
-                style={[
-                  styles.toggleButton,
-                  selectedGender === 'female'
-                    ? { backgroundColor: theme.primary }
-                    : { backgroundColor: theme.card }
-                ]}
-                onPress={async () => {
-                  await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  handleGenderChange('female');
-                }}
-              >
-                <Text style={{
-                  color: selectedGender === 'female' ? '#fff' : theme.text,
-                  fontWeight: 'bold'
-                }}>
-                  👩 Women
-                </Text>
-              </ScrollSafeTouchable>
-            </LinearGradient>
-          </View>
+                <ScrollSafeTouchable
+                  style={[
+                    styles.toggleButton,
+                    selectedGender === 'male'
+                      ? { backgroundColor: theme.primary }
+                      : { backgroundColor: theme.card }
+                  ]}
+                  onPress={async () => {
+                    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    handleGenderChange('male');
+                  }}
+                >
+                  <Text style={{
+                    color: selectedGender === 'male' ? '#fff' : theme.text,
+                    fontWeight: 'bold'
+                  }}>
+                    👨 Men
+                  </Text>
+                </ScrollSafeTouchable>
+                <ScrollSafeTouchable
+                  style={[
+                    styles.toggleButton,
+                    selectedGender === 'female'
+                      ? { backgroundColor: theme.primary }
+                      : { backgroundColor: theme.card }
+                  ]}
+                  onPress={async () => {
+                    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    handleGenderChange('female');
+                  }}
+                >
+                  <Text style={{
+                    color: selectedGender === 'female' ? '#fff' : theme.text,
+                    fontWeight: 'bold'
+                  }}>
+                    👩 Women
+                  </Text>
+                </ScrollSafeTouchable>
+              </LinearGradient>
+            </View>
+          )}
           {/* WELCOME TEXT */}
           <Animated.View style={[styles.welcomeContainer, { transform: [{ scale: welcomeScale }] }]}>
             <Text style={[styles.welcomeText, { color: theme.text }]}>Hi {userName}! 👋</Text>
@@ -525,7 +671,60 @@ export default function Fashion() {
           <View style={styles.bottomSpacing} />
         </ScrollView>
       </Animated.View>
-    </View>
+
+      {/* Gender Selection Modal */}
+      <Modal
+        visible={showGenderPrompt}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => { }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: theme.card }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: theme.text }]}>Choose Your Style</Text>
+              <Text style={[styles.modalSubtitle, { color: theme.textSecondary }]}>
+                Select your preferred fashion category to get personalized recommendations
+              </Text>
+            </View>
+
+            <View style={styles.genderOptions}>
+              <TouchableOpacity
+                style={[styles.genderOption, { borderColor: theme.border }]}
+                onPress={() => handleGenderSelection('male')}
+              >
+                <LinearGradient
+                  colors={['#667eea', '#764ba2']}
+                  style={styles.genderOptionGradient}
+                >
+                  <Text style={styles.genderOptionIcon}>👨</Text>
+                  <Text style={styles.genderOptionText}>Men's Fashion</Text>
+                  <Text style={styles.genderOptionDesc}>Suits, streetwear, casual & more</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.genderOption, { borderColor: theme.border }]}
+                onPress={() => handleGenderSelection('female')}
+              >
+                <LinearGradient
+                  colors={['#ff9ff3', '#f368e0']}
+                  style={styles.genderOptionGradient}
+                >
+                  <Text style={styles.genderOptionIcon}>👩</Text>
+                  <Text style={styles.genderOptionText}>Women's Fashion</Text>
+                  <Text style={styles.genderOptionDesc}>Dresses, chic styles, elegant & more</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={[styles.modalNote, { color: theme.textTertiary }]}>
+              You can change this anytime in your profile settings
+            </Text>
+          </View>
+        </View>
+      </Modal>
+    </Animated.View>
   );
 }
 
@@ -552,10 +751,18 @@ const styles = StyleSheet.create({
   backButton: {
     borderRadius: getResponsiveSize(15),
     overflow: 'hidden',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   backButtonGradient: {
     padding: getResponsiveSize(12),
     borderRadius: getResponsiveSize(15),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: 'rgba(203, 213, 225, 0.3)',
   },
   headerTitleContainer: { alignItems: 'center', flex: 1 },
   headerTitle: {
@@ -585,7 +792,12 @@ const styles = StyleSheet.create({
     borderRadius: getResponsiveSize(25),
     padding: getResponsiveSize(6),
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.5)',
+    borderColor: 'rgba(203, 213, 225, 0.8)',
+    shadowColor: '#64748b',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   toggleButton: {
     flex: 1,
@@ -703,4 +915,111 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   bottomSpacing: { height: getResponsiveSize(30) },
+
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: getResponsiveSize(20),
+  },
+  modalContent: {
+    borderRadius: getResponsiveSize(20),
+    padding: getResponsiveSize(24),
+    width: '100%',
+    maxWidth: getResponsiveSize(400),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  modalHeader: {
+    alignItems: 'center',
+    marginBottom: getResponsiveSize(24),
+  },
+  modalTitle: {
+    fontSize: getResponsiveFontSize(24),
+    fontWeight: 'bold',
+    marginBottom: getResponsiveSize(8),
+  },
+  modalSubtitle: {
+    fontSize: getResponsiveFontSize(14),
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  genderOptions: {
+    gap: getResponsiveSize(16),
+    marginBottom: getResponsiveSize(20),
+  },
+  genderOption: {
+    borderRadius: getResponsiveSize(16),
+    overflow: 'hidden',
+    borderWidth: 1,
+  },
+  genderOptionGradient: {
+    padding: getResponsiveSize(20),
+    alignItems: 'center',
+  },
+  genderOptionIcon: {
+    fontSize: getResponsiveFontSize(40),
+    marginBottom: getResponsiveSize(8),
+  },
+  genderOptionText: {
+    fontSize: getResponsiveFontSize(18),
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: getResponsiveSize(4),
+  },
+  genderOptionDesc: {
+    fontSize: getResponsiveFontSize(12),
+    color: 'rgba(255,255,255,0.9)',
+    textAlign: 'center',
+  },
+  modalNote: {
+    fontSize: getResponsiveFontSize(12),
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  
+  // Loading styles
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: getResponsiveSize(20),
+  },
+  loadingCard: {
+    padding: getResponsiveSize(32),
+    borderRadius: getResponsiveSize(20),
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 6,
+    minWidth: getResponsiveSize(200),
+  },
+  loadingIcon: {
+    fontSize: getResponsiveFontSize(48),
+    marginBottom: getResponsiveSize(16),
+  },
+  loadingText: {
+    fontSize: getResponsiveFontSize(18),
+    fontWeight: '600',
+    marginBottom: getResponsiveSize(20),
+    textAlign: 'center',
+  },
+  loadingBar: {
+    width: getResponsiveSize(150),
+    height: 4,
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  loadingProgress: {
+    height: '100%',
+    width: '70%',
+    borderRadius: 2,
+  },
 });

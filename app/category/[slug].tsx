@@ -1,37 +1,34 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  Dimensions,
-  FlatList,
-  RefreshControl,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Dimensions,
+    RefreshControl,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import Animated, {
-  runOnJS,
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-  withTiming,
+    useAnimatedStyle,
+    useSharedValue,
+    withSpring,
+    withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AIAdviceCard from '../../components/AIAdviceCard';
-import AIAdviceModal from '../../components/AIAdviceModal';
+import OutfitCard from '../../components/OutfitCard';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import categoryData from '../../data/categoryData';
+import { getOutfitSuggestions, OutfitSuggestion } from '../../services/outfitService';
 import {
-  getUserFavorites,
-  getUserProfile,
-  removeFavoriteOutfit,
-  saveFavoriteOutfit,
+    getUserProfile
 } from '../../services/userService';
 
 // Responsive utilities
@@ -43,7 +40,7 @@ const getResponsiveFontSize = (size: number) => {
   return Math.max(12, Math.min(newSize, size * 1.3));
 };
 
-const PAGE_SIZE = 5;
+// PAGE_SIZE removed - no longer needed without dummy outfits
 
 export default function CategoryScreen() {
   const { theme } = useTheme();
@@ -52,24 +49,30 @@ export default function CategoryScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
-  // User profile & favorites state
+  // User profile state
   const [userProfile, setUserProfile] = useState<any | null>(null);
-  const [userFavorites, setUserFavorites] = useState<any[]>([]);
   const [loadingProfile, setLoadingProfile] = useState(true);
 
   // Advice state
   const [adviceData, setAdviceData] = useState<any[] | null>(null);
   const [loadingAdvice, setLoadingAdvice] = useState(true);
   const [adviceError, setAdviceError] = useState(false);
-  const [adviceModalVisible, setAdviceModalVisible] = useState(false);
 
-  // Pagination state
-  const [outfitPage, setOutfitPage] = useState(1);
+
+  // Outfit suggestions state
+  const [outfitSuggestions, setOutfitSuggestions] = useState<OutfitSuggestion[]>([]);
+  const [loadingOutfits, setLoadingOutfits] = useState(false);
+  const [outfitError, setOutfitError] = useState(false);
+
+  // State
   const [refreshing, setRefreshing] = useState(false);
+  const [isExiting, setIsExiting] = useState(false);
 
   // Animation values
   const fadeAnim = useSharedValue(0);
   const slideAnim = useSharedValue(50);
+  const screenOpacity = useSharedValue(1);
+  const screenTranslateY = useSharedValue(0);
 
   // BackHandler removed to fix compatibility issues with React Native 0.79.4
   // The default back navigation behavior will work fine without custom handling
@@ -86,20 +89,16 @@ export default function CategoryScreen() {
   console.log('  - gender:', userProfile?.gender);
   console.log('  - profileComplete:', profileComplete);
 
-  // Load user profile and favorites
+  // Load user profile
   const loadUserData = useCallback(async () => {
     if (!user?.uid) {
       setLoadingProfile(false);
       return;
     }
     try {
-      const [profile, favorites] = await Promise.all([
-        getUserProfile(user.uid),
-        getUserFavorites(user.uid),
-      ]);
+      const profile = await getUserProfile(user.uid);
       console.log('🔍 DEBUG: Loaded user profile:', profile);
       setUserProfile(profile);
-      setUserFavorites(favorites || []);
     } catch (error) {
       console.error('Error loading user data:', error);
     } finally {
@@ -113,7 +112,7 @@ export default function CategoryScreen() {
     setAdviceError(false);
     try {
       const url =
-        'https://firebasestorage.googleapis.com/v0/b/uptrends-f893f.firebasestorage.app/o/advice.json?alt=media&token=b40ba6ea-0f83-4298-842e-5bf9ba9e1b84';
+        `https://firebasestorage.googleapis.com/v0/b/${process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID}.firebasestorage.app/o/advice.json?alt=media&token=b40ba6ea-0f83-4298-842e-5bf9ba9e1b84`;
       const response = await fetch(url);
       if (!response.ok) throw new Error('Failed to fetch advice data');
       const data = await response.json();
@@ -126,130 +125,122 @@ export default function CategoryScreen() {
     }
   }, []);
 
+  // Fetch outfit suggestions
+  const fetchOutfitSuggestions = useCallback(async () => {
+    if (!userProfile || !profileComplete || !slug) return;
+
+    // Redirect twinning categories to new twinning screen
+    if (slug.toString().toLowerCase().includes('twinning')) {
+      router.replace('/twinning');
+      return;
+    }
+
+    setLoadingOutfits(true);
+    setOutfitError(false);
+    try {
+      console.log('🔍 Fetching outfit suggestions for:', { 
+        userProfile: {
+          ...userProfile,
+          gender: userProfile?.gender
+        }, 
+        slug: slug.toString(),
+        slugType: typeof slug
+      });
+      const suggestions = await getOutfitSuggestions(userProfile, slug.toString());
+      console.log('🔍 Got outfit suggestions:', suggestions.length, 'suggestions');
+      setOutfitSuggestions(suggestions);
+    } catch (error) {
+      console.error('Error fetching outfit suggestions:', error);
+      setOutfitError(true);
+      setOutfitSuggestions([]);
+    } finally {
+      setLoadingOutfits(false);
+    }
+  }, [userProfile, profileComplete, slug]);
+
   useEffect(() => {
     loadUserData();
     fetchAdvice();
-    fadeAnim.value = withTiming(1, { duration: 800 });
+  }, [loadUserData, fetchAdvice, user?.uid]); // Added user?.uid to ensure reload on user change
+
+  // Fetch outfit suggestions when profile is complete
+  useEffect(() => {
+    if (profileComplete && userProfile) {
+      console.log('🔄 Profile changed, refetching outfit suggestions with gender:', userProfile.gender);
+      fetchOutfitSuggestions();
+    }
+  }, [fetchOutfitSuggestions, profileComplete, userProfile]);
+
+  // Use useFocusEffect to handle screen focus properly
+  useFocusEffect(
+    useCallback(() => {
+      // Reset animation values when screen comes into focus
+      resetAnimationValues();
+      startEntranceAnimations();
+      
+      // Reload user data when screen comes into focus (e.g., after profile edit)
+      loadUserData();
+
+      return () => {
+        // Cleanup when screen loses focus
+        setIsExiting(false);
+      };
+    }, [loadUserData])
+  );
+
+  const resetAnimationValues = () => {
+    screenOpacity.value = 1;
+    screenTranslateY.value = 0;
+    fadeAnim.value = 0;
+    slideAnim.value = 50;
+  };
+
+  const startEntranceAnimations = () => {
+    fadeAnim.value = withTiming(1, { duration: 600 });
     slideAnim.value = withSpring(0, {
       damping: 15,
       stiffness: 150,
     });
-  }, [loadUserData, fetchAdvice, fadeAnim, slideAnim]);
+  };
+
+  const startExitAnimation = (callback: () => void) => {
+    if (isExiting) return;
+    setIsExiting(true);
+
+    screenOpacity.value = withTiming(0, { duration: 250 });
+    screenTranslateY.value = withTiming(-30, { duration: 250 });
+
+    setTimeout(() => {
+      callback();
+    }, 250);
+  };
+
+  const handleOutfitPress = (outfit: any) => {
+    if (isExiting) return; // Prevent double-tap
+
+    router.push({
+      pathname: '/outfit-detail',
+      params: {
+        outfit: JSON.stringify(outfit),
+      },
+    });
+  };
 
   const category = categoryData[slug as string];
 
-  // Pagination logic for outfits
-  const [paginatedOutfits, setPaginatedOutfits] = useState<any[]>([]);
-  useEffect(() => {
-    if (category?.outfits) {
-      setPaginatedOutfits(category.outfits.slice(0, PAGE_SIZE));
-      setOutfitPage(1);
-    }
-  }, [slug, category?.outfits]);
-
-  const loadMoreOutfits = () => {
-    if (!category?.outfits) return;
-    const nextPage = outfitPage + 1;
-    const nextOutfits = category.outfits.slice(0, nextPage * PAGE_SIZE);
-    if (nextOutfits.length > paginatedOutfits.length) {
-      setPaginatedOutfits(nextOutfits);
-      setOutfitPage(nextPage);
-    }
-  };
+  // No more dummy outfits - focusing on AI advice only
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([loadUserData(), fetchAdvice()]);
-    if (category?.outfits) {
-      setPaginatedOutfits(category.outfits.slice(0, PAGE_SIZE));
-      setOutfitPage(1);
-    }
+    await Promise.all([
+      loadUserData(),
+      fetchAdvice(),
+      profileComplete ? fetchOutfitSuggestions() : Promise.resolve()
+    ]);
     setRefreshing(false);
   };
 
-  const isOutfitFavorited = useCallback(
-    (outfit: any) => {
-      const outfitId = outfit.id || outfit.name;
-      const categorySlug = Array.isArray(slug) ? slug[0] : slug;
-      return userFavorites.some(
-        (fav) =>
-          fav.id === outfitId ||
-          fav.name === outfit.name ||
-          (fav.categorySlug === categorySlug && fav.name === outfit.name)
-      );
-    },
-    [userFavorites, slug]
-  );
-
-  const [isToggling, setIsToggling] = useState(false);
-
-  const toggleFavorite = async (outfit: any) => {
-    if (!user?.uid) {
-      Alert.alert('Please Login', 'You need to login to save favorites');
-      return;
-    }
-    if (isToggling) return;
-    setIsToggling(true);
-    const isFavorited = isOutfitFavorited(outfit);
-    const categorySlug = Array.isArray(slug) ? slug[0] : slug;
-    try {
-      if (isFavorited) {
-        const favoriteItem = userFavorites.find(
-          (fav) =>
-            fav.id === (outfit.id || outfit.name) ||
-            fav.name === outfit.name ||
-            (fav.categorySlug === categorySlug && fav.name === outfit.name)
-        );
-        if (favoriteItem?.id) {
-          const success = await removeFavoriteOutfit(user.uid, favoriteItem.id);
-          if (success) {
-            setUserFavorites((prev) =>
-              prev.filter((fav) => fav.id !== favoriteItem.id)
-            );
-            Alert.alert('Removed! 💔', `${outfit.name} removed from favorites`);
-          } else {
-            Alert.alert('Error', 'Failed to remove from favorites');
-          }
-        }
-      } else {
-        const alreadyExists = userFavorites.some(
-          (fav) => fav.name === outfit.name && fav.categorySlug === categorySlug
-        );
-        if (alreadyExists) {
-          Alert.alert(
-            'Already Saved',
-            `${outfit.name} is already in your favorites!`
-          );
-          return;
-        }
-        const uniqueId = `${categorySlug}_${outfit.name}_${Date.now()}`;
-        const success = await saveFavoriteOutfit({
-          ...outfit,
-          category: category?.title || 'Fashion',
-          categorySlug: categorySlug,
-          id: uniqueId,
-        });
-        if (success) {
-          const newFavorite = {
-            ...outfit,
-            category: category?.title || 'Fashion',
-            categorySlug: categorySlug,
-            savedAt: new Date(),
-            id: uniqueId,
-          };
-          setUserFavorites((prev) => [...prev, newFavorite]);
-          Alert.alert('Saved! 💖', `${outfit.name} added to favorites!`);
-        } else {
-          Alert.alert('Error', 'Failed to save to favorites');
-        }
-      }
-    } catch (error) {
-      console.error('Error toggling favorite:', error);
-      Alert.alert('Error', 'Something went wrong!');
-    } finally {
-      setIsToggling(false);
-    }
-  };
+  // Outfit favorites functionality removed - focusing on AI advice only
 
   if (!category) {
     return (
@@ -271,6 +262,20 @@ export default function CategoryScreen() {
   }
 
   // --- Enhanced Advice Filtering Logic ---
+  function extractGenderFromCategorySlug(categorySlug: string): string | null {
+    const categoryLower = categorySlug.toLowerCase();
+    
+    if (categoryLower.includes('male-') || categoryLower.startsWith('male')) {
+      return 'male';
+    }
+    
+    if (categoryLower.includes('female-') || categoryLower.startsWith('female')) {
+      return 'female';
+    }
+    
+    return null;
+  }
+
   function normalizeHeight(height: string | number): string {
     const num = Number(height);
     if (!isNaN(num)) {
@@ -305,39 +310,36 @@ export default function CategoryScreen() {
     }
   }
 
-  function mapStylePreference(userProfile: any): string {
-    // Map user's preferredStyle to database style categories
-    const preferredStyle = userProfile.preferredStyle?.toLowerCase();
-    switch (preferredStyle) {
-      case 'formal':
-        return 'formal';
-      case 'casual':
-        return 'casual';
-      case 'street':
-      case 'streetwear':
-        return 'street';
-      case 'ethnic':
-      case 'traditional':
-        return 'ethnic';
-      case 'party':
-      case 'festive':
-        return 'party';
-      case 'gym':
-      case 'sports':
-      case 'athletic':
-        return 'gym';
-      case 'elegant':
-      case 'classy':
-        return 'elegant';
-      default:
-        return 'casual'; // Default fallback
-    }
+  function mapCategoryToStyle(categorySlug: string): string {
+    // Map current category to style based on category
+    const slug = categorySlug.toLowerCase();
+    
+    if (slug.includes('street')) return 'street';
+    if (slug.includes('formal')) return 'formal';
+    if (slug.includes('ethnic')) return 'ethnic';
+    if (slug.includes('party')) return 'party';
+    if (slug.includes('gym')) return 'gym';
+    if (slug.includes('office')) return 'formal';
+    if (slug.includes('elegant')) return 'elegant';
+    
+    // Direct mappings
+    const mappings: { [key: string]: string } = {
+      'street-style': 'street',
+      'formal-wear': 'formal',
+      'ethnic-wear': 'ethnic',
+      'party-wear': 'party',
+      'gym-wear': 'gym',
+      'office-wear': 'formal',
+      'elegant-wear': 'elegant'
+    };
+    
+    return mappings[slug] || 'casual';
   }
 
   function mapCategorySlugToDbCategory(categorySlug: string): string {
     // Map URL slugs to database category names
     const slug = categorySlug.toLowerCase();
-    
+
     // Handle combined slugs like "male-street-style" -> "street style"
     if (slug.includes('street')) {
       return 'street style';
@@ -360,7 +362,7 @@ export default function CategoryScreen() {
     if (slug.includes('elegant')) {
       return 'elegant wear';
     }
-    
+
     // Direct mappings
     const mappings: { [key: string]: string } = {
       'street-style': 'street style',
@@ -371,7 +373,7 @@ export default function CategoryScreen() {
       'office-wear': 'office wear',
       'elegant-wear': 'elegant wear'
     };
-    
+
     return mappings[slug] || slug;
   }
 
@@ -381,44 +383,81 @@ export default function CategoryScreen() {
       categorySlug,
       totalAdviceEntries: adviceArr.length
     });
-    
-    // Step 1: Map category slug to database category name
+
+    // Step 1: Extract gender from category slug if present
+    const categoryGender = extractGenderFromCategorySlug(categorySlug);
+    const userGender = userProfile.gender ? userProfile.gender.toLowerCase() : 'male';
+    const finalGender = categoryGender || userGender;
+
+    console.log('🎯 Gender extraction:', {
+      categorySlug,
+      categoryGender,
+      userGender,
+      finalGender
+    });
+
+    // Step 2: Map category slug to database category name
     const dbCategory = mapCategorySlugToDbCategory(categorySlug);
     console.log('🗂️ Mapped category:', categorySlug, '->', dbCategory);
     
-    // Step 2: Filter by category first
-    const categoryMatches = adviceArr.filter(entry => 
+    // Debug: Show all available categories in database
+    const availableCategories = [...new Set(adviceArr.map(entry => entry.category))];
+    console.log('📋 Available categories in database:', availableCategories);
+
+    // Step 3: Filter by category first - try exact match first
+    let categoryMatches = adviceArr.filter(entry =>
       entry.category && entry.category.toLowerCase() === dbCategory.toLowerCase()
     );
-    
-    console.log('📂 Category matches found:', categoryMatches.length);
-    
+
+    console.log('📂 Exact category matches found:', categoryMatches.length);
+
+    // If no exact matches, try partial matches
     if (categoryMatches.length === 0) {
-      console.log('❌ No exact category matches found, attempting partial match');
-      return adviceArr.find(entry => entry.category && entry.category.toLowerCase().includes(dbCategory.toLowerCase())) || null;
+      console.log('❌ No exact category matches, trying partial matches...');
+      categoryMatches = adviceArr.filter(entry =>
+        entry.category && entry.category.toLowerCase().includes(dbCategory.toLowerCase())
+      );
+      console.log('📂 Partial category matches found:', categoryMatches.length);
     }
-    
-    // Step 2: Build user attributes for matching
+
+    // If still no matches, try reverse partial matching (database category contains slug)
+    if (categoryMatches.length === 0) {
+      console.log('❌ No partial matches, trying reverse matching...');
+      const categoryKeywords = dbCategory.toLowerCase().split(' ');
+      categoryMatches = adviceArr.filter(entry => {
+        if (!entry.category) return false;
+        const entryCategory = entry.category.toLowerCase();
+        return categoryKeywords.some(keyword => entryCategory.includes(keyword));
+      });
+      console.log('📂 Reverse matches found:', categoryMatches.length);
+    }
+
+    if (categoryMatches.length === 0) {
+      console.log('❌ No category matches found at all');
+      return null;
+    }
+
+    // Step 4: Build user attributes for matching (using extracted gender)
     const userAttributes = {
-      gender: userProfile.gender ? userProfile.gender.toLowerCase() : 'male',
+      gender: finalGender,
       height: userProfile.height ? normalizeHeight(userProfile.height) : 'short',
       weight: normalizeBodyType(userProfile.bodyType),
       skinTone: userProfile.skinTone ? userProfile.skinTone.toLowerCase() : 'fair',
-      style: mapStylePreference(userProfile)
+      style: mapCategoryToStyle(categorySlug) // Use category-based style
     };
-    
+
     console.log('👤 User attributes:', userAttributes);
-    
+
     // Step 3: Score each category match
     let bestMatch = null;
     let maxScore = 0;
     let allMatches = [];
-    
+
     for (const entry of categoryMatches) {
       const forArr = entry.for ? entry.for.map((f: string) => f.toLowerCase()) : [];
       let score = 0;
       let matchDetails = [];
-      
+
       // Check each attribute match (database structure: [gender, height, weight, skinTone, style])
       if (forArr.length >= 5) {
         // Gender match
@@ -426,32 +465,32 @@ export default function CategoryScreen() {
           score += 10;
           matchDetails.push(`gender: ${userAttributes.gender}`);
         }
-        
+
         // Height match
         if (forArr[1] === userAttributes.height) {
           score += 8;
           matchDetails.push(`height: ${userAttributes.height}`);
         }
-        
+
         // Weight/Body type match
         if (forArr[2] === userAttributes.weight) {
           score += 15; // Higher weight for body type as it's most important
           matchDetails.push(`weight: ${userAttributes.weight}`);
         }
-        
+
         // Skin tone match
         if (forArr[3] === userAttributes.skinTone) {
           score += 12;
           matchDetails.push(`skinTone: ${userAttributes.skinTone}`);
         }
-        
-        // Style preference match
+
+        // Style match
         if (forArr[4] === userAttributes.style) {
           score += 5;
           matchDetails.push(`style: ${userAttributes.style}`);
         }
       }
-      
+
       allMatches.push({
         entry,
         score,
@@ -459,25 +498,36 @@ export default function CategoryScreen() {
         forFields: forArr,
         userAttributes
       });
-      
+
       if (score > maxScore) {
         maxScore = score;
         bestMatch = entry;
       }
     }
-    
+
     // Sort by score for debugging
     allMatches.sort((a, b) => b.score - a.score);
     console.log('🎯 Top 3 matches:', allMatches.slice(0, 3).map(m => ({
       score: m.score,
       matches: m.matchDetails,
-      forFields: m.forFields
+      forFields: m.forFields,
+      category: m.entry.category,
+      advicePreview: m.entry.advice?.slice(0, 1) // Show first advice item
     })));
     console.log('🏆 Best Match Score:', maxScore);
     console.log('🥇 Selected Advice Category:', bestMatch?.category);
-    
+    console.log('🎯 Selected Advice Preview:', bestMatch?.advice?.slice(0, 2));
+
     // Return best match if we have a good score, otherwise first category match
-    return bestMatch && maxScore > 0 ? bestMatch : categoryMatches[0];
+    const finalResult = bestMatch && maxScore > 0 ? bestMatch : categoryMatches[0];
+    
+    console.log('✅ Final result:', {
+      category: finalResult?.category,
+      score: bestMatch === finalResult ? maxScore : 0,
+      adviceCount: finalResult?.advice?.length || 0
+    });
+    
+    return finalResult;
   }
 
   const filteredAdviceObj =
@@ -488,153 +538,17 @@ export default function CategoryScreen() {
   const filteredAdvice = filteredAdviceObj ? filteredAdviceObj.advice : [];
   const adviceSources = filteredAdviceObj ? filteredAdviceObj.source : [];
 
-  const handleTryThis = (outfit: any) => {
-    const isFavorited = isOutfitFavorited(outfit);
-    Alert.alert(
-      outfit.name,
-      `Outfit Details:\n\nItems: ${outfit.items}\nPrice Range: ${outfit.price}\nPopularity: ${outfit.popularity}%\n\nTags: ${outfit.tags.join(
-        ', '
-      )}`,
-      [
-        {
-          text: isFavorited
-            ? '💔 Remove from Favorites'
-            : '💖 Save to Favorites',
-          onPress: () => toggleFavorite(outfit),
-          style: isFavorited ? 'destructive' : 'default',
-        },
-        {
-          text: '📱 Share',
-          onPress: () => Alert.alert('Share', 'Coming soon! 📱'),
-        },
-        { text: 'Close', style: 'cancel' },
-      ]
-    );
-  };
+  // All outfit-related functions removed - focusing on AI advice only
 
-  // Animated outfit card component
-  const AnimatedOutfitCard = ({
-    item,
-    index,
-  }: {
-    item: any;
-    index: number;
-  }) => {
-    const isFavorited = isOutfitFavorited(item);
-    const heartScale = useSharedValue(1);
-    const cardScale = useSharedValue(1);
-
-    const animateHeart = () => {
-      heartScale.value = withSpring(1.3, { damping: 10 }, () => {
-        heartScale.value = withSpring(1);
-      });
-    };
-
-    const heartAnimatedStyle = useAnimatedStyle(() => ({
-      transform: [{ scale: heartScale.value }],
-    }));
-
-    const cardAnimatedStyle = useAnimatedStyle(() => ({
-      transform: [{ scale: cardScale.value }],
-      opacity: fadeAnim.value,
-    }));
-
-    const handleHeartPress = () => {
-      if (!isToggling) {
-        animateHeart();
-        runOnJS(toggleFavorite)(item);
-      }
-    };
-
-    const handleCardPress = () => {
-      cardScale.value = withSpring(0.95, { damping: 15 }, () => {
-        cardScale.value = withSpring(1);
-      });
-      runOnJS(handleTryThis)(item);
-    };
-
-    return (
-      <Animated.View
-        style={[
-          styles.outfitCard,
-          {
-            backgroundColor: theme.card,
-            borderColor: theme.borderLight,
-          },
-          cardAnimatedStyle,
-        ]}
-      >
-        <TouchableOpacity
-          style={styles.cardContent}
-          onPress={handleCardPress}
-          activeOpacity={0.9}
-        >
-          <View style={styles.outfitInfo}>
-            <Text style={[styles.outfitName, { color: theme.text }]}>
-              {item.name}
-            </Text>
-            <Text style={[styles.outfitItems, { color: theme.textSecondary }]}>
-              {item.items}
-            </Text>
-            <Text style={[styles.outfitPrice, { color: theme.primary }]}>
-              {item.price}
-            </Text>
-            {item.trending && (
-              <View
-                style={[styles.trendingBadge, { backgroundColor: theme.error }]}
-              >
-                <Text style={styles.trendingText}>🔥 Trending</Text>
-              </View>
-            )}
-          </View>
-          <View style={styles.cardActions}>
-            <TouchableOpacity
-              onPress={handleHeartPress}
-              style={[
-                styles.heartButton,
-                {
-                  backgroundColor: isFavorited
-                    ? theme.error + '20'
-                    : theme.background,
-                  borderColor: isFavorited ? theme.error : theme.borderLight,
-                  borderWidth: isFavorited ? 2 : 1,
-                },
-              ]}
-              activeOpacity={0.7}
-            >
-              <Animated.View style={heartAnimatedStyle}>
-                <Ionicons
-                  name={isFavorited ? 'heart' : 'heart-outline'}
-                  size={24}
-                  color={isFavorited ? theme.error : theme.textTertiary}
-                />
-              </Animated.View>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.tryButton, { backgroundColor: theme.primary }]}
-              onPress={handleCardPress}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.tryButtonText}>Try This</Text>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      </Animated.View>
-    );
-  };
-
-  const renderOutfitCard = ({
-    item,
-    index,
-  }: {
-    item: any;
-    index: number;
-  }) => <AnimatedOutfitCard item={item} index={index} />;
+  const screenAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: screenOpacity.value,
+    transform: [{ translateY: screenTranslateY.value }],
+  }));
 
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
-      <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <Animated.View style={[styles.container, { backgroundColor: theme.background }, screenAnimatedStyle]}>
         <StatusBar
           barStyle={
             theme.background === '#18181b' ? 'light-content' : 'dark-content'
@@ -642,7 +556,7 @@ export default function CategoryScreen() {
           backgroundColor={theme.background}
         />
         {/* Header */}
-        <View style={[styles.modernHeader, { paddingTop: insets.top }]}>
+        <View style={[styles.modernHeader, { paddingTop: insets.top + 8 }]}>
           <LinearGradient
             colors={category.colors}
             style={styles.headerGradient}
@@ -654,7 +568,12 @@ export default function CategoryScreen() {
                 name="arrow-back"
                 size={24}
                 color="#fff"
-                onPress={() => router.back()}
+                onPress={() => {
+                  if (isExiting) return;
+                  startExitAnimation(() => {
+                    router.back();
+                  });
+                }}
                 style={styles.backButton}
               />
               <View style={styles.headerTitleSection}>
@@ -679,137 +598,7 @@ export default function CategoryScreen() {
         </View>
         {/* Main Content */}
         <Animated.View style={{ flex: 1 }}>
-          <FlatList
-            ListHeaderComponent={
-              <>
-                {/* AI Advice Section */}
-                {loadingAdvice ? (
-                  <View style={styles.loaderContainer}>
-                    <ActivityIndicator size="large" color={theme.primary} />
-                    <Text style={[styles.loadingText, { color: theme.text }]}>
-                      Loading your personalized AI advice...
-                    </Text>
-                  </View>
-                ) : adviceError ? (
-                  <View style={styles.loaderContainer}>
-                    <Text style={[styles.loadingText, { color: theme.text }]}>
-                      Could not load AI advice.
-                    </Text>
-                    <TouchableOpacity
-                      style={styles.retryButton}
-                      onPress={fetchAdvice}
-                    >
-                      <Ionicons name="refresh" size={18} color="#fff" />
-                      <Text
-                        style={{
-                          color: '#fff',
-                          fontWeight: 'bold',
-                          marginLeft: 6,
-                        }}
-                      >
-                        Retry
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                ) : (
-                  <AIAdviceCard
-                    advice={filteredAdvice}
-                    onExpand={() => setAdviceModalVisible(true)}
-                    isProfileComplete={!!profileComplete}
-                    theme={theme}
-                  />
-                )}
-
-                {/* Stats Section */}
-                <View style={styles.statsSection}>
-                  <View
-                    style={[
-                      styles.statCard,
-                      {
-                        backgroundColor: theme.card,
-                        borderColor: theme.borderLight,
-                      },
-                    ]}
-                  >
-                    <Text style={[styles.statNumber, { color: theme.primary }]}>
-                      {category.outfits.length}
-                    </Text>
-                    <Text
-                      style={[styles.statLabel, { color: theme.textSecondary }]}
-                    >
-                      Outfits
-                    </Text>
-                  </View>
-                  <View
-                    style={[
-                      styles.statCard,
-                      {
-                        backgroundColor: theme.card,
-                        borderColor: theme.borderLight,
-                      },
-                    ]}
-                  >
-                    <Text style={[styles.statNumber, { color: theme.primary }]}>
-                      {Math.round(
-                        category.outfits.reduce(
-                          (acc: number, outfit: any) =>
-                            acc + outfit.popularity,
-                          0
-                        ) / category.outfits.length
-                      )}
-                      %
-                    </Text>
-                    <Text
-                      style={[styles.statLabel, { color: theme.textSecondary }]}
-                    >
-                      Avg Rating
-                    </Text>
-                  </View>
-                  <View
-                    style={[
-                      styles.statCard,
-                      {
-                        backgroundColor: theme.card,
-                        borderColor: theme.borderLight,
-                      },
-                    ]}
-                  >
-                    <Text style={[styles.statNumber, { color: theme.primary }]}>
-                      {
-                        category.outfits.filter(
-                          (outfit: any) => outfit.trending
-                        ).length
-                      }
-                    </Text>
-                    <Text
-                      style={[styles.statLabel, { color: theme.textSecondary }]}
-                    >
-                      Trending
-                    </Text>
-                  </View>
-                </View>
-                <Text style={[styles.sectionTitle, { color: theme.text }]}>
-                  Trending Outfits
-                </Text>
-              </>
-            }
-            data={paginatedOutfits}
-            renderItem={renderOutfitCard}
-            keyExtractor={(item, index) => `${item.id || item.name}_${index}`}
-            onEndReached={loadMoreOutfits}
-            onEndReachedThreshold={0.5}
-            ListFooterComponent={
-              paginatedOutfits.length < category.outfits.length ? (
-                <View style={{ alignItems: 'center', marginVertical: 16 }}>
-                  <ActivityIndicator size="small" color={theme.primary} />
-                  <Text style={{ color: theme.textTertiary, marginTop: 6 }}>
-                    Loading more outfits...
-                  </Text>
-                </View>
-              ) : (
-                <View style={styles.bottomSpacing} />
-              )
-            }
+          <ScrollView
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}
@@ -822,18 +611,132 @@ export default function CategoryScreen() {
             }
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
-          />
+          >
+            {/* AI Advice Section */}
+            {loadingAdvice ? (
+              <View style={styles.loaderContainer}>
+                <ActivityIndicator size="large" color={theme.primary} />
+                <Text style={[styles.loadingText, { color: theme.text }]}>
+                  Loading your personalized AI advice...
+                </Text>
+              </View>
+            ) : adviceError ? (
+              <View style={styles.loaderContainer}>
+                <Text style={[styles.loadingText, { color: theme.text }]}>
+                  Could not load AI advice.
+                </Text>
+                <TouchableOpacity
+                  style={styles.retryButton}
+                  onPress={fetchAdvice}
+                >
+                  <Ionicons name="refresh" size={18} color="#fff" />
+                  <Text
+                    style={{
+                      color: '#fff',
+                      fontWeight: 'bold',
+                      marginLeft: 6,
+                    }}
+                  >
+                    Retry
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <AIAdviceCard
+                advice={filteredAdvice}
+                sources={adviceSources}
+                isProfileComplete={!!profileComplete}
+                theme={theme}
+              />
+            )}
+
+            {/* Outfit Suggestions */}
+            {!slug?.toString().toLowerCase().includes('twinning') && (
+              <>
+                {loadingOutfits ? (
+                  <View style={styles.loaderContainer}>
+                    <ActivityIndicator size="large" color={theme.primary} />
+                    <Text style={[styles.loadingText, { color: theme.text }]}>
+                      Generating personalized outfit suggestions...
+                    </Text>
+                  </View>
+                ) : outfitError ? (
+                  <View style={styles.loaderContainer}>
+                    <Ionicons name="cloud-offline" size={48} color={theme.textSecondary} />
+                    <Text style={[styles.loadingText, { color: theme.text, textAlign: 'center', marginTop: 12 }]}>
+                      AI service is temporarily busy. {'\n'}Showing fallback suggestions instead.
+                    </Text>
+                    <TouchableOpacity
+                      style={styles.retryButton}
+                      onPress={fetchOutfitSuggestions}
+                    >
+                      <Ionicons name="refresh" size={18} color="#fff" />
+                      <Text
+                        style={{
+                          color: '#fff',
+                          fontWeight: 'bold',
+                          marginLeft: 6,
+                        }}
+                      >
+                        Try Again
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : outfitSuggestions.length > 0 ? (
+                  <>
+                    <View style={styles.sectionHeader}>
+                      <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                        Personalized Outfit Suggestions
+                      </Text>
+                      {outfitSuggestions.some(outfit => outfit.id?.includes('fallback')) && (
+                        <View style={[styles.fallbackNotice, { backgroundColor: theme.card, borderColor: theme.borderLight }]}>
+                          <Ionicons name="information-circle" size={16} color={theme.primary} />
+                          <Text style={[styles.fallbackText, { color: theme.textSecondary }]}>
+                            AI is busy - showing curated suggestions
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                    {outfitSuggestions.map((outfit, index) => (
+                      <OutfitCard
+                        key={outfit.id || index}
+                        outfit={outfit}
+                        index={index}
+                        onPress={handleOutfitPress}
+                        theme={theme}
+                      />
+                    ))}
+                  </>
+                ) : profileComplete ? (
+                  <View style={styles.loaderContainer}>
+                    <Text style={[styles.loadingText, { color: theme.text }]}>
+                      No outfit suggestions available for this category.
+                    </Text>
+                  </View>
+                ) : null}
+              </>
+            )}
+
+            {/* Category Info */}
+            <View style={[styles.categoryInfo, { backgroundColor: theme.card, borderColor: theme.borderLight }]}>
+              <Text style={[styles.categoryTitle, { color: theme.text }]}>
+                {category.title}
+              </Text>
+              <Text style={[styles.categoryDescription, { color: theme.textSecondary }]}>
+                {category.description}
+              </Text>
+              <Text style={[styles.aiOnlyMessage, { color: theme.primary }]}>
+                🤖 Get personalized AI advice for this style category
+              </Text>
+            </View>
+
+            <View style={styles.bottomSpacing} />
+          </ScrollView>
         </Animated.View>
 
-        {/* AI Advice Modal (ALWAYS AT ROOT LEVEL!) */}
-        <AIAdviceModal
-          visible={adviceModalVisible}
-          onClose={() => setAdviceModalVisible(false)}
-          advice={filteredAdvice}
-          sources={adviceSources}
-          theme={theme}
-        />
-      </View>
+      </Animated.View>
+
+
     </>
   );
 }
@@ -849,7 +752,8 @@ const styles = StyleSheet.create({
   },
   headerGradient: {
     paddingHorizontal: getResponsiveSize(20),
-    paddingVertical: getResponsiveSize(20),
+    paddingVertical: getResponsiveSize(16),
+    paddingBottom: getResponsiveSize(20),
   },
   headerContent: {
     flexDirection: 'row',
@@ -890,13 +794,71 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 12,
   },
-  scrollContent: { paddingTop: getResponsiveSize(20), paddingBottom: 30 },
+  scrollContent: { 
+    paddingTop: getResponsiveSize(16), 
+    paddingBottom: getResponsiveSize(100),
+    paddingHorizontal: getResponsiveSize(4)
+  },
+  categoryInfo: {
+    marginHorizontal: getResponsiveSize(16),
+    marginVertical: getResponsiveSize(12),
+    padding: getResponsiveSize(16),
+    borderRadius: getResponsiveSize(12),
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  categoryTitle: {
+    fontSize: getResponsiveFontSize(24),
+    fontWeight: 'bold',
+    marginBottom: getResponsiveSize(8),
+    textAlign: 'center',
+  },
+  categoryDescription: {
+    fontSize: getResponsiveFontSize(16),
+    lineHeight: 24,
+    textAlign: 'center',
+    marginBottom: getResponsiveSize(16),
+  },
+  aiOnlyMessage: {
+    fontSize: getResponsiveFontSize(14),
+    fontWeight: '600',
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  loaderContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: getResponsiveSize(32),
+    paddingHorizontal: getResponsiveSize(16),
+    marginHorizontal: getResponsiveSize(16),
+  },
+  loadingText: {
+    fontSize: getResponsiveFontSize(16),
+    marginTop: getResponsiveSize(12),
+    textAlign: 'center',
+  },
+  retryButton: {
+    backgroundColor: '#6366f1',
+    paddingHorizontal: getResponsiveSize(20),
+    paddingVertical: getResponsiveSize(10),
+    borderRadius: getResponsiveSize(20),
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: getResponsiveSize(16),
+  },
+  bottomSpacing: {
+    height: getResponsiveSize(80),
+  },
   profileLoader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 10,
-    marginHorizontal: getResponsiveSize(20),
+    marginHorizontal: getResponsiveSize(16),
     marginBottom: 10,
   },
   profileLoadingText: {
@@ -908,8 +870,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    marginHorizontal: getResponsiveSize(20),
-    marginBottom: 15,
+    marginHorizontal: getResponsiveSize(16),
+    marginBottom: 12,
     borderRadius: 12,
     borderWidth: 1,
   },
@@ -918,30 +880,6 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     fontSize: 14,
     fontWeight: '500',
-  },
-  loaderContainer: {
-    marginTop: 20,
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 10,
-    fontSize: 16,
-  },
-  retryButton: {
-    marginTop: 12,
-    backgroundColor: '#6366f1',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  statsSection: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingHorizontal: getResponsiveSize(20),
-    marginBottom: getResponsiveSize(30),
-    marginTop: 10,
   },
   statCard: {
     padding: getResponsiveSize(16),
@@ -964,22 +902,38 @@ const styles = StyleSheet.create({
     fontSize: getResponsiveFontSize(12),
     fontWeight: '500',
   },
+  sectionHeader: {
+    marginHorizontal: getResponsiveSize(16),
+    marginTop: getResponsiveSize(8),
+    marginBottom: getResponsiveSize(12),
+  },
   sectionTitle: {
     fontSize: getResponsiveFontSize(22),
     fontWeight: 'bold',
-    marginBottom: getResponsiveSize(20),
-    marginLeft: getResponsiveSize(20),
+    marginBottom: getResponsiveSize(12),
+  },
+  fallbackNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: getResponsiveSize(12),
+    borderRadius: getResponsiveSize(8),
+    borderWidth: 1,
+    gap: 8,
+  },
+  fallbackText: {
+    fontSize: getResponsiveFontSize(13),
+    fontWeight: '500',
   },
   outfitCard: {
-    borderRadius: getResponsiveSize(20),
-    marginBottom: getResponsiveSize(20),
+    borderRadius: getResponsiveSize(16),
+    marginBottom: getResponsiveSize(16),
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
     shadowRadius: 12,
     elevation: 6,
     borderWidth: 1,
-    marginHorizontal: getResponsiveSize(20),
+    marginHorizontal: getResponsiveSize(16),
     overflow: 'hidden',
   },
   cardContent: {
@@ -1045,7 +999,5 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 14,
   },
-  bottomSpacing: {
-    height: getResponsiveSize(40),
-  },
+
 });

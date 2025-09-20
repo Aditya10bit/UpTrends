@@ -1,6 +1,6 @@
 // services/userService.ts
 
-import { arrayRemove, arrayUnion, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
 
 // --- Types ---
@@ -58,50 +58,11 @@ export const updateUserProfile = async (userId: string, updateData: Record<strin
   }
 };
 
-// --- Save Favorite Outfit ---
-export const saveFavoriteOutfit = async (outfit: Outfit): Promise<boolean> => {
-  const user = auth.currentUser;
-  if (!user) {
-    console.log('No authenticated user found');
-    return false;
-  }
-  try {
-    const userRef = doc(db, 'users', user.uid);
-    const favoriteOutfit = {
-      ...outfit,
-      savedAt: new Date(),
-      // Use provided ID or generate new one
-      id: outfit.id || `${outfit.categorySlug}_${Date.now()}`
-    };
-    await updateDoc(userRef, {
-      favorites: arrayUnion(favoriteOutfit)
-    });
-    console.log('Outfit saved to favorites');
-    return true;
-  } catch (error) {
-    console.error('Error saving favorite:', error);
-    return false;
-  }
-};
 
-// --- Get User Favorites ---
-export const getUserFavorites = async (userId: string): Promise<any[]> => {
-  try {
-    const userDoc = await getDoc(doc(db, 'users', userId));
-    if (userDoc.exists()) {
-      const userData = userDoc.data();
-      return userData.favorites || [];
-    }
-    return [];
-  } catch (error) {
-    console.error('Error getting user favorites:', error);
-    throw error;
-  }
-};
 
 // --- Get User Profile (by UID, or current user if not provided) ---
 export const getUserProfile = async (uid?: string): Promise<any | null> => {
-  let userId = uid;
+  let userId: string = uid || '';
   if (!userId) {
     const user = auth.currentUser;
     if (!user) {
@@ -139,51 +100,3 @@ export const checkUserProfile = async (): Promise<boolean> => {
   }
 };
 
-// --- Remove Favorite Outfit (by ID) ---
-export const removeFavoriteOutfit = async (userId: string, outfitId: string): Promise<boolean> => {
-  try {
-    const userRef = doc(db, 'users', userId);
-    const userDoc = await getDoc(userRef);
-    if (userDoc.exists()) {
-      const userData = userDoc.data();
-      const currentFavorites = userData.favorites || [];
-      const itemToRemove = currentFavorites.find((item: any) => item.id === outfitId);
-      if (itemToRemove) {
-        await updateDoc(userRef, {
-          favorites: arrayRemove(itemToRemove)
-        });
-        console.log('Favorite removed successfully from Firebase');
-        return true;
-      } else {
-        console.log('Item not found in favorites');
-        return false;
-      }
-    }
-    return false;
-  } catch (error) {
-    console.error('Error removing favorite:', error);
-    return false;
-  }
-};
-
-// --- Remove Favorite by Index (Alternative) ---
-export const removeFavoriteByIndex = async (userId: string, itemIndex: number): Promise<boolean> => {
-  try {
-    const userRef = doc(db, 'users', userId);
-    const userDoc = await getDoc(userRef);
-    if (userDoc.exists()) {
-      const userData = userDoc.data();
-      const currentFavorites = userData.favorites || [];
-      const updatedFavorites = currentFavorites.filter((_: any, index: number) => index !== itemIndex);
-      await updateDoc(userRef, {
-        favorites: updatedFavorites
-      });
-      console.log('Favorite removed successfully by index');
-      return true;
-    }
-    return false;
-  } catch (error) {
-    console.error('Error removing favorite by index:', error);
-    return false;
-  }
-};
