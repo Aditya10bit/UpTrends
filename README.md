@@ -225,6 +225,10 @@ For issues or questions:
 ---
 
 **Note**: This app is optimized for small user groups (3-4 people) and will stay well within free tier limits. The AI provides sophisticated fashion advice while maintaining cost efficiency.
+
+
+
+
 ![WhatsApp Image 2025-09-20 at 20 16 34_a16435e0](https://github.com/user-attachments/assets/96c47ccf-c25b-40ea-a5e1-88f941d5c29d)
 
 ![WhatsApp Image 2025-09-20 at 20 16 39_1d540214](https://github.com/user-attachments/assets/3de322a5-ccd5-46ca-a3a4-dea07c8ad3d7)
