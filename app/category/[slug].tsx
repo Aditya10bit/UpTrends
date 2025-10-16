@@ -4,21 +4,21 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Dimensions,
-    RefreshControl,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Dimensions,
+  RefreshControl,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import Animated, {
-    useAnimatedStyle,
-    useSharedValue,
-    withSpring,
-    withTiming,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AIAdviceCard from '../../components/AIAdviceCard';
@@ -28,7 +28,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import categoryData from '../../data/categoryData';
 import { getOutfitSuggestions, OutfitSuggestion } from '../../services/outfitService';
 import {
-    getUserProfile
+  getUserProfile
 } from '../../services/userService';
 
 // Responsive utilities
@@ -63,6 +63,16 @@ export default function CategoryScreen() {
   const [outfitSuggestions, setOutfitSuggestions] = useState<OutfitSuggestion[]>([]);
   const [loadingOutfits, setLoadingOutfits] = useState(false);
   const [outfitError, setOutfitError] = useState(false);
+
+  // Caching state
+  const [cachedData, setCachedData] = useState<{
+    [key: string]: {
+      suggestions: OutfitSuggestion[];
+      timestamp: number;
+      userProfileHash: string;
+    }
+  }>({});
+  const [lastFetchTime, setLastFetchTime] = useState<number>(0);
 
   // State
   const [refreshing, setRefreshing] = useState(false);
@@ -125,8 +135,14 @@ export default function CategoryScreen() {
     }
   }, []);
 
-  // Fetch outfit suggestions
-  const fetchOutfitSuggestions = useCallback(async () => {
+  // Helper function to create user profile hash for cache validation
+  const createUserProfileHash = useCallback((profile: any): string => {
+    if (!profile) return '';
+    return `${profile.gender}-${profile.height}-${profile.weight}-${profile.bodyType}-${profile.skinTone}`;
+  }, []);
+
+  // Fetch outfit suggestions with caching
+  const fetchOutfitSuggestions = useCallback(async (forceRefresh: boolean = false) => {
     if (!userProfile || !profileComplete || !slug) return;
 
     // Redirect twinning categories to new twinning screen
@@ -135,20 +151,60 @@ export default function CategoryScreen() {
       return;
     }
 
+    const cacheKey = `${slug.toString()}-${user?.uid}`;
+    const userProfileHash = createUserProfileHash(userProfile);
+    const now = Date.now();
+    const CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
+
+    // Check if we have valid cached data
+    const cached = cachedData[cacheKey];
+    if (!forceRefresh && cached &&
+      (now - cached.timestamp < CACHE_DURATION) &&
+      cached.userProfileHash === userProfileHash &&
+      cached.suggestions.length > 0) {
+      console.log('🎯 Using cached outfit suggestions for:', slug.toString());
+      setOutfitSuggestions(cached.suggestions);
+      setOutfitError(false);
+      return;
+    }
+
+    // Only fetch if we haven't fetched recently (prevent rapid refetches)
+    if (!forceRefresh && (now - lastFetchTime < 5000)) { // 5 seconds cooldown
+      console.log('⏱️ Skipping fetch - too recent');
+      return;
+    }
+
     setLoadingOutfits(true);
     setOutfitError(false);
+    setLastFetchTime(now);
+
     try {
-      console.log('🔍 Fetching outfit suggestions for:', { 
+      console.log('🔍 Fetching outfit suggestions for:', {
         userProfile: {
           ...userProfile,
           gender: userProfile?.gender
-        }, 
+        },
         slug: slug.toString(),
-        slugType: typeof slug
+        slugType: typeof slug,
+        cached: !!cached,
+        forceRefresh
       });
+
       const suggestions = await getOutfitSuggestions(userProfile, slug.toString());
       console.log('🔍 Got outfit suggestions:', suggestions.length, 'suggestions');
+
       setOutfitSuggestions(suggestions);
+
+      // Cache the results
+      setCachedData(prev => ({
+        ...prev,
+        [cacheKey]: {
+          suggestions,
+          timestamp: now,
+          userProfileHash
+        }
+      }));
+
     } catch (error) {
       console.error('Error fetching outfit suggestions:', error);
       setOutfitError(true);
@@ -156,7 +212,7 @@ export default function CategoryScreen() {
     } finally {
       setLoadingOutfits(false);
     }
-  }, [userProfile, profileComplete, slug]);
+  }, [userProfile, profileComplete, slug, cachedData, createUserProfileHash, user?.uid, lastFetchTime]);
 
   useEffect(() => {
     loadUserData();
@@ -166,8 +222,8 @@ export default function CategoryScreen() {
   // Fetch outfit suggestions when profile is complete
   useEffect(() => {
     if (profileComplete && userProfile) {
-      console.log('🔄 Profile changed, refetching outfit suggestions with gender:', userProfile.gender);
-      fetchOutfitSuggestions();
+      console.log('🔄 Profile changed, checking cached outfit suggestions with gender:', userProfile.gender);
+      fetchOutfitSuggestions(false); // Don't force refresh, use cache if available
     }
   }, [fetchOutfitSuggestions, profileComplete, userProfile]);
 
@@ -177,15 +233,17 @@ export default function CategoryScreen() {
       // Reset animation values when screen comes into focus
       resetAnimationValues();
       startEntranceAnimations();
-      
-      // Reload user data when screen comes into focus (e.g., after profile edit)
-      loadUserData();
+
+      // Only reload user data if we don't have it, don't refetch outfit suggestions
+      if (!userProfile) {
+        loadUserData();
+      }
 
       return () => {
         // Cleanup when screen loses focus
         setIsExiting(false);
       };
-    }, [loadUserData])
+    }, [loadUserData, userProfile])
   );
 
   const resetAnimationValues = () => {
@@ -235,7 +293,7 @@ export default function CategoryScreen() {
     await Promise.all([
       loadUserData(),
       fetchAdvice(),
-      profileComplete ? fetchOutfitSuggestions() : Promise.resolve()
+      profileComplete ? fetchOutfitSuggestions(true) : Promise.resolve() // Force refresh on manual refresh
     ]);
     setRefreshing(false);
   };
@@ -264,15 +322,15 @@ export default function CategoryScreen() {
   // --- Enhanced Advice Filtering Logic ---
   function extractGenderFromCategorySlug(categorySlug: string): string | null {
     const categoryLower = categorySlug.toLowerCase();
-    
+
     if (categoryLower.includes('male-') || categoryLower.startsWith('male')) {
       return 'male';
     }
-    
+
     if (categoryLower.includes('female-') || categoryLower.startsWith('female')) {
       return 'female';
     }
-    
+
     return null;
   }
 
@@ -313,7 +371,7 @@ export default function CategoryScreen() {
   function mapCategoryToStyle(categorySlug: string): string {
     // Map current category to style based on category
     const slug = categorySlug.toLowerCase();
-    
+
     if (slug.includes('street')) return 'street';
     if (slug.includes('formal')) return 'formal';
     if (slug.includes('ethnic')) return 'ethnic';
@@ -321,7 +379,7 @@ export default function CategoryScreen() {
     if (slug.includes('gym')) return 'gym';
     if (slug.includes('office')) return 'formal';
     if (slug.includes('elegant')) return 'elegant';
-    
+
     // Direct mappings
     const mappings: { [key: string]: string } = {
       'street-style': 'street',
@@ -332,7 +390,7 @@ export default function CategoryScreen() {
       'office-wear': 'formal',
       'elegant-wear': 'elegant'
     };
-    
+
     return mappings[slug] || 'casual';
   }
 
@@ -399,7 +457,7 @@ export default function CategoryScreen() {
     // Step 2: Map category slug to database category name
     const dbCategory = mapCategorySlugToDbCategory(categorySlug);
     console.log('🗂️ Mapped category:', categorySlug, '->', dbCategory);
-    
+
     // Debug: Show all available categories in database
     const availableCategories = [...new Set(adviceArr.map(entry => entry.category))];
     console.log('📋 Available categories in database:', availableCategories);
@@ -520,13 +578,13 @@ export default function CategoryScreen() {
 
     // Return best match if we have a good score, otherwise first category match
     const finalResult = bestMatch && maxScore > 0 ? bestMatch : categoryMatches[0];
-    
+
     console.log('✅ Final result:', {
       category: finalResult?.category,
       score: bestMatch === finalResult ? maxScore : 0,
       adviceCount: finalResult?.advice?.length || 0
     });
-    
+
     return finalResult;
   }
 
@@ -668,7 +726,7 @@ export default function CategoryScreen() {
                     </Text>
                     <TouchableOpacity
                       style={styles.retryButton}
-                      onPress={fetchOutfitSuggestions}
+                      onPress={() => fetchOutfitSuggestions(true)}
                     >
                       <Ionicons name="refresh" size={18} color="#fff" />
                       <Text
@@ -794,8 +852,8 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 12,
   },
-  scrollContent: { 
-    paddingTop: getResponsiveSize(16), 
+  scrollContent: {
+    paddingTop: getResponsiveSize(16),
     paddingBottom: getResponsiveSize(100),
     paddingHorizontal: getResponsiveSize(4)
   },

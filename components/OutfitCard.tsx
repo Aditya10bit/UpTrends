@@ -69,9 +69,13 @@ export default function OutfitCard({
           end={{ x: 1, y: 1 }}
         >
           <View style={styles.headerContent}>
-            <Text style={styles.outfitTitle}>{outfit.title}</Text>
+            <Text style={styles.outfitTitle} numberOfLines={1} ellipsizeMode="tail">
+              {outfit.title}
+            </Text>
             <View style={styles.occasionBadge}>
-              <Text style={styles.occasionText}>{outfit.occasion}</Text>
+              <Text style={styles.occasionText} numberOfLines={1}>
+                {outfit.occasion}
+              </Text>
             </View>
           </View>
         </LinearGradient>
@@ -269,8 +273,8 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   gradientHeader: {
-    padding: 16,
-    paddingBottom: 12,
+    padding: 8,
+    paddingBottom: 6,
   },
   headerContent: {
     flexDirection: 'row',
@@ -278,7 +282,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   outfitTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#fff',
     flex: 1,

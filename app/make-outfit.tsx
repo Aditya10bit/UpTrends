@@ -353,36 +353,51 @@ export default function MakeOutfit() {
       // First, analyze outfit compatibility
       const compatibilityAnalysis = await analyzeOutfitCompatibility(selectedImages, userProfile);
 
+      // Only show dialog for major missing items (shirts, pants, etc.), not accessories
       if (!compatibilityAnalysis.canFormOutfits) {
-        // Show alert with recommendations
-        Alert.alert(
-          'Insufficient Items for Complete Outfits',
-          `Your current items can't form complete outfits. Here's what you need:\n\n${compatibilityAnalysis.recommendations.join('\n')}`,
-          [
-            { text: 'OK' },
-            { text: 'Upload More Items', onPress: () => selectImage() }
-          ]
+        const majorMissingItems = compatibilityAnalysis.missingCategories.filter(category =>
+          ['shirts', 'tops', 'pants', 'bottoms', 'dresses', 'jackets', 'blazers'].includes(category.toLowerCase())
         );
-        return;
+
+        if (majorMissingItems.length > 0) {
+          Alert.alert(
+            'Need More Basic Items',
+            `To create personalized outfits, please add more basic clothing items like: ${majorMissingItems.join(', ')}`,
+            [
+              { text: 'OK' },
+              { text: 'Upload More Items', onPress: () => selectImage() }
+            ]
+          );
+          return;
+        }
+        // If only accessories are missing, proceed with outfit generation
       }
 
       // Generate wardrobe-based outfits from user's actual clothes
       const wardrobeAnalysis = await generateWardrobeBasedOutfits(selectedImages, userProfile, topography);
 
-      // Check if we have enough items for complete outfits
-      if (wardrobeAnalysis.wardrobeAnalysis.completenessScore < 50) {
-        // Show alert with suggestions for missing items
-        Alert.alert(
-          'Wardrobe Needs Enhancement',
-          `Your current wardrobe can create ${wardrobeAnalysis.availableOutfits.length} outfits, but adding a few key pieces would unlock many more combinations!\n\nTop suggestions:\n${wardrobeAnalysis.suggestions.slice(0, 3).map(s => `• ${s.item}: ${s.reason}`).join('\n')}`,
-          [
-            { text: 'Show Me Shopping Links', onPress: () => showShoppingLinks(wardrobeAnalysis.suggestions) },
-            { text: 'Create with Current Items', onPress: () => proceedWithCurrentItems(wardrobeAnalysis) },
-            { text: 'Cancel' }
-          ]
+      // Check if we have enough basic items (only show dialog for very low scores)
+      if (wardrobeAnalysis.wardrobeAnalysis.completenessScore < 30) {
+        // Only show dialog if major clothing categories are missing
+        const majorMissing = wardrobeAnalysis.wardrobeAnalysis.missingCategories.filter(category =>
+          ['shirts', 'tops', 'pants', 'bottoms', 'dresses'].includes(category.toLowerCase())
         );
-        return;
+
+        if (majorMissing.length > 1) {
+          Alert.alert(
+            'Need More Basic Items',
+            `To create better personalized outfits, consider adding more ${majorMissing.join(' and ')}.`,
+            [
+              { text: 'Create with Current Items', onPress: () => proceedWithCurrentItems(wardrobeAnalysis) },
+              { text: 'Upload More Items', onPress: () => selectImage() },
+              { text: 'Cancel' }
+            ]
+          );
+          return;
+        }
       }
+
+      // If we reach here, proceed with outfit generation (accessories missing is OK)
 
       const analysis = wardrobeAnalysis;
 
@@ -1242,6 +1257,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 12,
     elevation: 6,
+    maxWidth: '100%',
+    overflow: 'hidden',
   },
   resultHeader: {
     flexDirection: 'row',
@@ -1321,17 +1338,24 @@ const styles = StyleSheet.create({
     padding: getResponsiveSize(15),
     marginBottom: getResponsiveSize(15),
     borderWidth: 1,
+    minHeight: getResponsiveSize(120),
+    maxWidth: '100%',
+    overflow: 'hidden',
   },
   comboHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: getResponsiveSize(8),
+    flexWrap: 'wrap',
+    gap: getResponsiveSize(8),
   },
   comboName: {
     fontSize: getResponsiveFontSize(16),
     fontWeight: 'bold',
     flex: 1,
+    flexShrink: 1,
+    flexWrap: 'wrap',
   },
   comboRatings: {
     alignItems: 'flex-end',
@@ -1344,6 +1368,8 @@ const styles = StyleSheet.create({
     fontSize: getResponsiveFontSize(14),
     marginBottom: getResponsiveSize(10),
     fontWeight: '500',
+    flexWrap: 'wrap',
+    lineHeight: 20,
   },
   comboColors: {
     flexDirection: 'row',
@@ -1371,6 +1397,7 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     marginBottom: getResponsiveSize(10),
     lineHeight: 18,
+    flexWrap: 'wrap',
   },
   stylingTips: {
     marginTop: getResponsiveSize(8),

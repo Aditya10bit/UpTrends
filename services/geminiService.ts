@@ -6,6 +6,138 @@ import { TopographyData } from './topographyService';
 const API_KEY = getSecureApiKey();
 const genAI = new GoogleGenerativeAI(API_KEY);
 
+// Performance optimization: Cache for frequently used responses
+const responseCache = new Map<string, { data: any; timestamp: number; ttl: number }>();
+const CACHE_TTL = 30 * 60 * 1000; // 30 minutes
+const MAX_CACHE_SIZE = 100;
+
+// Performance optimization: Request queue for batching
+interface QueuedRequest {
+  id: string;
+  resolve: (value: any) => void;
+  reject: (error: any) => void;
+  prompt: string;
+  model: string;
+  priority: number;
+}
+
+const requestQueue: QueuedRequest[] = [];
+let isProcessingQueue = false;
+
+// Performance optimization: Model instances with different configurations
+const models = {
+  fast: genAI.getGenerativeModel({
+    model: 'gemini-2.0-flash-exp',
+    generationConfig: {
+      temperature: 0.7,
+      topK: 40,
+      topP: 0.95,
+      maxOutputTokens: 2048,
+    }
+  }),
+  balanced: genAI.getGenerativeModel({
+    model: 'gemini-2.5-flash',
+    generationConfig: {
+      temperature: 0.8,
+      topK: 40,
+      topP: 0.95,
+      maxOutputTokens: 4096,
+    }
+  }),
+  quality: genAI.getGenerativeModel({
+    model: 'gemini-2.5-pro',
+    generationConfig: {
+      temperature: 0.9,
+      topK: 40,
+      topP: 0.95,
+      maxOutputTokens: 8192,
+    }
+  })
+};
+
+// Cache management functions
+const getCacheKey = (prompt: string, model: string): string => {
+  return `${model}:${prompt.slice(0, 100)}:${prompt.length}`;
+};
+
+const getFromCache = (key: string): any | null => {
+  const cached = responseCache.get(key);
+  if (cached && Date.now() - cached.timestamp < cached.ttl) {
+    return cached.data;
+  }
+  if (cached) {
+    responseCache.delete(key);
+  }
+  return null;
+};
+
+const setCache = (key: string, data: any, ttl: number = CACHE_TTL): void => {
+  if (responseCache.size >= MAX_CACHE_SIZE) {
+    const oldestKey = responseCache.keys().next().value;
+    if (oldestKey) {
+      responseCache.delete(oldestKey);
+    }
+  }
+  responseCache.set(key, { data, timestamp: Date.now(), ttl });
+};
+
+// Queue processing for batched requests
+const processQueue = async (): Promise<void> => {
+  if (isProcessingQueue || requestQueue.length === 0) return;
+
+  isProcessingQueue = true;
+
+  // Sort by priority (higher number = higher priority)
+  requestQueue.sort((a, b) => b.priority - a.priority);
+
+  const batch = requestQueue.splice(0, 3); // Process up to 3 requests at once
+
+  await Promise.all(batch.map(async (request) => {
+    try {
+      const cacheKey = getCacheKey(request.prompt, request.model);
+      const cached = getFromCache(cacheKey);
+
+      if (cached) {
+        request.resolve(cached);
+        return;
+      }
+
+      const model = models[request.model as keyof typeof models] || models.balanced;
+      const result = await model.generateContent(request.prompt);
+      const response = result.response.text();
+
+      setCache(cacheKey, response);
+      request.resolve(response);
+    } catch (error) {
+      request.reject(error);
+    }
+  }));
+
+  isProcessingQueue = false;
+
+  // Continue processing if there are more requests
+  if (requestQueue.length > 0) {
+    setTimeout(processQueue, 100);
+  }
+};
+
+// Optimized request function
+const queueRequest = (prompt: string, modelType: string = 'balanced', priority: number = 1): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const request: QueuedRequest = {
+      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+      resolve,
+      reject,
+      prompt,
+      model: modelType,
+      priority
+    };
+
+    requestQueue.push(request);
+    processQueue();
+  });
+};
+
 export interface OutfitSuggestion {
   style: string;
   colors: string[];
@@ -54,138 +186,98 @@ export const analyzeImageAndGenerateOutfits = async (
   // Track AI request at the start
   trackAIRequest();
 
-  // Retry logic for API overload
-  const maxRetries = 3;
-  let lastError;
+  try {
+    // Convert image to base64 (optimized)
+    const response = await fetch(imageUri);
+    const blob = await response.blob();
+    const base64 = await blobToBase64(blob);
 
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      console.log(`Attempt ${attempt} of ${maxRetries} for Gemini API call`);
+    const imagePart = {
+      inlineData: {
+        data: base64.split(',')[1],
+        mimeType: blob.type,
+      },
+    };
 
-      // Try different models based on attempt
-      let model;
-      if (attempt === 1) {
-        model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-      } else if (attempt === 2) {
-        model = genAI.getGenerativeModel({ model: 'gemini-pro-vision' });
-      } else {
-        model = genAI.getGenerativeModel({ model: 'gemini-pro' });
-      }
+    const safePrompt = sanitizeForPrompt(prompt);
+    const userContext = userProfile ? buildUserProfileContext(userProfile) : '';
 
-      // Convert image to base64
-      const response = await fetch(imageUri);
-      const blob = await response.blob();
-      const base64 = await blobToBase64(blob);
+    // Optimized prompt for faster processing
+    const analysisPrompt = `
+Analyze image + description: "${safePrompt}"
+${userContext ? `User: ${userContext}` : ''}
 
-      const imagePart = {
-        inlineData: {
-          data: base64.split(',')[1], // Remove data:image/jpeg;base64, prefix
-          mimeType: blob.type,
-        },
-      };
-
-      const safePrompt = sanitizeForPrompt(prompt);
-
-      // Build user profile context for personalized recommendations
-      const userContext = userProfile ? buildUserProfileContext(userProfile) : '';
-
-      const analysisPrompt = `
-Analyze this image and the user's description: "${safePrompt}"
-
-${userContext ? `User Profile Information:
-${userContext}
-
-Please consider the user's body type, height, skin tone, and gender when making recommendations.` : ''}
-
-Please provide a detailed style analysis in the following JSON format:
+Return JSON only:
 {
-  "venue": "Brief description of the place/venue type",
-  "ambiance": "Description of the atmosphere and mood",
+  "venue": "venue type",
+  "ambiance": "atmosphere",
   "dominantColors": ["color1", "color2", "color3"],
   "recommendations": [
     {
-      "style": "Style name (e.g., Smart Casual)",
-      "colors": ["color1", "color2", "color3"],
-      "outfit": "Specific outfit description listing concrete items and colors (e.g., 'black shirt + beige shorts + white sneakers')",
-      "accessories": "Recommended accessories",
-      "mood": "Mood/vibe of this outfit",
-      "reasoning": "Why this works for this venue",
+      "style": "style name",
+      "colors": ["color1", "color2"],
+      "outfit": "specific items (e.g., 'black shirt + beige shorts')",
+      "accessories": "accessories",
+      "mood": "mood",
+      "reasoning": "why this works",
       "shoppingLinks": [
         {
           "platform": "Pinterest",
-          "searchQuery": "<derive from outfit items; avoid generic examples>",
+          "searchQuery": "outfit description",
           "url": "https://www.pinterest.com/search/pins/?q=<URL_ENCODED_QUERY>",
-          "description": "Outfit inspiration and styling ideas"
+          "description": "Outfit inspiration"
         },
         {
           "platform": "Amazon",
-          "searchQuery": "<use 1-2 key items from outfit; avoid generic examples>",
+          "searchQuery": "key item",
           "url": "https://www.amazon.com/s?k=<URL_ENCODED_QUERY>",
-          "description": "Shop similar items"
+          "description": "Shop items"
         }
       ]
     }
   ],
-  "tips": ["tip1", "tip2", "tip3", "tip4"]
+  "tips": ["tip1", "tip2", "tip3"]
 }
 
-Focus on:
-1. Extract the dominant colors from the image
-2. Consider the venue's lighting and atmosphere
-3. Match outfit colors that complement the environment AND the user's skin tone
-4. Provide 3-4 different style options suitable for the user's body type
-5. Consider the occasion described in the prompt
-6. Give practical styling tips specific to the user's body type and height
-7. Ensure all recommendations flatter the user's specific body shape and proportions
-
-Rules for shopping links:
-- DO NOT reuse generic examples like "navy blazer white shirt". Always derive queries from the actual outfit and user's prompt.
-- For Amazon/Myntra: Use ONLY 1-2 specific items from the outfit (e.g., "black shirt", "white sneakers", "olive pants")
-- For Pinterest: Use the full outfit description for inspiration searches
-- NEVER search for the entire outfit as one query - break it down into individual items
-- Focus on the most important clothing pieces that users would actually search for
-
-Make sure the response is valid JSON only, no additional text.
+Focus: Extract colors, match user's body type (${userProfile?.bodyType || 'N/A'}), provide 3 style options, practical tips.
 `;
 
+    // Use optimized model selection based on complexity
+    const modelType = userProfile && Object.keys(userProfile).length > 3 ? 'balanced' : 'fast';
+
+    // Try with image first (high priority)
+    try {
+      const model = models[modelType];
       const result = await model.generateContent([analysisPrompt, imagePart]);
       const responseText = result.response.text();
+      const cleanedResponse = responseText.replace(/```json\n?|\n?```/g, '').trim();
 
-      // Clean the response to ensure it's valid JSON
+      const parsedResult = JSON.parse(cleanedResponse);
+      console.log('✅ Fast image analysis successful');
+      return parsedResult;
+    } catch (error) {
+      console.log('⚠️ Fast model failed, trying balanced model');
+
+      // Fallback to balanced model
+      const model = models.balanced;
+      const result = await model.generateContent([analysisPrompt, imagePart]);
+      const responseText = result.response.text();
       const cleanedResponse = responseText.replace(/```json\n?|\n?```/g, '').trim();
 
       try {
         const parsedResult = JSON.parse(cleanedResponse);
-        console.log(`Successfully got response on attempt ${attempt}`);
+        console.log('✅ Balanced model analysis successful');
         return parsedResult;
       } catch (parseError) {
-        console.error('JSON Parse Error:', parseError);
-        // If JSON parsing fails, try next attempt or fallback
-        if (attempt === maxRetries) {
-          return generateFallbackResponse(prompt, userProfile);
-        }
-        continue;
+        console.log('⚠️ JSON parse failed, using fallback');
+        return generateFallbackResponse(prompt, userProfile);
       }
-
-    } catch (error: any) {
-      console.error(`Gemini API Error (attempt ${attempt}):`, error);
-      lastError = error;
-
-      // Check if it's a 503 (overloaded) or rate limit error
-      if (error.message?.includes('overloaded') || error.message?.includes('503') || error.message?.includes('429')) {
-        console.log(`Model overloaded/rate limited, waiting before retry...`);
-        await new Promise(resolve => setTimeout(resolve, 2000 * attempt)); // Exponential backoff
-        continue;
-      }
-
-      // If it's not a retryable error, break the loop
-      break;
     }
-  }
 
-  // If all retries failed, return fallback response
-  console.error('All Gemini API attempts failed, using fallback response');
-  return generateFallbackResponse(prompt, userProfile);
+  } catch (error: any) {
+    console.error('🚨 Image analysis failed:', error);
+    return generateFallbackResponse(prompt, userProfile);
+  }
 };
 
 export const generateOutfitsFromPrompt = async (prompt: string, userProfile?: any): Promise<StyleAnalysisResult> => {
@@ -196,83 +288,156 @@ export const generateOutfitsFromPrompt = async (prompt: string, userProfile?: an
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-
     const safePrompt = sanitizeForPrompt(prompt);
-
-    // Build user profile context for personalized recommendations
     const userContext = userProfile ? buildUserProfileContext(userProfile) : '';
 
+    // Create cache key for this request
+    const cacheKey = getCacheKey(`${safePrompt}${userContext}`, 'prompt');
+    const cached = getFromCache(cacheKey);
+
+    if (cached) {
+      console.log('✅ Using cached response for prompt');
+      return JSON.parse(cached);
+    }
+
+    // Optimized prompt for faster processing
     const analysisPrompt = `
-Based on this description: "${safePrompt}"
+Description: "${safePrompt}"
+${userContext ? `User: ${userContext}` : ''}
 
-${userContext ? `User Profile Information:
-${userContext}
-
-Please consider the user's body type, height, skin tone, and gender when making recommendations.` : ''}
-
-Please provide outfit suggestions in the following JSON format:
+JSON only:
 {
-  "venue": "Inferred venue type from description",
-  "ambiance": "Inferred atmosphere and mood",
+  "venue": "venue type",
+  "ambiance": "atmosphere", 
   "dominantColors": ["color1", "color2", "color3"],
   "recommendations": [
     {
-      "style": "Style name",
-      "colors": ["color1", "color2", "color3"],
-      "outfit": "Specific outfit description with concrete items (e.g., 'black shirt + beige shorts + white sneakers')",
-      "accessories": "Recommended accessories",
-      "mood": "Mood/vibe of this outfit",
-      "reasoning": "Why this works for this occasion",
+      "style": "style name",
+      "colors": ["color1", "color2"],
+      "outfit": "specific items",
+      "accessories": "accessories",
+      "mood": "mood",
+      "reasoning": "why this works",
       "shoppingLinks": [
         {
           "platform": "Pinterest",
-          "searchQuery": "<derive from outfit items; avoid generic examples>",
+          "searchQuery": "outfit description",
           "url": "https://www.pinterest.com/search/pins/?q=<URL_ENCODED_QUERY>",
-          "description": "Outfit inspiration and styling ideas"
+          "description": "Outfit inspiration"
         },
         {
-          "platform": "Amazon",
-          "searchQuery": "<use 1-2 key items from outfit; avoid generic examples>",
+          "platform": "Amazon", 
+          "searchQuery": "key item",
           "url": "https://www.amazon.com/s?k=<URL_ENCODED_QUERY>",
-          "description": "Shop similar items"
+          "description": "Shop items"
         }
       ]
     }
   ],
-  "tips": ["tip1", "tip2", "tip3", "tip4"]
+  "tips": ["tip1", "tip2", "tip3"]
 }
 
-Rules:
-- Provide 3-4 different outfit recommendations suitable for the described occasion AND the user's body type
-- For each outfit, generate 2-3 shopping/inspiration links
-- Include Pinterest for inspiration, Amazon/Myntra for purchasing
-- Make search queries specific and URL-encoded
-- Ensure all URLs are properly formatted
-- DO NOT reuse generic examples like "navy blazer white shirt"; derive from the actual outfit
-- For Amazon/Myntra: Use ONLY 1-2 specific items from the outfit (e.g., "black shirt", "white sneakers")
-- For Pinterest: Use the full outfit description for inspiration searches
-- NEVER search for the entire outfit as one query - break it down into individual items
-- Consider the user's height, body type, and skin tone when making recommendations
-- Ensure all outfits will be flattering for the user's specific body shape
-
-Make sure the response is valid JSON only, no additional text.
+Provide 3 outfits for ${userProfile?.bodyType || 'average'} body type, ${userProfile?.gender || 'person'}.
 `;
 
-    const result = await model.generateContent(analysisPrompt);
-    const responseText = result.response.text();
-
+    // Use queued request for better performance
+    const responseText = await queueRequest(analysisPrompt, 'fast', 2);
     const cleanedResponse = responseText.replace(/```json\n?|\n?```/g, '').trim();
 
     try {
-      return JSON.parse(cleanedResponse);
+      const result = JSON.parse(cleanedResponse);
+      setCache(cacheKey, cleanedResponse, CACHE_TTL);
+      console.log('✅ Prompt analysis successful');
+      return result;
     } catch (parseError) {
-      console.error('JSON Parse Error:', parseError);
-      return generateFallbackResponse(prompt, userProfile);
+      console.log('⚠️ JSON parse failed, trying balanced model');
+
+      // Fallback to balanced model
+      const fallbackResponse = await queueRequest(analysisPrompt, 'balanced', 1);
+      const fallbackCleaned = fallbackResponse.replace(/```json\n?|\n?```/g, '').trim();
+
+      try {
+        const result = JSON.parse(fallbackCleaned);
+        setCache(cacheKey, fallbackCleaned, CACHE_TTL);
+        return result;
+      } catch (fallbackError) {
+        console.log('⚠️ Fallback failed, using generated response');
+        return generateFallbackResponse(prompt, userProfile);
+      }
     }
   } catch (error) {
-    console.error('Gemini API Error:', error);
-    throw new Error('Failed to generate outfit suggestions');
+    console.error('🚨 Prompt analysis failed:', error);
+    return generateFallbackResponse(prompt, userProfile);
+  }
+};
+
+// Enhanced body analysis with comprehensive body types
+export const analyzePersonComprehensively = async (imageUri: string, userName: string = 'User'): Promise<string> => {
+  try {
+    const response = await fetch(imageUri);
+    const blob = await response.blob();
+    const base64 = await blobToBase64(blob);
+
+    const imagePart = {
+      inlineData: {
+        data: base64.split(',')[1],
+        mimeType: blob.type,
+      },
+    };
+
+    // Enhanced body type analysis with more options
+    const analysisPrompt = `
+Analyze this person's body type and characteristics. Provide detailed analysis:
+
+For MALES, choose from these body types:
+- Slim/Ectomorph: Naturally thin, fast metabolism, narrow shoulders
+- Average/Mesomorph: Balanced proportions, moderate muscle mass
+- Athletic/Muscular: Well-defined muscles, broad shoulders
+- Heavy/Endomorph: Larger frame, slower metabolism, rounder shape
+- Rectangle/Straight: Shoulders and hips similar width, minimal waist definition
+- Triangle/Pear: Hips wider than shoulders, weight in lower body
+- Inverted Triangle/V-Shape: Broad shoulders, narrow hips
+- Oval/Round: Weight distributed around midsection
+- Trapezoid/Broad: Wide shoulders tapering to narrower waist
+- Diamond/Rhomboid: Widest at midsection, narrower at shoulders and hips
+- Lean Muscular: Defined muscles with low body fat
+- Stocky/Compact: Short and sturdy build, dense muscle
+- Tall & Lanky: Very tall with thin frame
+- Short & Sturdy: Shorter height with solid build
+
+For FEMALES, choose from these body types:
+- Slim/Petite: Naturally thin, small frame
+- Average/Balanced: Proportional measurements
+- Athletic/Toned: Muscular definition, fit appearance
+- Curvy/Full: Fuller figure with curves
+- Hourglass: Balanced bust and hips, defined waist
+- Pear/Bottom Heavy: Hips wider than bust
+- Apple/Top Heavy: Bust larger than hips, weight in upper body
+- Rectangle/Straight: Similar bust, waist, and hip measurements
+- Inverted Triangle: Broad shoulders, narrow hips
+- Spoon/Hip Dip: Similar to pear but with hip dips
+- Top Hourglass: Larger bust than hips, defined waist
+- Bottom Hourglass: Larger hips than bust, defined waist
+- Oval/Round: Weight distributed around midsection
+
+Skin tone options: Fair, Wheatish, Dusky, Dark
+
+Format response as:
+Body Type: [specific type from above]
+Skin Tone: [Fair/Wheatish/Dusky/Dark]
+Confidence: [85-95]%
+Analysis: [2-3 sentences explaining the assessment and styling recommendations]
+
+Be precise and choose the most accurate body type from the comprehensive list above.
+`;
+
+    // Use fast model for body analysis
+    const result = await queueRequest(analysisPrompt + JSON.stringify(imagePart), 'fast', 3);
+    return result;
+
+  } catch (error) {
+    console.error('Body analysis error:', error);
+    throw new Error('Unable to analyze body type from image');
   }
 };
 
@@ -887,7 +1052,7 @@ export const getChatbotResponse = async (prompt: string): Promise<string> => {
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
     const chatPrompt = `
 You are StyleBuddy, a friendly and knowledgeable fashion chatbot assistant. You help users understand their body type and provide personalized fashion advice.
@@ -934,7 +1099,7 @@ export const analyzeBodyImage = async (imageUri: string, customPrompt?: string):
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
     // Convert image to base64
     const response = await fetch(imageUri);
@@ -1003,7 +1168,7 @@ export const analyzeVenueComprehensively = async (imageUri: string, category: st
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
     // Convert image to base64
     const response = await fetch(imageUri);
@@ -1069,103 +1234,7 @@ Focus on elements that will help coordinate outfits with the environment.
   }
 };
 
-// New function specifically for comprehensive body analysis
-export const analyzePersonComprehensively = async (imageUri: string, name: string): Promise<string> => {
-  // Check rate limit
-  if (!geminiRateLimiter.canMakeCall()) {
-    const waitTime = Math.ceil(geminiRateLimiter.getTimeUntilNextCall() / 1000);
-    throw new Error(`Rate limit exceeded. Please wait ${waitTime} seconds before trying again.`);
-  }
 
-  try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
-
-    // Convert image to base64
-    const response = await fetch(imageUri);
-    const blob = await response.blob();
-    const base64 = await blobToBase64(blob);
-
-    const imagePart = {
-      inlineData: {
-        data: base64.split(',')[1], // Remove data:image/jpeg;base64, prefix
-        mimeType: blob.type,
-      },
-    };
-
-    const analysisPrompt = `
-You are an expert fashion stylist and body type analyst. Analyze this person's photo comprehensively for fashion coordination purposes.
-
-REQUIRED ANALYSIS:
-1. GENDER: Identify if this person is male or female
-2. BODY TYPE: 
-   - For MALES: Athletic, Slim, Average, Heavy
-   - For FEMALES: Hourglass, Pear, Apple, Rectangle, Inverted Triangle
-3. SKIN TONE: Fair, Wheatish, Dusky, Dark
-4. PHYSICAL FEATURES: Height impression, build, posture, notable features
-5. STYLE ASSESSMENT: Current fashion sense and preferences visible in the photo
-6. PERSONALITY TRAITS: Based on appearance, styling choices, and overall presentation
-
-FORMAT YOUR RESPONSE EXACTLY AS:
-Gender: [male/female]
-Body Type: [specific body type from the list above]
-Skin Tone: [Fair/Wheatish/Dusky/Dark]
-Physical Features: [list 2-3 key physical features that affect clothing choices]
-Style: [describe their current style in 1-2 sentences]
-Traits: [list 3-4 personality traits separated by commas]
-Confidence: [number from 1-100 based on photo quality and analysis certainty]
-
-Additional Analysis: [Provide detailed reasoning for each assessment, explaining why you chose each classification]
-
-Be professional, respectful, and focus only on fashion-relevant characteristics that will help with outfit coordination.
-`;
-
-    const result = await model.generateContent([analysisPrompt, imagePart]);
-    const responseText = result.response.text();
-
-    console.log('🔍 Gemini Analysis Response:', responseText); // Debug log
-
-    return responseText.trim();
-  } catch (error: any) {
-    console.error('Gemini Comprehensive Analysis Error:', error);
-
-    // Check if it's a 503 error (model overloaded)
-    if (error.message?.includes('503') || error.message?.includes('overloaded')) {
-      return `Gender: unknown
-Body Type: Rectangle
-Skin Tone: Fair
-Physical Features: Unable to analyze due to high system demand
-Style: Analysis temporarily unavailable
-Traits: friendly, stylish, patient, understanding
-Confidence: 0
-
-Additional Analysis: I'm currently experiencing high demand and can't analyze your photo right now. 😅 Please try again in a few minutes, or you can provide this information manually. I've set some default values that you can update!`;
-    }
-
-    // Check if it's a rate limit error
-    if (error.message?.includes('Rate limit')) {
-      return `Gender: unknown
-Body Type: Rectangle
-Skin Tone: Fair
-Physical Features: Analysis paused due to rate limiting
-Style: Please try again shortly
-Traits: patient, understanding, stylish, kind
-Confidence: 0
-
-Additional Analysis: I need a moment to process! 😊 Please wait a few seconds and try uploading your photo again, or provide the information manually.`;
-    }
-
-    // Generic error fallback
-    return `Gender: unknown
-Body Type: Rectangle
-Skin Tone: Fair
-Physical Features: Photo analysis unavailable
-Style: Manual input recommended
-Traits: stylish, unique, fashionable, confident
-Confidence: 0
-
-Additional Analysis: I had trouble analyzing your photo. Please try uploading a clearer image or provide your information manually for the best fashion recommendations!`;
-  }
-};
 
 // Dedicated function for profile body type analysis with different categories
 export const analyzeProfileBodyTypeFromImage = async (imageUri: string, gender?: string): Promise<{ bodyType: string, confidence: number, analysis: string }> => {
@@ -1179,7 +1248,7 @@ export const analyzeProfileBodyTypeFromImage = async (imageUri: string, gender?:
   const normalizedGender = gender ? gender.toLowerCase().trim() : 'unknown';
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
     // Convert image to base64
     const response = await fetch(imageUri);
@@ -1305,7 +1374,7 @@ export const analyzeBodyTypeFromImage = async (imageUri: string, gender?: string
   const normalizedGender = gender ? gender.toLowerCase().trim() : 'unknown';
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' }); // Use Flash for better reliability
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' }); // Use Flash for better reliability
 
     // Convert image to base64
     const response = await fetch(imageUri);
@@ -1430,7 +1499,7 @@ export const generatePersonalizedFashionTips = async (
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
     const tipsPrompt = `
 You are StyleBuddy, a friendly fashion assistant. Provide personalized fashion advice for this user:
@@ -1524,7 +1593,7 @@ export
     }
 
     try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
       const result = await model.generateContent(prompt);
       const responseText = result.response.text();
@@ -2152,7 +2221,7 @@ export const generateTodaysOutfit = async (userProfile: any, weather: any): Prom
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-pro' }); // Using Pro model for better results
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' }); // Using Pro model for better results
 
     const prompt = `
 You are a professional fashion stylist and weather expert. Create the perfect outfit recommendation for today based on the weather and user's profile.
@@ -2279,7 +2348,7 @@ Return ONLY the JSON object, no additional text.
 
 const generateFallbackWardrobeAnalysis = (clothingImages: string[], userProfile: any): any => {
   const isMale = userProfile?.gender?.toLowerCase() === 'male';
-  
+
   return {
     availableOutfits: [
       {
@@ -2287,11 +2356,11 @@ const generateFallbackWardrobeAnalysis = (clothingImages: string[], userProfile:
         items: ["Available top from your wardrobe", "Available bottom from your wardrobe"],
         colors: ["Navy", "White"],
         occasion: "Daily wear, casual meetings",
-        completeness: 70,
+        completeness: 80,
         missingItems: [
           {
             item: isMale ? "Casual blazer" : "Statement accessories",
-            reason: "Would elevate the look and add versatility",
+            reason: "Would elevate the look and add versatility for different occasions",
             shoppingLinks: [
               {
                 platform: "Amazon",
@@ -2314,6 +2383,35 @@ const generateFallbackWardrobeAnalysis = (clothingImages: string[], userProfile:
             searchQuery: isMale ? "smart casual outfit men" : "versatile chic outfit women",
             url: `https://www.pinterest.com/search/pins/?q=${encodeURIComponent(isMale ? 'smart casual outfit men' : 'versatile chic outfit women')}`,
             description: "Get outfit inspiration"
+          }
+        ]
+      },
+      {
+        name: isMale ? "Weekend Casual" : "Relaxed Style",
+        items: ["Casual top from your wardrobe", "Comfortable bottom from your wardrobe"],
+        colors: ["Blue", "Beige"],
+        occasion: "Weekend outings, casual hangouts",
+        completeness: 85,
+        missingItems: [
+          {
+            item: isMale ? "Comfortable sneakers" : "Casual flats",
+            reason: "Perfect footwear to complete this relaxed look",
+            shoppingLinks: [
+              {
+                platform: "Amazon",
+                searchQuery: isMale ? "men casual sneakers" : "women casual flats",
+                url: `https://www.amazon.com/s?k=${encodeURIComponent(isMale ? 'men casual sneakers' : 'women casual flats')}`,
+                description: "Shop comfortable footwear"
+              }
+            ]
+          }
+        ],
+        outfitLinks: [
+          {
+            platform: "Pinterest",
+            searchQuery: isMale ? "weekend casual outfit men" : "relaxed style outfit women",
+            url: `https://www.pinterest.com/search/pins/?q=${encodeURIComponent(isMale ? 'weekend casual outfit men' : 'relaxed style outfit women')}`,
+            description: "Weekend outfit inspiration"
           }
         ]
       }
@@ -2483,11 +2581,11 @@ export const generateTopographyAwareOutfits = async (
       // Try different models based on attempt
       let model;
       if (attempt === 1) {
-        model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
       } else if (attempt === 2) {
-        model = genAI.getGenerativeModel({ model: 'gemini-pro-vision' });
+        model = genAI.getGenerativeModel({ model: 'gemini-2.5-pro' });
       } else {
-        model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+        model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
       }
 
       // Convert image to base64
@@ -2642,11 +2740,11 @@ export const generateWeatherAwareOutfits = async (
       // Try different models based on attempt
       let model;
       if (attempt === 1) {
-        model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
       } else if (attempt === 2) {
-        model = genAI.getGenerativeModel({ model: 'gemini-pro-vision' });
+        model = genAI.getGenerativeModel({ model: 'gemini-2.5-pro' });
       } else {
-        model = genAI.getGenerativeModel({ model: 'gemini-pro' });
+        model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
       }
 
       // Convert image to base64
@@ -3332,7 +3430,7 @@ export const validateClothingImage = async (imageUri: string): Promise<{ isValid
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
     // Convert image to base64
     const response = await fetch(imageUri);
@@ -3488,7 +3586,7 @@ export const generateWardrobeBasedOutfits = async (
   trackAIRequest();
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
     // Convert images to base64
     const imageParts = await Promise.all(
@@ -3521,9 +3619,10 @@ ${locationContext ? `LOCATION CONTEXT: ${locationContext}` : ''}
 
 TASK:
 1. Identify all clothing items in the images
-2. Create 3-4 complete outfits using ONLY the available items
-3. For each outfit, identify what's missing to make it even better
-4. Suggest priority items to buy that would unlock more outfit combinations
+2. Create 3-4 stylish outfits using the available items (show outfits even if not 100% complete)
+3. For each outfit, suggest what additional items would enhance or complete the look
+4. Provide shopping links and styling tips for each outfit
+5. Suggest priority items to buy that would unlock more outfit combinations
 
 RESPONSE FORMAT (JSON):
 {
@@ -3536,14 +3635,20 @@ RESPONSE FORMAT (JSON):
       "completeness": 85,
       "missingItems": [
         {
-          "item": "specific missing item (e.g., 'brown leather belt')",
-          "reason": "why this would improve the outfit",
+          "item": "brown leather belt",
+          "reason": "would add a polished finishing touch and define the waistline",
           "shoppingLinks": [
             {
               "platform": "Amazon",
               "searchQuery": "brown leather belt men",
               "url": "https://www.amazon.com/s?k=brown+leather+belt+men",
               "description": "Shop brown leather belts"
+            },
+            {
+              "platform": "Pinterest",
+              "searchQuery": "how to style brown leather belt",
+              "url": "https://www.pinterest.com/search/pins/?q=how+to+style+brown+leather+belt",
+              "description": "Belt styling inspiration"
             }
           ]
         }
@@ -3582,12 +3687,15 @@ RESPONSE FORMAT (JSON):
 }
 
 IMPORTANT RULES:
-- Only use items you can clearly see in the images
-- Be specific about colors and styles you observe
-- Suggest realistic missing pieces that would genuinely improve outfits
+- Create outfits using available items, even if some pieces are missing
+- Always show outfit suggestions with Pinterest inspiration and Amazon shopping links
+- Be specific about colors and styles you observe in the images
+- In missingItems, suggest 1-2 key pieces that would enhance each outfit (not mandatory items)
+- Make missing items helpful suggestions, not strict requirements
 - Consider the user's location and cultural context if provided
-- Generate proper shopping URLs for suggested items
+- Generate proper shopping URLs for all suggested items
 - Focus on versatile pieces that unlock multiple outfit combinations
+- Set completeness to 70-90% even for good outfits with minor missing pieces
 
 Return ONLY the JSON object, no additional text.
 `;
@@ -3631,7 +3739,7 @@ export const analyzeOutfitCompatibility = async (
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
     // Convert images to base64
     const imageParts = await Promise.all(
@@ -3674,11 +3782,12 @@ COMPATIBILITY_SCORE: [percentage]%
 
 IMPORTANT GUIDELINES:
 - Consider gender-appropriate clothing combinations for ${userProfile.gender || 'Male'}
-- Focus on creating balanced, wearable outfits
-- Identify missing essential pieces (tops, bottoms, footwear, etc.)
+- Focus ONLY on major clothing categories: tops, bottoms, dresses, jackets
+- IGNORE accessories like belts, socks, jewelry, bags when determining if outfits can be formed
+- Only mark as "No" if missing essential items like shirts, pants, or dresses
+- If user has basic tops and bottoms, answer "Yes" even if accessories are missing
 - Consider the user's body type and proportions
-- Suggest specific items that would complete the outfits
-- Be realistic about what can be achieved with the current items
+- Be lenient - prioritize showing outfits over being restrictive
 
 Make sure the response is in the exact format specified above, no additional text.
 `;
@@ -3714,17 +3823,16 @@ Make sure the response is in the exact format specified above, no additional tex
   } catch (error: any) {
     console.error('Outfit compatibility analysis error:', error);
 
-    // Return a conservative result on error
+    // Return a lenient result on error - assume they can form outfits
     return {
-      canFormOutfits: false,
-      outfitTypes: [],
-      missingCategories: ['tops', 'bottoms', 'footwear'],
+      canFormOutfits: true,
+      outfitTypes: ['casual', 'smart casual'],
+      missingCategories: [],
       recommendations: [
-        "Please upload clear photos of clothing items",
-        "Ensure you have a mix of tops and bottoms",
-        "Include footwear for complete outfits"
+        "Upload clear photos for better analysis",
+        "Mix and match your current items"
       ],
-      compatibilityScore: 0
+      compatibilityScore: 70
     };
   }
 };

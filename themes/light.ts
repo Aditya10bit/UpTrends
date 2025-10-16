@@ -1,65 +1,83 @@
 const lightTheme = {
-  // Enhanced modern backgrounds with subtle gradients and depth
-  background: '#fafbfc',
-  backgroundGradient: ['#fafbfc', '#f8fafc'],
+  // Ultra-modern backgrounds with premium gradients and depth
+  background: '#f8fafc',
+  backgroundGradient: ['#f8fafc', '#f1f5f9', '#e2e8f0'],
   card: '#ffffff',
   cardSecondary: '#f8fafc',
   cardTertiary: '#f1f5f9',
   backgroundSecondary: '#f1f5f9',
   backgroundAccent: '#eef2ff',
+  surfaceElevated: '#ffffff',
+  surfaceOverlay: 'rgba(255, 255, 255, 0.95)',
   
-  // Rich text colors with perfect contrast ratios
-  text: '#1a202c',
-  textSecondary: '#4a5568',
-  textTertiary: '#718096',
-  textAccent: '#5a67d8',
+  // Premium text colors with enhanced readability
+  text: '#0f172a',
+  textSecondary: '#334155',
+  textTertiary: '#64748b',
+  textAccent: '#6366f1',
+  textMuted: '#94a3b8',
   
-  // Refined border colors for subtle separation
+  // Ultra-refined border colors with glass morphism support
   border: '#e2e8f0',
   borderLight: '#f1f5f9',
   borderAccent: '#cbd5e0',
+  borderGlass: 'rgba(255, 255, 255, 0.2)',
+  borderGlow: 'rgba(99, 102, 241, 0.3)',
   
-  // Beautiful primary colors inspired by modern design systems
-  primary: '#667eea',        // Soft indigo - more approachable than harsh blues
-  primaryDark: '#5a67d8',    // Darker variant for interactions
-  primaryLight: '#edf2f7',   // Very light indigo
-  secondary: '#764ba2',      // Rich purple for accents
-  secondaryLight: '#f7fafc', // Almost white with hint of color
-  accent: '#48bb78',         // Fresh green for success states
-  accentLight: '#f0fff4',    // Very light green
+  // Next-gen primary colors with enhanced vibrancy
+  primary: '#6366f1',        // Modern indigo with perfect saturation
+  primaryDark: '#4f46e5',    // Rich indigo for interactions
+  primaryLight: '#e0e7ff',   // Ultra-light indigo
+  primaryGlow: 'rgba(99, 102, 241, 0.15)',
+  secondary: '#8b5cf6',      // Vibrant purple for accents
+  secondaryLight: '#f3f4f6', // Neutral light
+  accent: '#10b981',         // Premium emerald for success
+  accentLight: '#ecfdf5',    // Light emerald background
+  accentGlow: 'rgba(16, 185, 129, 0.15)',
   
-  // Enhanced status colors with perfect balance
-  success: '#38a169',        // Confident green
-  successLight: '#f0fff4',   // Light green background
-  warning: '#ed8936',        // Warm orange
-  warningLight: '#fffaf0',   // Light orange background
-  error: '#e53e3e',          // Clear red without being aggressive
-  errorLight: '#fed7d7',     // Light red background
-  trending: '#ed64a6',       // Playful pink for highlights
-  trendingLight: '#fef5e7',  // Light pink background
+  // Premium status colors with enhanced visual hierarchy
+  success: '#059669',        // Rich emerald
+  successLight: '#ecfdf5',   // Ultra-light emerald
+  successGlow: 'rgba(5, 150, 105, 0.15)',
+  warning: '#f59e0b',        // Premium amber
+  warningLight: '#fffbeb',   // Light amber background
+  warningGlow: 'rgba(245, 158, 11, 0.15)',
+  error: '#dc2626',          // Modern red
+  errorLight: '#fef2f2',     // Light red background
+  errorGlow: 'rgba(220, 38, 38, 0.15)',
+  trending: '#ec4899',       // Vibrant pink
+  trendingLight: '#fdf2f8',  // Light pink background
+  trendingGlow: 'rgba(236, 72, 153, 0.15)',
   
-  // Dynamic colors for different screens
-  homeAccent: '#667eea',     // Indigo for home
-  profileAccent: '#38b2ac',  // Teal for profile
-  wardrobeAccent: '#ed64a6', // Pink for wardrobe
-  twinningAccent: '#ff6b9d', // Rose for twinning/date
-  friendsAccent: '#4facfe',  // Blue for friends
-  makeOutfitAccent: '#f093fb', // Purple gradient for make outfit
+  // Premium screen-specific colors with enhanced branding
+  homeAccent: '#6366f1',     // Modern indigo for home
+  profileAccent: '#06b6d4',  // Cyan for profile
+  wardrobeAccent: '#ec4899', // Hot pink for wardrobe
+  twinningAccent: '#f43f5e', // Rose for twinning/date
+  friendsAccent: '#3b82f6',  // Blue for friends
+  makeOutfitAccent: '#8b5cf6', // Purple for make outfit
+  fashionAccent: '#f59e0b',  // Amber for fashion
+  styleCheckAccent: '#10b981', // Emerald for style check
   
-  // Subtle shadow for depth without heaviness
-  shadow: 'rgba(26, 32, 44, 0.08)',
-  shadowMedium: 'rgba(26, 32, 44, 0.12)',
-  shadowStrong: 'rgba(26, 32, 44, 0.16)',
+  // Premium shadows with glass morphism support
+  shadow: 'rgba(15, 23, 42, 0.08)',
+  shadowMedium: 'rgba(15, 23, 42, 0.12)',
+  shadowStrong: 'rgba(15, 23, 42, 0.16)',
+  shadowGlow: 'rgba(99, 102, 241, 0.25)',
+  shadowInset: 'inset 0 1px 0 rgba(255, 255, 255, 0.1)',
   
-  // Gradient combinations for modern visual appeal
-  gradientStart: '#667eea',
-  gradientEnd: '#764ba2',
-  gradientHome: ['#667eea', '#764ba2'],
-  gradientProfile: ['#38b2ac', '#4fd1c7'],
-  gradientWardrobe: ['#ed64a6', '#f093fb'],
-  gradientTwinning: ['#ff6b9d', '#c44569'],
-  gradientFriends: ['#4facfe', '#00f2fe'],
-  gradientMakeOutfit: ['#f093fb', '#f5576c'],
+  // Next-gen gradients with enhanced visual impact
+  gradientStart: '#6366f1',
+  gradientEnd: '#8b5cf6',
+  gradientHome: ['#6366f1', '#8b5cf6', '#ec4899'],
+  gradientProfile: ['#06b6d4', '#3b82f6', '#8b5cf6'],
+  gradientWardrobe: ['#ec4899', '#f43f5e', '#f59e0b'],
+  gradientTwinning: ['#f43f5e', '#ec4899', '#8b5cf6'],
+  gradientFriends: ['#3b82f6', '#06b6d4', '#10b981'],
+  gradientMakeOutfit: ['#8b5cf6', '#ec4899', '#f59e0b'],
+  gradientFashion: ['#f59e0b', '#f97316', '#dc2626'],
+  gradientStyleCheck: ['#10b981', '#059669', '#047857'],
+  gradientGlass: ['rgba(255, 255, 255, 0.25)', 'rgba(255, 255, 255, 0.1)'],
   
   // Additional modern colors for enhanced UI
   info: '#4299e1',           // Clear blue for information

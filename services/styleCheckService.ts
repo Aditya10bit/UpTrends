@@ -105,8 +105,8 @@ export const analyzeOutfitRating = async (input: StyleCheckInput): Promise<Style
   }
 
   try {
-    // Use Gemini 1.5 Pro for superior analysis
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
+    // Use Gemini 2.5 Flash for superior analysis
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
     styleCheckRateLimiter.recordCall();
 

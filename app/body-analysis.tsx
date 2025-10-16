@@ -337,26 +337,26 @@ export default function BodyAnalysisScreen() {
 
         if (gender === 'male') {
             bodyTypeMessage = lang === 'hindi'
-                ? 'अब मैं आपके बॉडी टाइप का विश्लेषण करूंगा! पुरुषों के लिए मुख्य बॉडी टाइप हैं: Rectangle, Triangle, Inverted Triangle, Oval। आप अपनी फोटो अपलोड करें या मैन्युअल चुनें? 💪'
+                ? 'अब मैं आपके बॉडी टाइप का विश्लेषण करूंगा! पुरुषों के लिए मुख्य बॉडी टाइप हैं: Slim/Ectomorph, Athletic/Muscular, Rectangle, Triangle, Inverted Triangle, Trapezoid, Diamond, Lean Muscular, Stocky, Tall & Lanky, Short & Sturdy। आप अपनी फोटो अपलोड करें या मैन्युअल चुनें? 💪'
                 : lang === 'hinglish'
-                    ? 'Ab main aapke body type ka analysis karunga! Males ke liye main body types hain: Rectangle, Triangle, Inverted Triangle, Oval. Aap apni photo upload karein ya manual choose karein? 💪'
-                    : 'Now let me analyze your body type! For males, the main body types are: Rectangle, Triangle, Inverted Triangle, Oval. Would you like to upload a photo for analysis or choose manually? 💪';
+                    ? 'Ab main aapke body type ka analysis karunga! Males ke liye enhanced body types hain: Slim/Ectomorph, Athletic/Muscular, Rectangle, Triangle, Inverted Triangle, Trapezoid, Diamond, Lean Muscular, Stocky, Tall & Lanky, Short & Sturdy. Aap apni photo upload karein ya manual choose karein? 💪'
+                    : 'Now let me analyze your body type! For males, we have comprehensive body types: Slim/Ectomorph, Athletic/Muscular, Rectangle, Triangle, Inverted Triangle, Trapezoid, Diamond, Lean Muscular, Stocky, Tall & Lanky, Short & Sturdy. Would you like to upload a photo for analysis or choose manually? 💪';
 
             options = ['📸 Upload Photo for Analysis', '✋ Choose Manually'];
         } else if (gender === 'female') {
             bodyTypeMessage = lang === 'hindi'
-                ? 'अब मैं आपके बॉडी टाइप का विश्लेषण करूंगा! महिलाओं के लिए मुख्य बॉडी टाइप हैं: Hourglass, Pear, Apple, Rectangle, Inverted Triangle। आप अपनी फोटो अपलोड करें या मैन्युअल चुनें? 👗'
+                ? 'अब मैं आपके बॉडी टाइप का विश्लेषण करूंगा! महिलाओं के लिए व्यापक बॉडी टाइप हैं: Hourglass, Pear, Apple, Rectangle, Inverted Triangle, Spoon, Top Hourglass, Bottom Hourglass, Slim/Petite, Athletic/Toned। आप अपनी फोटो अपलोड करें या मैन्युअल चुनें? 👗'
                 : lang === 'hinglish'
-                    ? 'Ab main aapke body type ka analysis karunga! Females ke liye main body types hain: Hourglass, Pear, Apple, Rectangle, Inverted Triangle. Aap apni photo upload karein ya manual choose karein? 👗'
-                    : 'Now let me analyze your body type! For females, the main body types are: Hourglass, Pear, Apple, Rectangle, Inverted Triangle. Would you like to upload a photo for analysis or choose manually? 👗';
+                    ? 'Ab main aapke body type ka analysis karunga! Females ke liye comprehensive body types hain: Hourglass, Pear, Apple, Rectangle, Inverted Triangle, Spoon, Top Hourglass, Bottom Hourglass, Slim/Petite, Athletic/Toned. Aap apni photo upload karein ya manual choose karein? 👗'
+                    : 'Now let me analyze your body type! For females, we have comprehensive body types: Hourglass, Pear, Apple, Rectangle, Inverted Triangle, Spoon, Top Hourglass, Bottom Hourglass, Slim/Petite, Athletic/Toned. Would you like to upload a photo for analysis or choose manually? 👗';
 
             options = ['📸 Upload Photo for Analysis', '✋ Choose Manually'];
         } else {
             bodyTypeMessage = lang === 'hindi'
-                ? 'अब मैं आपके बॉडी टाइप का विश्लेषण करूंगा! मुख्य बॉडी टाइप हैं: Rectangle, Pear, Apple, Hourglass, Triangle, Inverted Triangle। आप अपनी फोटो अपलोड करें या मैन्युअल चुनें? ✨'
+                ? 'अब मैं आपके बॉडी टाइप का विश्लेषण करूंगा! सभी के लिए व्यापक बॉडी टाइप हैं: Rectangle, Pear, Apple, Hourglass, Triangle, Inverted Triangle, Oval, Diamond, Slim/Lean, Athletic/Fit, Average/Balanced। आप अपनी फोटो अपलोड करें या मैन्युअल चुनें? ✨'
                 : lang === 'hinglish'
-                    ? 'Ab main aapke body type ka analysis karunga! Main body types hain: Rectangle, Pear, Apple, Hourglass, Triangle, Inverted Triangle. Aap apni photo upload karein ya manual choose karein? ✨'
-                    : 'Now let me analyze your body type! The main body types are: Rectangle, Pear, Apple, Hourglass, Triangle, Inverted Triangle. Would you like to upload a photo for analysis or choose manually? ✨';
+                    ? 'Ab main aapke body type ka analysis karunga! Universal body types hain: Rectangle, Pear, Apple, Hourglass, Triangle, Inverted Triangle, Oval, Diamond, Slim/Lean, Athletic/Fit, Average/Balanced. Aap apni photo upload karein ya manual choose karein? ✨'
+                    : 'Now let me analyze your body type! We have universal body types: Rectangle, Pear, Apple, Hourglass, Triangle, Inverted Triangle, Oval, Diamond, Slim/Lean, Athletic/Fit, Average/Balanced. Would you like to upload a photo for analysis or choose manually? ✨';
 
             options = ['📸 Upload Photo for Analysis', '✋ Choose Manually'];
         }

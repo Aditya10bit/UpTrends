@@ -1,65 +1,83 @@
 const darkTheme = {
-  // Enhanced rich, deep backgrounds for comfortable dark mode
-  background: '#0d1117',
-  backgroundGradient: ['#0d1117', '#161b22'],
-  card: '#161b22',
-  cardSecondary: '#21262d',
-  cardTertiary: '#30363d',
-  backgroundSecondary: '#1c2128',
+  // Ultra-premium dark backgrounds with enhanced depth
+  background: '#0f172a',
+  backgroundGradient: ['#0f172a', '#1e293b', '#334155'],
+  card: '#1e293b',
+  cardSecondary: '#334155',
+  cardTertiary: '#475569',
+  backgroundSecondary: '#1e293b',
   backgroundAccent: '#1a1f36',
+  surfaceElevated: '#334155',
+  surfaceOverlay: 'rgba(30, 41, 59, 0.95)',
   
-  // High contrast text for excellent readability
-  text: '#f0f6fc',
-  textSecondary: '#8b949e',
-  textTertiary: '#6e7681',
+  // Premium text colors with enhanced contrast
+  text: '#f8fafc',
+  textSecondary: '#cbd5e1',
+  textTertiary: '#94a3b8',
   textAccent: '#a78bfa',
+  textMuted: '#64748b',
   
-  // Subtle borders that don't overpower
-  border: '#30363d',
-  borderLight: '#21262d',
-  borderAccent: '#484f58',
+  // Premium borders with glass morphism support
+  border: '#475569',
+  borderLight: '#334155',
+  borderAccent: '#64748b',
+  borderGlass: 'rgba(255, 255, 255, 0.1)',
+  borderGlow: 'rgba(139, 92, 246, 0.3)',
   
-  // Vibrant but not harsh colors for dark mode
-  primary: '#7c3aed',        // Rich purple that pops on dark
-  primaryDark: '#6d28d9',    // Darker variant for interactions
-  primaryLight: '#1e1b4b',   // Very dark purple
-  secondary: '#a78bfa',      // Lighter purple for accents
-  secondaryLight: '#312e81', // Dark indigo
-  accent: '#34d399',         // Bright green that's easy on eyes
-  accentLight: '#064e3b',    // Very dark green
+  // Next-gen colors optimized for dark mode
+  primary: '#8b5cf6',        // Vibrant purple that pops
+  primaryDark: '#7c3aed',    // Rich purple for interactions
+  primaryLight: '#312e81',   // Dark purple background
+  primaryGlow: 'rgba(139, 92, 246, 0.25)',
+  secondary: '#a78bfa',      // Light purple for accents
+  secondaryLight: '#1e1b4b', // Very dark purple
+  accent: '#22d3ee',         // Bright cyan for success
+  accentLight: '#164e63',    // Dark cyan background
+  accentGlow: 'rgba(34, 211, 238, 0.25)',
   
-  // Enhanced status colors optimized for dark backgrounds
-  success: '#22c55e',        // Vibrant green
-  successLight: '#064e3b',   // Dark green background
-  warning: '#f59e0b',        // Warm amber
+  // Premium status colors for dark mode excellence
+  success: '#10b981',        // Rich emerald
+  successLight: '#064e3b',   // Dark emerald background
+  successGlow: 'rgba(16, 185, 129, 0.25)',
+  warning: '#f59e0b',        // Premium amber
   warningLight: '#451a03',   // Dark amber background
-  error: '#ef4444',          // Clear red
+  warningGlow: 'rgba(245, 158, 11, 0.25)',
+  error: '#ef4444',          // Vibrant red
   errorLight: '#450a0a',     // Dark red background
-  trending: '#f472b6',       // Bright pink
+  errorGlow: 'rgba(239, 68, 68, 0.25)',
+  trending: '#f472b6',       // Hot pink
   trendingLight: '#4c1d95',  // Dark pink background
+  trendingGlow: 'rgba(244, 114, 182, 0.25)',
   
-  // Dynamic colors for different screens (dark mode variants)
-  homeAccent: '#7c3aed',     // Purple for home
-  profileAccent: '#06b6d4',  // Cyan for profile
-  wardrobeAccent: '#f472b6', // Pink for wardrobe
+  // Premium screen-specific colors for dark mode
+  homeAccent: '#8b5cf6',     // Vibrant purple for home
+  profileAccent: '#22d3ee',  // Bright cyan for profile
+  wardrobeAccent: '#f472b6', // Hot pink for wardrobe
   twinningAccent: '#fb7185', // Rose for twinning/date
-  friendsAccent: '#3b82f6',  // Blue for friends
+  friendsAccent: '#60a5fa',  // Bright blue for friends
   makeOutfitAccent: '#a855f7', // Purple for make outfit
+  fashionAccent: '#fbbf24',  // Golden amber for fashion
+  styleCheckAccent: '#34d399', // Bright emerald for style check
   
-  // Deeper shadow for dark mode depth
+  // Enhanced shadows for dark mode depth and glow effects
   shadow: 'rgba(0, 0, 0, 0.6)',
   shadowMedium: 'rgba(0, 0, 0, 0.7)',
   shadowStrong: 'rgba(0, 0, 0, 0.8)',
+  shadowGlow: 'rgba(139, 92, 246, 0.4)',
+  shadowInset: 'inset 0 1px 0 rgba(255, 255, 255, 0.05)',
   
-  // Enhanced gradient combinations for dark mode
-  gradientStart: '#7c3aed',
+  // Next-gen gradients for dark mode excellence
+  gradientStart: '#8b5cf6',
   gradientEnd: '#a78bfa',
-  gradientHome: ['#7c3aed', '#a78bfa'],
-  gradientProfile: ['#06b6d4', '#0891b2'],
-  gradientWardrobe: ['#f472b6', '#ec4899'],
-  gradientTwinning: ['#fb7185', '#f43f5e'],
-  gradientFriends: ['#3b82f6', '#2563eb'],
-  gradientMakeOutfit: ['#a855f7', '#9333ea'],
+  gradientHome: ['#8b5cf6', '#a78bfa', '#f472b6'],
+  gradientProfile: ['#22d3ee', '#60a5fa', '#a78bfa'],
+  gradientWardrobe: ['#f472b6', '#fb7185', '#fbbf24'],
+  gradientTwinning: ['#fb7185', '#f472b6', '#a78bfa'],
+  gradientFriends: ['#60a5fa', '#22d3ee', '#34d399'],
+  gradientMakeOutfit: ['#a855f7', '#f472b6', '#fbbf24'],
+  gradientFashion: ['#fbbf24', '#f59e0b', '#ef4444'],
+  gradientStyleCheck: ['#34d399', '#10b981', '#059669'],
+  gradientGlass: ['rgba(255, 255, 255, 0.1)', 'rgba(255, 255, 255, 0.05)'],
   
   // Additional colors for enhanced dark UI
   info: '#60a5fa',           // Bright blue for dark mode

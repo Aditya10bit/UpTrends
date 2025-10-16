@@ -905,16 +905,22 @@ const styles = StyleSheet.create({
     padding: getResponsiveSize(16),
     borderRadius: getResponsiveSize(12),
     marginBottom: getResponsiveSize(12),
+    maxWidth: '100%',
+    overflow: 'hidden',
   },
   recommendationHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: getResponsiveSize(8),
+    flexWrap: 'wrap',
+    gap: getResponsiveSize(8),
   },
   recommendationStyle: {
     fontSize: getResponsiveFontSize(16),
     fontWeight: 'bold',
+    flexShrink: 1,
+    flexWrap: 'wrap',
   },
   recommendationMood: {
     fontSize: getResponsiveFontSize(12),
@@ -924,6 +930,8 @@ const styles = StyleSheet.create({
     fontSize: getResponsiveFontSize(14),
     marginBottom: getResponsiveSize(8),
     fontWeight: '500',
+    flexWrap: 'wrap',
+    lineHeight: 20,
   },
   recommendationColors: {
     marginBottom: getResponsiveSize(8),
@@ -956,6 +964,7 @@ const styles = StyleSheet.create({
     marginTop: getResponsiveSize(8),
     fontStyle: 'italic',
     lineHeight: 16,
+    flexWrap: 'wrap',
   },
   linksButton: {
     marginTop: getResponsiveSize(12),

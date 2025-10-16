@@ -33,41 +33,66 @@ const skinTones = [
   { label: 'Dark 🏿', value: 'Dark' },
 ];
 
-// Comprehensive body types that match AI analysis results
+// Comprehensive body types for males with enhanced options
 const maleBodyTypes = [
-  { label: 'Slim 🪶', value: 'Slim' },
-  { label: 'Average 👤', value: 'Average' },
-  { label: 'Athletic 💪', value: 'Athletic' },
-  { label: 'Heavy 🐻', value: 'Heavy' },
-  { label: 'Rectangle 📐', value: 'Rectangle' },
-  { label: 'Triangle 🔺', value: 'Triangle' },
-  { label: 'Inverted Triangle 🔻', value: 'Inverted Triangle' },
-  { label: 'Oval 🥚', value: 'Oval' },
+  // Basic Build Types
+  { label: 'Slim/Ectomorph 🪶', value: 'Slim' },
+  { label: 'Average/Mesomorph 👤', value: 'Average' },
+  { label: 'Athletic/Muscular 💪', value: 'Athletic' },
+  { label: 'Heavy/Endomorph 🐻', value: 'Heavy' },
+  
+  // Geometric Body Shapes
+  { label: 'Rectangle/Straight 📐', value: 'Rectangle' },
+  { label: 'Triangle/Pear 🔺', value: 'Triangle' },
+  { label: 'Inverted Triangle/V-Shape 🔻', value: 'Inverted Triangle' },
+  { label: 'Oval/Round 🥚', value: 'Oval' },
+  
+  // Additional Male-Specific Shapes
+  { label: 'Trapezoid/Broad 🏗️', value: 'Trapezoid' },
+  { label: 'Diamond/Rhomboid 💎', value: 'Diamond' },
+  { label: 'Lean Muscular 🏃‍♂️', value: 'Lean Muscular' },
+  { label: 'Stocky/Compact 🧱', value: 'Stocky' },
+  { label: 'Tall & Lanky 🗼', value: 'Tall Lanky' },
+  { label: 'Short & Sturdy ⛰️', value: 'Short Sturdy' },
 ];
 
 const femaleBodyTypes = [
-  { label: 'Slim 🪶', value: 'Slim' },
-  { label: 'Average 👤', value: 'Average' },
-  { label: 'Athletic 💪', value: 'Athletic' },
-  { label: 'Heavy 🐻', value: 'Heavy' },
+  // Basic Build Types
+  { label: 'Slim/Petite 🪶', value: 'Slim' },
+  { label: 'Average/Balanced 👤', value: 'Average' },
+  { label: 'Athletic/Toned 💪', value: 'Athletic' },
+  { label: 'Curvy/Full 🐻', value: 'Heavy' },
+  
+  // Classic Female Body Shapes
   { label: 'Hourglass ⏳', value: 'Hourglass' },
-  { label: 'Pear 🍐', value: 'Pear' },
-  { label: 'Apple 🍎', value: 'Apple' },
-  { label: 'Rectangle 📐', value: 'Rectangle' },
+  { label: 'Pear/Bottom Heavy 🍐', value: 'Pear' },
+  { label: 'Apple/Top Heavy 🍎', value: 'Apple' },
+  { label: 'Rectangle/Straight 📐', value: 'Rectangle' },
   { label: 'Inverted Triangle 🔻', value: 'Inverted Triangle' },
+  
+  // Additional Female-Specific Shapes
+  { label: 'Spoon/Hip Dip 🥄', value: 'Spoon' },
+  { label: 'Top Hourglass ⌛', value: 'Top Hourglass' },
+  { label: 'Bottom Hourglass ⏳', value: 'Bottom Hourglass' },
+  { label: 'Oval/Round 🥚', value: 'Oval' },
 ];
 
 const otherBodyTypes = [
-  { label: 'Slim 🪶', value: 'Slim' },
-  { label: 'Average 👤', value: 'Average' },
-  { label: 'Athletic 💪', value: 'Athletic' },
-  { label: 'Heavy 🐻', value: 'Heavy' },
-  { label: 'Rectangle 📐', value: 'Rectangle' },
-  { label: 'Pear 🍐', value: 'Pear' },
-  { label: 'Apple 🍎', value: 'Apple' },
-  { label: 'Hourglass ⏳', value: 'Hourglass' },
+  // Universal Build Types
+  { label: 'Slim/Lean 🪶', value: 'Slim' },
+  { label: 'Average/Balanced 👤', value: 'Average' },
+  { label: 'Athletic/Fit 💪', value: 'Athletic' },
+  { label: 'Full/Curvy 🐻', value: 'Heavy' },
+  
+  // Universal Geometric Shapes
+  { label: 'Rectangle/Straight 📐', value: 'Rectangle' },
+  { label: 'Pear/Bottom Heavy 🍐', value: 'Pear' },
+  { label: 'Apple/Top Heavy 🍎', value: 'Apple' },
+  { label: 'Hourglass/Balanced ⏳', value: 'Hourglass' },
   { label: 'Triangle 🔺', value: 'Triangle' },
   { label: 'Inverted Triangle 🔻', value: 'Inverted Triangle' },
+  { label: 'Oval/Round 🥚', value: 'Oval' },
+  { label: 'Diamond 💎', value: 'Diamond' },
 ];
 
 const genderList = [
