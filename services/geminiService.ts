@@ -1,4 +1,5 @@
-import { checkMemoryPressure } from '@/utils/apiSafeguards';
+// Temporarily disable to prevent startup crashes
+// import { checkMemoryPressure } from '../utils/apiSafeguards';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { geminiRateLimiter, getSecureApiKey } from '../config/security';
 import { trackAIRequest } from './analyticsService';
@@ -178,11 +179,11 @@ export const analyzeImageAndGenerateOutfits = async (
   prompt: string,
   userProfile?: any
 ): Promise<StyleAnalysisResult> => {
-  // Check memory pressure before making API call
-  if (checkMemoryPressure()) {
-    console.warn('High memory usage detected, using fallback response');
-    return generateFallbackResponse(prompt, userProfile);
-  }
+  // Check memory pressure before making API call (temporarily disabled)
+  // if (checkMemoryPressure()) {
+  //   console.warn('High memory usage detected, using fallback response');
+  //   return generateFallbackResponse(prompt, userProfile);
+  // }
 
   // Check rate limit
   if (!geminiRateLimiter.canMakeCall()) {
