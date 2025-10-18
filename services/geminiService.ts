@@ -1,3 +1,4 @@
+import { checkMemoryPressure } from '@/utils/apiSafeguards';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { geminiRateLimiter, getSecureApiKey } from '../config/security';
 import { trackAIRequest } from './analyticsService';
@@ -177,10 +178,17 @@ export const analyzeImageAndGenerateOutfits = async (
   prompt: string,
   userProfile?: any
 ): Promise<StyleAnalysisResult> => {
+  // Check memory pressure before making API call
+  if (checkMemoryPressure()) {
+    console.warn('High memory usage detected, using fallback response');
+    return generateFallbackResponse(prompt, userProfile);
+  }
+
   // Check rate limit
   if (!geminiRateLimiter.canMakeCall()) {
     const waitTime = Math.ceil(geminiRateLimiter.getTimeUntilNextCall() / 1000);
-    throw new Error(`Rate limit exceeded. Please wait ${waitTime} seconds before trying again.`);
+    console.warn(`Rate limit exceeded, using fallback response`);
+    return generateFallbackResponse(prompt, userProfile);
   }
 
   // Track AI request at the start
