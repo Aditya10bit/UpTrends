@@ -2,7 +2,7 @@
   "expo": {
     "name": "UpTrends",
     "slug": "uptrends",
-    "version": "1.0.1",
+    "version": "2.5.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "uptrends",
@@ -22,14 +22,18 @@
         "backgroundColor": "#667eea"
       },
       "package": "com.aditya10das.uptrends",
-      "versionCode": 2,
+      "versionCode": 25,
       "permissions": [
         "CAMERA",
         "READ_EXTERNAL_STORAGE", 
         "WRITE_EXTERNAL_STORAGE",
         "INTERNET",
         "ACCESS_NETWORK_STATE"
-      ]
+      ],
+      "allowBackup": false,
+      "networkSecurityConfig": {
+        "cleartextTrafficPermitted": false
+      }
     },
     "web": {
       "bundler": "metro",
