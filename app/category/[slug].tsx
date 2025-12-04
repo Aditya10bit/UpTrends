@@ -4,31 +4,30 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Dimensions,
-  RefreshControl,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
+    ActivityIndicator,
+    Dimensions,
+    RefreshControl,
+    ScrollView,
+    StatusBar,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from 'react-native';
 import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-  withTiming,
+    useAnimatedStyle,
+    useSharedValue,
+    withSpring,
+    withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import AIAdviceCard from '../../components/AIAdviceCard';
 import OutfitCard from '../../components/OutfitCard';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import categoryData from '../../data/categoryData';
 import { getOutfitSuggestions, OutfitSuggestion } from '../../services/outfitService';
 import {
-  getUserProfile
+    getUserProfile
 } from '../../services/userService';
 
 // Responsive utilities
@@ -53,10 +52,7 @@ export default function CategoryScreen() {
   const [userProfile, setUserProfile] = useState<any | null>(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
 
-  // Advice state
-  const [adviceData, setAdviceData] = useState<any[] | null>(null);
-  const [loadingAdvice, setLoadingAdvice] = useState(true);
-  const [adviceError, setAdviceError] = useState(false);
+  // Advice feature removed - using only Gemini outfit suggestions
 
 
   // Outfit suggestions state
@@ -116,24 +112,7 @@ export default function CategoryScreen() {
     }
   }, [user?.uid]);
 
-  // Fetch advice.json from Firebase Storage
-  const fetchAdvice = useCallback(async () => {
-    setLoadingAdvice(true);
-    setAdviceError(false);
-    try {
-      const url =
-        `https://firebasestorage.googleapis.com/v0/b/${process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID}.firebasestorage.app/o/advice.json?alt=media&token=b40ba6ea-0f83-4298-842e-5bf9ba9e1b84`;
-      const response = await fetch(url);
-      if (!response.ok) throw new Error('Failed to fetch advice data');
-      const data = await response.json();
-      setAdviceData(data);
-    } catch (error) {
-      setAdviceData(null);
-      setAdviceError(true);
-    } finally {
-      setLoadingAdvice(false);
-    }
-  }, []);
+  // fetchAdvice removed - no longer fetching from Firebase
 
   // Helper function to create user profile hash for cache validation
   const createUserProfileHash = useCallback((profile: any): string => {
@@ -216,8 +195,7 @@ export default function CategoryScreen() {
 
   useEffect(() => {
     loadUserData();
-    fetchAdvice();
-  }, [loadUserData, fetchAdvice, user?.uid]); // Added user?.uid to ensure reload on user change
+  }, [loadUserData, user?.uid]);
 
   // Fetch outfit suggestions when profile is complete
   useEffect(() => {
@@ -292,8 +270,7 @@ export default function CategoryScreen() {
     setRefreshing(true);
     await Promise.all([
       loadUserData(),
-      fetchAdvice(),
-      profileComplete ? fetchOutfitSuggestions(true) : Promise.resolve() // Force refresh on manual refresh
+      profileComplete ? fetchOutfitSuggestions(true) : Promise.resolve()
     ]);
     setRefreshing(false);
   };
@@ -319,284 +296,9 @@ export default function CategoryScreen() {
     );
   }
 
-  // --- Enhanced Advice Filtering Logic ---
-  function extractGenderFromCategorySlug(categorySlug: string): string | null {
-    const categoryLower = categorySlug.toLowerCase();
+  // Helper functions removed - no longer needed for advice filtering
 
-    if (categoryLower.includes('male-') || categoryLower.startsWith('male')) {
-      return 'male';
-    }
-
-    if (categoryLower.includes('female-') || categoryLower.startsWith('female')) {
-      return 'female';
-    }
-
-    return null;
-  }
-
-  function normalizeHeight(height: string | number): string {
-    const num = Number(height);
-    if (!isNaN(num)) {
-      if (num < 165) return 'short';
-      if (num <= 180) return 'average';
-      return 'tall';
-    }
-    return '';
-  }
-
-  function normalizeBodyType(bodyType: string): string {
-    if (!bodyType) return 'slim';
-    const type = bodyType.toLowerCase();
-    // Map bodyType to weight categories used in database
-    switch (type) {
-      case 'slim':
-      case 'thin':
-      case 'skinny':
-        return 'slim';
-      case 'athletic':
-      case 'muscular':
-      case 'fit':
-        return 'average';
-      case 'heavy':
-      case 'chubby':
-      case 'plus':
-        return 'heavy';
-      case 'obese':
-        return 'obese';
-      default:
-        return 'slim';
-    }
-  }
-
-  function mapCategoryToStyle(categorySlug: string): string {
-    // Map current category to style based on category
-    const slug = categorySlug.toLowerCase();
-
-    if (slug.includes('street')) return 'street';
-    if (slug.includes('formal')) return 'formal';
-    if (slug.includes('ethnic')) return 'ethnic';
-    if (slug.includes('party')) return 'party';
-    if (slug.includes('gym')) return 'gym';
-    if (slug.includes('office')) return 'formal';
-    if (slug.includes('elegant')) return 'elegant';
-
-    // Direct mappings
-    const mappings: { [key: string]: string } = {
-      'street-style': 'street',
-      'formal-wear': 'formal',
-      'ethnic-wear': 'ethnic',
-      'party-wear': 'party',
-      'gym-wear': 'gym',
-      'office-wear': 'formal',
-      'elegant-wear': 'elegant'
-    };
-
-    return mappings[slug] || 'casual';
-  }
-
-  function mapCategorySlugToDbCategory(categorySlug: string): string {
-    // Map URL slugs to database category names
-    const slug = categorySlug.toLowerCase();
-
-    // Handle combined slugs like "male-street-style" -> "street style"
-    if (slug.includes('street')) {
-      return 'street style';
-    }
-    if (slug.includes('formal')) {
-      return 'formal wear';
-    }
-    if (slug.includes('ethnic')) {
-      return 'ethnic wear';
-    }
-    if (slug.includes('party')) {
-      return 'party wear';
-    }
-    if (slug.includes('gym')) {
-      return 'gym wear';
-    }
-    if (slug.includes('office')) {
-      return 'office wear';
-    }
-    if (slug.includes('elegant')) {
-      return 'elegant wear';
-    }
-
-    // Direct mappings
-    const mappings: { [key: string]: string } = {
-      'street-style': 'street style',
-      'formal-wear': 'formal wear',
-      'ethnic-wear': 'ethnic wear',
-      'party-wear': 'party wear',
-      'gym-wear': 'gym wear',
-      'office-wear': 'office wear',
-      'elegant-wear': 'elegant wear'
-    };
-
-    return mappings[slug] || slug;
-  }
-
-  function filterAdvice(adviceArr: any[], userProfile: any, categorySlug: string) {
-    console.log('🔍 Starting filter with:', {
-      userProfile,
-      categorySlug,
-      totalAdviceEntries: adviceArr.length
-    });
-
-    // Step 1: Extract gender from category slug if present
-    const categoryGender = extractGenderFromCategorySlug(categorySlug);
-    const userGender = userProfile.gender ? userProfile.gender.toLowerCase() : 'male';
-    const finalGender = categoryGender || userGender;
-
-    console.log('🎯 Gender extraction:', {
-      categorySlug,
-      categoryGender,
-      userGender,
-      finalGender
-    });
-
-    // Step 2: Map category slug to database category name
-    const dbCategory = mapCategorySlugToDbCategory(categorySlug);
-    console.log('🗂️ Mapped category:', categorySlug, '->', dbCategory);
-
-    // Debug: Show all available categories in database
-    const availableCategories = [...new Set(adviceArr.map(entry => entry.category))];
-    console.log('📋 Available categories in database:', availableCategories);
-
-    // Step 3: Filter by category first - try exact match first
-    let categoryMatches = adviceArr.filter(entry =>
-      entry.category && entry.category.toLowerCase() === dbCategory.toLowerCase()
-    );
-
-    console.log('📂 Exact category matches found:', categoryMatches.length);
-
-    // If no exact matches, try partial matches
-    if (categoryMatches.length === 0) {
-      console.log('❌ No exact category matches, trying partial matches...');
-      categoryMatches = adviceArr.filter(entry =>
-        entry.category && entry.category.toLowerCase().includes(dbCategory.toLowerCase())
-      );
-      console.log('📂 Partial category matches found:', categoryMatches.length);
-    }
-
-    // If still no matches, try reverse partial matching (database category contains slug)
-    if (categoryMatches.length === 0) {
-      console.log('❌ No partial matches, trying reverse matching...');
-      const categoryKeywords = dbCategory.toLowerCase().split(' ');
-      categoryMatches = adviceArr.filter(entry => {
-        if (!entry.category) return false;
-        const entryCategory = entry.category.toLowerCase();
-        return categoryKeywords.some(keyword => entryCategory.includes(keyword));
-      });
-      console.log('📂 Reverse matches found:', categoryMatches.length);
-    }
-
-    if (categoryMatches.length === 0) {
-      console.log('❌ No category matches found at all');
-      return null;
-    }
-
-    // Step 4: Build user attributes for matching (using extracted gender)
-    const userAttributes = {
-      gender: finalGender,
-      height: userProfile.height ? normalizeHeight(userProfile.height) : 'short',
-      weight: normalizeBodyType(userProfile.bodyType),
-      skinTone: userProfile.skinTone ? userProfile.skinTone.toLowerCase() : 'fair',
-      style: mapCategoryToStyle(categorySlug) // Use category-based style
-    };
-
-    console.log('👤 User attributes:', userAttributes);
-
-    // Step 3: Score each category match
-    let bestMatch = null;
-    let maxScore = 0;
-    let allMatches = [];
-
-    for (const entry of categoryMatches) {
-      const forArr = entry.for ? entry.for.map((f: string) => f.toLowerCase()) : [];
-      let score = 0;
-      let matchDetails = [];
-
-      // Check each attribute match (database structure: [gender, height, weight, skinTone, style])
-      if (forArr.length >= 5) {
-        // Gender match
-        if (forArr[0] === userAttributes.gender) {
-          score += 10;
-          matchDetails.push(`gender: ${userAttributes.gender}`);
-        }
-
-        // Height match
-        if (forArr[1] === userAttributes.height) {
-          score += 8;
-          matchDetails.push(`height: ${userAttributes.height}`);
-        }
-
-        // Weight/Body type match
-        if (forArr[2] === userAttributes.weight) {
-          score += 15; // Higher weight for body type as it's most important
-          matchDetails.push(`weight: ${userAttributes.weight}`);
-        }
-
-        // Skin tone match
-        if (forArr[3] === userAttributes.skinTone) {
-          score += 12;
-          matchDetails.push(`skinTone: ${userAttributes.skinTone}`);
-        }
-
-        // Style match
-        if (forArr[4] === userAttributes.style) {
-          score += 5;
-          matchDetails.push(`style: ${userAttributes.style}`);
-        }
-      }
-
-      allMatches.push({
-        entry,
-        score,
-        matchDetails,
-        forFields: forArr,
-        userAttributes
-      });
-
-      if (score > maxScore) {
-        maxScore = score;
-        bestMatch = entry;
-      }
-    }
-
-    // Sort by score for debugging
-    allMatches.sort((a, b) => b.score - a.score);
-    console.log('🎯 Top 3 matches:', allMatches.slice(0, 3).map(m => ({
-      score: m.score,
-      matches: m.matchDetails,
-      forFields: m.forFields,
-      category: m.entry.category,
-      advicePreview: m.entry.advice?.slice(0, 1) // Show first advice item
-    })));
-    console.log('🏆 Best Match Score:', maxScore);
-    console.log('🥇 Selected Advice Category:', bestMatch?.category);
-    console.log('🎯 Selected Advice Preview:', bestMatch?.advice?.slice(0, 2));
-
-    // Return best match if we have a good score, otherwise first category match
-    const finalResult = bestMatch && maxScore > 0 ? bestMatch : categoryMatches[0];
-
-    console.log('✅ Final result:', {
-      category: finalResult?.category,
-      score: bestMatch === finalResult ? maxScore : 0,
-      adviceCount: finalResult?.advice?.length || 0
-    });
-
-    return finalResult;
-  }
-
-  const filteredAdviceObj =
-    adviceData && profileComplete && userProfile
-      ? filterAdvice(adviceData, userProfile, slug as string)
-      : null;
-
-  const filteredAdvice = filteredAdviceObj ? filteredAdviceObj.advice : [];
-  const adviceSources = filteredAdviceObj ? filteredAdviceObj.source : [];
-
-  // All outfit-related functions removed - focusing on AI advice only
+  // filterAdvice function removed - no longer using Firebase advice data
 
   const screenAnimatedStyle = useAnimatedStyle(() => ({
     opacity: screenOpacity.value,
@@ -670,44 +372,6 @@ export default function CategoryScreen() {
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
           >
-            {/* AI Advice Section */}
-            {loadingAdvice ? (
-              <View style={styles.loaderContainer}>
-                <ActivityIndicator size="large" color={theme.primary} />
-                <Text style={[styles.loadingText, { color: theme.text }]}>
-                  Loading your personalized AI advice...
-                </Text>
-              </View>
-            ) : adviceError ? (
-              <View style={styles.loaderContainer}>
-                <Text style={[styles.loadingText, { color: theme.text }]}>
-                  Could not load AI advice.
-                </Text>
-                <TouchableOpacity
-                  style={styles.retryButton}
-                  onPress={fetchAdvice}
-                >
-                  <Ionicons name="refresh" size={18} color="#fff" />
-                  <Text
-                    style={{
-                      color: '#fff',
-                      fontWeight: 'bold',
-                      marginLeft: 6,
-                    }}
-                  >
-                    Retry
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <AIAdviceCard
-                advice={filteredAdvice}
-                sources={adviceSources}
-                isProfileComplete={!!profileComplete}
-                theme={theme}
-              />
-            )}
-
             {/* Outfit Suggestions */}
             {!slug?.toString().toLowerCase().includes('twinning') && (
               <>
@@ -782,9 +446,6 @@ export default function CategoryScreen() {
               </Text>
               <Text style={[styles.categoryDescription, { color: theme.textSecondary }]}>
                 {category.description}
-              </Text>
-              <Text style={[styles.aiOnlyMessage, { color: theme.primary }]}>
-                🤖 Get personalized AI advice for this style category
               </Text>
             </View>
 

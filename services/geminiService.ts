@@ -29,7 +29,7 @@ let isProcessingQueue = false;
 // Performance optimization: Model instances with different configurations
 const models = {
   fast: genAI.getGenerativeModel({
-    model: 'gemini-2.0-flash-exp',
+    model: 'gemini-2.0-flash-lite',
     generationConfig: {
       temperature: 0.7,
       topK: 40,
@@ -38,7 +38,7 @@ const models = {
     }
   }),
   balanced: genAI.getGenerativeModel({
-    model: 'gemini-2.5-flash',
+    model: 'gemini-2.0-flash-lite',
     generationConfig: {
       temperature: 0.8,
       topK: 40,
@@ -47,7 +47,7 @@ const models = {
     }
   }),
   quality: genAI.getGenerativeModel({
-    model: 'gemini-2.5-pro',
+    model: 'gemini-2.0-flash-lite',
     generationConfig: {
       temperature: 0.9,
       topK: 40,
@@ -1061,7 +1061,7 @@ export const getChatbotResponse = async (prompt: string): Promise<string> => {
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
 
     const chatPrompt = `
 You are StyleBuddy, a friendly and knowledgeable fashion chatbot assistant. You help users understand their body type and provide personalized fashion advice.
@@ -1108,7 +1108,7 @@ export const analyzeBodyImage = async (imageUri: string, customPrompt?: string):
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
 
     // Convert image to base64
     const response = await fetch(imageUri);
@@ -1177,7 +1177,7 @@ export const analyzeVenueComprehensively = async (imageUri: string, category: st
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
 
     // Convert image to base64
     const response = await fetch(imageUri);
@@ -1257,7 +1257,7 @@ export const analyzeProfileBodyTypeFromImage = async (imageUri: string, gender?:
   const normalizedGender = gender ? gender.toLowerCase().trim() : 'unknown';
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
 
     // Convert image to base64
     const response = await fetch(imageUri);
@@ -1383,7 +1383,7 @@ export const analyzeBodyTypeFromImage = async (imageUri: string, gender?: string
   const normalizedGender = gender ? gender.toLowerCase().trim() : 'unknown';
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' }); // Use Flash for better reliability
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' }); // Use Flash for better reliability
 
     // Convert image to base64
     const response = await fetch(imageUri);
@@ -1508,7 +1508,7 @@ export const generatePersonalizedFashionTips = async (
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
 
     const tipsPrompt = `
 You are StyleBuddy, a friendly fashion assistant. Provide personalized fashion advice for this user:
@@ -1602,7 +1602,7 @@ export
     }
 
     try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
 
       const result = await model.generateContent(prompt);
       const responseText = result.response.text();
@@ -2230,7 +2230,7 @@ export const generateTodaysOutfit = async (userProfile: any, weather: any): Prom
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' }); // Using Pro model for better results
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' }); // Using Pro model for better results
 
     const prompt = `
 You are a professional fashion stylist and weather expert. Create the perfect outfit recommendation for today based on the weather and user's profile.
@@ -2590,11 +2590,11 @@ export const generateTopographyAwareOutfits = async (
       // Try different models based on attempt
       let model;
       if (attempt === 1) {
-        model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+        model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
       } else if (attempt === 2) {
-        model = genAI.getGenerativeModel({ model: 'gemini-2.5-pro' });
+        model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
       } else {
-        model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+        model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
       }
 
       // Convert image to base64
@@ -2749,11 +2749,11 @@ export const generateWeatherAwareOutfits = async (
       // Try different models based on attempt
       let model;
       if (attempt === 1) {
-        model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+        model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
       } else if (attempt === 2) {
-        model = genAI.getGenerativeModel({ model: 'gemini-2.5-pro' });
+        model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
       } else {
-        model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+        model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
       }
 
       // Convert image to base64
@@ -3439,7 +3439,7 @@ export const validateClothingImage = async (imageUri: string): Promise<{ isValid
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
 
     // Convert image to base64
     const response = await fetch(imageUri);
@@ -3595,7 +3595,7 @@ export const generateWardrobeBasedOutfits = async (
   trackAIRequest();
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
 
     // Convert images to base64
     const imageParts = await Promise.all(
@@ -3748,7 +3748,7 @@ export const analyzeOutfitCompatibility = async (
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
 
     // Convert images to base64
     const imageParts = await Promise.all(

@@ -12,8 +12,8 @@ interface ErrorBoundaryState {
   hasError: boolean;
 }
 
-class StartupErrorBoundary extends React.Component<{children: React.ReactNode}, ErrorBoundaryState> {
-  constructor(props: {children: React.ReactNode}) {
+class StartupErrorBoundary extends React.Component<{ children: React.ReactNode }, ErrorBoundaryState> {
+  constructor(props: { children: React.ReactNode }) {
     super(props);
     this.state = { hasError: false };
   }
@@ -22,7 +22,7 @@ class StartupErrorBoundary extends React.Component<{children: React.ReactNode}, 
     return { hasError: true };
   }
 
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+  componentDidCatch(error: Error, errorInfo: any) {
     console.error('Startup Error:', error, errorInfo);
   }
 
