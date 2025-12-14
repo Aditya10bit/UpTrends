@@ -2,7 +2,7 @@
 import { router, useRootNavigationState } from 'expo-router';
 import { User, onAuthStateChanged, signOut } from 'firebase/auth';
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { auth } from '../firebaseConfig';
+import { auth, isFirebaseInitialized } from '../firebaseConfig';
 
 interface AuthContextType {
   user: User | null;
@@ -13,7 +13,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
-  logout: async () => {},
+  logout: async () => { },
 });
 
 export const useAuth = () => {
@@ -32,6 +32,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     try {
+      if (!isFirebaseInitialized || !auth) {
+        console.warn('AuthContext: Firebase not initialized, auth disabled');
+        setLoading(false);
+        return;
+      }
+
       const unsubscribe = onAuthStateChanged(auth, (user) => {
         console.log('Auth state changed:', user ? 'User logged in' : 'User logged out');
         setUser(user);
@@ -53,9 +59,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Navigation effect - production-safe
   useEffect(() => {
     if (!rootNavigationState?.key || loading) return;
-    
+
     console.log('AuthContext navigation - User:', user ? 'exists' : 'null');
-    
+
     // Add timeout to prevent race conditions in production
     const navigationTimeout = setTimeout(() => {
       try {

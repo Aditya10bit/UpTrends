@@ -5,29 +5,29 @@ import { router } from 'expo-router';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-    Alert,
-    Dimensions,
-    Image,
-    Platform,
-    RefreshControl,
-    ScrollView,
-    StatusBar,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  Alert,
+  Dimensions,
+  Image,
+  Platform,
+  RefreshControl,
+  ScrollView,
+  StatusBar,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
-import { storage } from '../firebaseConfig';
+import { isFirebaseInitialized, storage } from '../firebaseConfig';
 
 import Animated, {
-    useAnimatedStyle,
-    useSharedValue,
-    withDelay,
-    withSpring,
-    withTiming
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withSpring,
+  withTiming
 } from 'react-native-reanimated';
 import { getUserAnalytics, syncAnalyticsWithFirebase, UserAnalytics } from '../services/analyticsService';
 import { getUserProfile, updateUserProfile } from '../services/userService';
@@ -287,6 +287,10 @@ export default function ProfileScreen() {
   const uploadProfileImage = async (imageUri: string) => {
     try {
       setUploading(true);
+
+      if (!isFirebaseInitialized || !storage) {
+        throw new Error('Firebase Storage not initialized');
+      }
 
       // Check if user is authenticated
       if (!user?.uid) {

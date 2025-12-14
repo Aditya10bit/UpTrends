@@ -1,11 +1,10 @@
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FirebaseApp, initializeApp } from 'firebase/app';
-import { Auth, getAuth, getReactNativePersistence, initializeAuth } from 'firebase/auth';
+import { Auth, getAuth } from 'firebase/auth';
 import { Firestore, getFirestore } from 'firebase/firestore';
 import { FirebaseStorage, getStorage } from 'firebase/storage';
 
-// Validate environment variables
+// Validate environment variables - Safe version
 const validateEnvironment = () => {
   const requiredVars = [
     'EXPO_PUBLIC_FIREBASE_API_KEY',
@@ -19,53 +18,57 @@ const validateEnvironment = () => {
   const missing = requiredVars.filter(varName => !process.env[varName]);
 
   if (missing.length > 0) {
-    throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
+    console.error(`Missing required environment variables: ${missing.join(', ')}`);
+    return false;
   }
+  return true;
 };
 
-// Validate environment on initialization
-validateEnvironment();
+// Validated config or null
+const getFirebaseConfig = () => {
+  if (!validateEnvironment()) return null;
 
-// Firebase configuration using environment variables
-const firebaseConfig = {
-  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY!,
-  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN!,
-  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID!,
-  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET!,
-  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID!,
-  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID!
+  return {
+    apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY!,
+    authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN!,
+    projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID!,
+    storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET!,
+    messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID!,
+    appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID!
+  };
 };
 
-let app: FirebaseApp;
-let auth: Auth;
-let db: Firestore;
-let storage: FirebaseStorage;
+let app: FirebaseApp | undefined;
+let auth: Auth | undefined;
+let db: Firestore | undefined;
+let storage: FirebaseStorage | undefined;
+let isFirebaseInitialized = false;
+let initializationError: Error | null = null;
 
 try {
-  app = initializeApp(firebaseConfig);
+  const config = getFirebaseConfig();
+  if (config) {
+    app = initializeApp(config);
 
-  // Initialize Firebase Auth with AsyncStorage persistence
-  try {
-    auth = initializeAuth(app, {
-      persistence: getReactNativePersistence(AsyncStorage)
-    });
-    console.log('Firebase Auth initialized successfully with AsyncStorage persistence');
-
-  } catch (authError) {
-    // If initializeAuth fails (already initialized), use getAuth
-    console.log('Auth already initialized, using existing instance');
+    // Initialize Firebase Auth - Firebase v11 handles persistence automatically
     auth = getAuth(app);
+    console.log('Firebase Auth initialized successfully');
+
+    db = getFirestore(app);
+    storage = getStorage(app);
+    isFirebaseInitialized = true;
+    console.log('Firebase initialized successfully with secure configuration');
+  } else {
+    initializationError = new Error("Missing environment variables");
+    console.warn("Firebase skipped due to missing config");
   }
-
-  db = getFirestore(app);
-  storage = getStorage(app);
-
-  console.log('Firebase initialized successfully with secure configuration');
 } catch (error) {
   console.error('Firebase initialization failed:', error);
-  throw error;
+  // Do NOT throw here, just log it.
+  initializationError = error as Error;
 }
 
-export { auth, db, storage };
+// We export these. They might be undefined if init failed.
+// Consumers should check `isFirebaseInitialized` or check for undefined.
+export { app, auth, db, initializationError, isFirebaseInitialized, storage };
 export default app;
-

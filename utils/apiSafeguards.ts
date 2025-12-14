@@ -6,11 +6,11 @@ class CircuitBreaker {
   private failures = 0;
   private lastFailureTime = 0;
   private state: 'CLOSED' | 'OPEN' | 'HALF_OPEN' = 'CLOSED';
-  
+
   constructor(
     private threshold = 5, // Max failures before opening
     private timeout = 60000 // 1 minute timeout
-  ) {}
+  ) { }
 
   async execute<T>(operation: () => Promise<T>): Promise<T> {
     if (this.state === 'OPEN') {
@@ -39,7 +39,7 @@ class CircuitBreaker {
   private onFailure() {
     this.failures++;
     this.lastFailureTime = Date.now();
-    
+
     if (this.failures >= this.threshold) {
       this.state = 'OPEN';
     }
@@ -70,14 +70,14 @@ class RequestQueue {
           reject(error);
         }
       });
-      
+
       this.processQueue();
     });
   }
 
   private async processQueue() {
     if (this.processing || this.activeRequests >= this.maxConcurrent) return;
-    
+
     const request = this.queue.shift();
     if (!request) return;
 
@@ -89,7 +89,7 @@ class RequestQueue {
     } finally {
       this.activeRequests--;
       this.processing = false;
-      
+
       // Process next request after a small delay to prevent UI blocking
       setTimeout(() => this.processQueue(), 100);
     }
@@ -100,12 +100,12 @@ export const apiRequestQueue = new RequestQueue();
 
 // Timeout wrapper to prevent hanging requests
 export const withTimeout = <T>(
-  promise: Promise<T>, 
+  promise: Promise<T>,
   timeoutMs: number = 15000
 ): Promise<T> => {
   return Promise.race([
     promise,
-    new Promise<T>((_, reject) => 
+    new Promise<T>((_, reject) =>
       setTimeout(() => reject(new Error('Request timeout')), timeoutMs)
     )
   ]);
@@ -129,11 +129,11 @@ export const safeApiCall = async <T>(
       const result = await geminiCircuitBreaker.execute(async () => {
         return await apiRequestQueue.add(() => withTimeout(apiCall(), timeout));
       });
-      
+
       return result;
     } catch (error) {
       console.warn(`API call attempt ${attempt + 1} failed:`, error);
-      
+
       // If it's the last attempt, handle the error
       if (attempt === retries) {
         if (showErrorAlert) {
@@ -143,25 +143,29 @@ export const safeApiCall = async <T>(
             [{ text: 'OK' }]
           );
         }
-        
+
         // Return fallback data instead of crashing
         return fallback;
       }
-      
+
       // Wait before retry (exponential backoff)
       await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
     }
   }
-  
+
   return fallback;
 };
 
 // Memory pressure detection
 export const checkMemoryPressure = (): boolean => {
-  if (typeof performance !== 'undefined' && (performance as any).memory) {
-    const memory = (performance as any).memory;
-    const usageRatio = memory.usedJSHeapSize / memory.totalJSHeapSize;
-    return usageRatio > 0.8; // 80% memory usage threshold
+  try {
+    if (typeof performance !== 'undefined' && (performance as any).memory) {
+      const memory = (performance as any).memory;
+      const usageRatio = memory.usedJSHeapSize / memory.totalJSHeapSize;
+      return usageRatio > 0.8; // 80% memory usage threshold
+    }
+  } catch (e) {
+    // Ignore memory check errors on platforms that don't support it
   }
   return false;
 };
@@ -176,7 +180,7 @@ export const debounceApiCall = <T extends (...args: any[]) => Promise<any>>(
 
   return ((...args: Parameters<T>) => {
     clearTimeout(timeoutId);
-    
+
     // Return the last pending call if it exists
     if (lastCall) {
       return lastCall;
@@ -210,7 +214,7 @@ export const checkApiHealth = async (): Promise<boolean> => {
       }),
       5000
     );
-    
+
     return healthCheck.ok;
   } catch {
     return false;

@@ -4,7 +4,7 @@ import { createUserWithEmailAndPassword, sendPasswordResetEmail, signInWithEmail
 import React, { useState } from 'react';
 import { Alert, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
-import { auth } from '../firebaseConfig';
+import { auth, isFirebaseInitialized } from '../firebaseConfig';
 import { checkUserProfile, createUserProfile } from '../services/userService';
 
 export default function AuthScreen() {
@@ -16,6 +16,11 @@ export default function AuthScreen() {
   const router = useRouter();
 
   const handleEmailAuth = async () => {
+    if (!isFirebaseInitialized || !auth) {
+      Alert.alert('Configuration Error', 'App is not connected to Firebase. Please check your configuration.');
+      return;
+    }
+
     if (!email || !password) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
@@ -47,6 +52,11 @@ export default function AuthScreen() {
   };
 
   const handleForgotPassword = async () => {
+    if (!isFirebaseInitialized || !auth) {
+      Alert.alert('Configuration Error', 'App is not connected to Firebase.');
+      return;
+    }
+
     if (!email) {
       Alert.alert('Error', 'Please enter your email first!');
       return;
