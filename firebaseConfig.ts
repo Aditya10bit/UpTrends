@@ -1,8 +1,19 @@
 
+import Constants from 'expo-constants';
 import { FirebaseApp, initializeApp } from 'firebase/app';
 import { Auth, getAuth } from 'firebase/auth';
 import { Firestore, getFirestore } from 'firebase/firestore';
 import { FirebaseStorage, getStorage } from 'firebase/storage';
+
+// Get environment variables from expo-constants (works in production builds)
+const getEnvVar = (key: string): string | undefined => {
+  // Try expo-constants first (for EAS builds)
+  const extraValue = Constants.expoConfig?.extra?.[key];
+  if (extraValue) return extraValue;
+
+  // Fallback to process.env (for development)
+  return process.env[key];
+};
 
 // Validate environment variables - Safe version
 const validateEnvironment = () => {
@@ -15,10 +26,11 @@ const validateEnvironment = () => {
     'EXPO_PUBLIC_FIREBASE_APP_ID'
   ];
 
-  const missing = requiredVars.filter(varName => !process.env[varName]);
+  const missing = requiredVars.filter(varName => !getEnvVar(varName));
 
   if (missing.length > 0) {
     console.error(`Missing required environment variables: ${missing.join(', ')}`);
+    console.log('Available extra keys:', Object.keys(Constants.expoConfig?.extra || {}));
     return false;
   }
   return true;
@@ -29,12 +41,12 @@ const getFirebaseConfig = () => {
   if (!validateEnvironment()) return null;
 
   return {
-    apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY!,
-    authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN!,
-    projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID!,
-    storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET!,
-    messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID!,
-    appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID!
+    apiKey: getEnvVar('EXPO_PUBLIC_FIREBASE_API_KEY')!,
+    authDomain: getEnvVar('EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN')!,
+    projectId: getEnvVar('EXPO_PUBLIC_FIREBASE_PROJECT_ID')!,
+    storageBucket: getEnvVar('EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET')!,
+    messagingSenderId: getEnvVar('EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID')!,
+    appId: getEnvVar('EXPO_PUBLIC_FIREBASE_APP_ID')!
   };
 };
 
