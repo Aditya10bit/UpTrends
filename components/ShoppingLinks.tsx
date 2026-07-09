@@ -2,7 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useRef } from 'react';
-import { Alert, Animated, Linking, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Animated, Text, TouchableOpacity, View } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
 
 interface ShoppingLinksProps {
   result: {
@@ -126,13 +127,11 @@ const ShoppingItemCard: React.FC<{
   const handlePress = async () => {
     try {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      const supported = await Linking.canOpenURL(item.url);
-      
-      if (supported) {
-        await Linking.openURL(item.url);
-      } else {
-        Alert.alert('Error', 'Unable to open this link');
-      }
+      await WebBrowser.openBrowserAsync(item.url, {
+        readerMode: false,
+        enableBarCollapsing: true,
+        dismissButtonStyle: 'close',
+      });
     } catch (error) {
       console.error('Error opening link:', error);
       Alert.alert('Error', 'Unable to open this link');

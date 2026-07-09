@@ -1,12 +1,174 @@
 // Temporarily disable to prevent startup crashes
 // import { checkMemoryPressure } from '../utils/apiSafeguards';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { geminiRateLimiter, getSecureApiKey } from '../config/security';
 import { trackAIRequest } from './analyticsService';
 import { TopographyData } from './topographyService';
 
-const API_KEY = getSecureApiKey();
-const genAI = new GoogleGenerativeAI(API_KEY);
+// --- Dynamic API Key Resolution ---
+// Checks AsyncStorage for a user-provided custom key first,
+// falls back to the developer's bundled key.
+const CUSTOM_KEY_STORAGE_KEY = 'user_gemini_api_key';
+
+let cachedCustomKey: string | null | undefined = undefined; // undefined = not yet checked
+let cachedGenAIInstance: GoogleGenerativeAI | null = null;
+let lastKeySource: 'custom' | 'default' = 'default';
+
+const getGenAIInstance = async (): Promise<GoogleGenerativeAI> => {
+  try {
+    // Check AsyncStorage for a user-provided key (cache after first read)
+    if (cachedCustomKey === undefined) {
+      cachedCustomKey = await AsyncStorage.getItem(CUSTOM_KEY_STORAGE_KEY);
+    }
+
+    if (cachedCustomKey && cachedCustomKey.startsWith('AIza') && cachedCustomKey.length > 10) {
+      // User has a valid custom key
+      if (lastKeySource !== 'custom' || !cachedGenAIInstance) {
+        console.log('[Gemini] Using user-provided custom API key');
+        cachedGenAIInstance = new GoogleGenerativeAI(cachedCustomKey.trim());
+        lastKeySource = 'custom';
+      }
+      return cachedGenAIInstance;
+    }
+  } catch (err) {
+    console.error('[Gemini] Error reading custom API key, falling back to default:', err);
+  }
+
+  // Fallback to developer's bundled key
+  if (lastKeySource !== 'default' || !cachedGenAIInstance) {
+    const defaultKey = getSecureApiKey();
+    cachedGenAIInstance = new GoogleGenerativeAI(defaultKey);
+    lastKeySource = 'default';
+    console.log('[Gemini] Using default developer API key');
+  }
+  return cachedGenAIInstance!;
+};
+
+/**
+ * Call this after the user saves or removes a custom API key
+ * to force re-resolution on the next AI request.
+ */
+export const invalidateApiKeyCache = () => {
+  cachedCustomKey = undefined;
+  cachedGenAIInstance = null;
+  lastKeySource = 'default';
+  console.log('[Gemini] API key cache invalidated — will re-resolve on next request');
+};
+
+/**
+ * Returns which key source is currently active: 'custom' or 'default'.
+ */
+export const getActiveKeySource = async (): Promise<'custom' | 'default'> => {
+  try {
+    const customKey = await AsyncStorage.getItem(CUSTOM_KEY_STORAGE_KEY);
+    if (customKey && customKey.startsWith('AIza') && customKey.length > 10) {
+      return 'custom';
+    }
+  } catch {}
+  return 'default';
+};
+
+/**
+ * Tests a Gemini API key by making a minimal request.
+ * Returns { success: true } or { success: false, error: string }.
+ */
+export const testApiKey = async (apiKey: string): Promise<{ success: boolean; error?: string }> => {
+  try {
+    if (!apiKey || !apiKey.startsWith('AIza') || apiKey.length < 20) {
+      return { success: false, error: 'Invalid key format. Keys should start with "AIza" and be at least 20 characters.' };
+    }
+    const testGenAI = new GoogleGenerativeAI(apiKey.trim());
+    const testModel = testGenAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
+    const result = await testModel.generateContent('Respond with exactly one word: Ready');
+    const text = result.response?.text?.();
+    if (text) {
+      return { success: true };
+    }
+    return { success: false, error: 'API key connected but returned an empty response.' };
+  } catch (error: any) {
+    const msg = error.message || 'Unknown error';
+    if (msg.includes('API_KEY_INVALID') || msg.includes('400')) {
+      return { success: false, error: 'This API key is invalid. Please check and try again.' };
+    }
+    if (msg.includes('403') || msg.includes('PERMISSION_DENIED')) {
+      return { success: false, error: 'This API key does not have permission to access the Gemini API.' };
+    }
+    if (msg.includes('429') || msg.includes('Quota')) {
+      return { success: false, error: 'This API key has exceeded its quota. Try again later or use a different key.' };
+    }
+    return { success: false, error: `Connection failed: ${msg.slice(0, 120)}` };
+  }
+};
+
+// --- Dynamic genAI wrapper ---
+// Resolves the correct GoogleGenerativeAI instance (custom or default)
+// at call-time, not at import-time.
+export const genAI = {
+  getGenerativeModel: (params: any) => {
+    // Return a model-like object whose generateContent resolves the key dynamically
+    return {
+      generateContent: async (request: any, options?: any) => {
+        const instance = await getGenAIInstance();
+        const model = instance.getGenerativeModel(params);
+
+        // Exponential backoff retry logic
+        let delay = 1000;
+        const maxRetries = 3;
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+          try {
+            return await model.generateContent(request, options);
+          } catch (error: any) {
+            const isQuota = error.message?.includes('429') || error.message?.includes('Quota') || error.message?.includes('Too Many Requests');
+            const isOverloaded = error.message?.includes('503') || error.message?.includes('overloaded');
+
+            if ((isQuota || isOverloaded) && attempt < maxRetries) {
+              console.warn(`[Gemini] API error (Attempt ${attempt}/${maxRetries}). Retrying in ${delay}ms...`, error.message);
+              await new Promise(resolve => setTimeout(resolve, delay));
+              delay *= 2;
+            } else {
+              throw error;
+            }
+          }
+        }
+        throw new Error("Max retries exceeded");
+      }
+    };
+  }
+};
+
+// Performance optimization: Lazy model getters (re-resolve key on each call)
+const getModel = (config: any) => genAI.getGenerativeModel(config);
+
+const models = {
+  get fast() { return getModel({
+    model: 'gemini-3.5-flash',
+    generationConfig: {
+      temperature: 0.7,
+      topK: 40,
+      topP: 0.95,
+      maxOutputTokens: 2048,
+    }
+  }); },
+  get balanced() { return getModel({
+    model: 'gemini-3.5-flash',
+    generationConfig: {
+      temperature: 0.8,
+      topK: 40,
+      topP: 0.95,
+      maxOutputTokens: 4096,
+    }
+  }); },
+  get quality() { return getModel({
+    model: 'gemini-3.5-flash',
+    generationConfig: {
+      temperature: 0.9,
+      topK: 40,
+      topP: 0.95,
+      maxOutputTokens: 8192,
+    }
+  }); }
+};
 
 // Performance optimization: Cache for frequently used responses
 const responseCache = new Map<string, { data: any; timestamp: number; ttl: number }>();
@@ -25,37 +187,6 @@ interface QueuedRequest {
 
 const requestQueue: QueuedRequest[] = [];
 let isProcessingQueue = false;
-
-// Performance optimization: Model instances with different configurations
-const models = {
-  fast: genAI.getGenerativeModel({
-    model: 'gemini-2.0-flash-lite',
-    generationConfig: {
-      temperature: 0.7,
-      topK: 40,
-      topP: 0.95,
-      maxOutputTokens: 2048,
-    }
-  }),
-  balanced: genAI.getGenerativeModel({
-    model: 'gemini-2.0-flash-lite',
-    generationConfig: {
-      temperature: 0.8,
-      topK: 40,
-      topP: 0.95,
-      maxOutputTokens: 4096,
-    }
-  }),
-  quality: genAI.getGenerativeModel({
-    model: 'gemini-2.0-flash-lite',
-    generationConfig: {
-      temperature: 0.9,
-      topK: 40,
-      topP: 0.95,
-      maxOutputTokens: 8192,
-    }
-  })
-};
 
 // Cache management functions
 const getCacheKey = (prompt: string, model: string): string => {
@@ -441,8 +572,9 @@ Be precise and choose the most accurate body type from the comprehensive list ab
 `;
 
     // Use fast model for body analysis
-    const result = await queueRequest(analysisPrompt + JSON.stringify(imagePart), 'fast', 3);
-    return result;
+    const model = models.fast;
+    const result = await model.generateContent([analysisPrompt, imagePart]);
+    return result.response.text();
 
   } catch (error) {
     console.error('Body analysis error:', error);
@@ -1061,7 +1193,7 @@ export const getChatbotResponse = async (prompt: string): Promise<string> => {
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
 
     const chatPrompt = `
 You are StyleBuddy, a friendly and knowledgeable fashion chatbot assistant. You help users understand their body type and provide personalized fashion advice.
@@ -1108,7 +1240,7 @@ export const analyzeBodyImage = async (imageUri: string, customPrompt?: string):
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
 
     // Convert image to base64
     const response = await fetch(imageUri);
@@ -1177,7 +1309,7 @@ export const analyzeVenueComprehensively = async (imageUri: string, category: st
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
 
     // Convert image to base64
     const response = await fetch(imageUri);
@@ -1257,7 +1389,7 @@ export const analyzeProfileBodyTypeFromImage = async (imageUri: string, gender?:
   const normalizedGender = gender ? gender.toLowerCase().trim() : 'unknown';
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
 
     // Convert image to base64
     const response = await fetch(imageUri);
@@ -1383,7 +1515,7 @@ export const analyzeBodyTypeFromImage = async (imageUri: string, gender?: string
   const normalizedGender = gender ? gender.toLowerCase().trim() : 'unknown';
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' }); // Use Flash for better reliability
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' }); // Use Flash for better reliability
 
     // Convert image to base64
     const response = await fetch(imageUri);
@@ -1508,7 +1640,7 @@ export const generatePersonalizedFashionTips = async (
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
 
     const tipsPrompt = `
 You are StyleBuddy, a friendly fashion assistant. Provide personalized fashion advice for this user:
@@ -1602,7 +1734,7 @@ export
     }
 
     try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
+      const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
 
       const result = await model.generateContent(prompt);
       const responseText = result.response.text();
@@ -2230,7 +2362,7 @@ export const generateTodaysOutfit = async (userProfile: any, weather: any): Prom
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' }); // Using Pro model for better results
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' }); // Using Pro model for better results
 
     const prompt = `
 You are a professional fashion stylist and weather expert. Create the perfect outfit recommendation for today based on the weather and user's profile.
@@ -2590,11 +2722,11 @@ export const generateTopographyAwareOutfits = async (
       // Try different models based on attempt
       let model;
       if (attempt === 1) {
-        model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
+        model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
       } else if (attempt === 2) {
-        model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
+        model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
       } else {
-        model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
+        model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
       }
 
       // Convert image to base64
@@ -2749,11 +2881,11 @@ export const generateWeatherAwareOutfits = async (
       // Try different models based on attempt
       let model;
       if (attempt === 1) {
-        model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
+        model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
       } else if (attempt === 2) {
-        model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
+        model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
       } else {
-        model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
+        model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
       }
 
       // Convert image to base64
@@ -3439,7 +3571,7 @@ export const validateClothingImage = async (imageUri: string): Promise<{ isValid
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
 
     // Convert image to base64
     const response = await fetch(imageUri);
@@ -3595,7 +3727,7 @@ export const generateWardrobeBasedOutfits = async (
   trackAIRequest();
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
 
     // Convert images to base64
     const imageParts = await Promise.all(
@@ -3748,7 +3880,7 @@ export const analyzeOutfitCompatibility = async (
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
 
     // Convert images to base64
     const imageParts = await Promise.all(

@@ -1,9 +1,11 @@
 
 import Constants from 'expo-constants';
 import { FirebaseApp, initializeApp } from 'firebase/app';
-import { Auth, getAuth } from 'firebase/auth';
+// @ts-ignore — getReactNativePersistence types are missing in firebase v11 but the export exists at runtime
+import { Auth, getReactNativePersistence, initializeAuth } from 'firebase/auth';
 import { Firestore, getFirestore } from 'firebase/firestore';
 import { FirebaseStorage, getStorage } from 'firebase/storage';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Get environment variables from expo-constants (works in production builds)
 const getEnvVar = (key: string): string | undefined => {
@@ -62,9 +64,12 @@ try {
   if (config) {
     app = initializeApp(config);
 
-    // Initialize Firebase Auth - Firebase v11 handles persistence automatically
-    auth = getAuth(app);
-    console.log('Firebase Auth initialized successfully');
+    // Initialize Firebase Auth with AsyncStorage persistence for React Native
+    // Without this, auth state is memory-only and lost on every app reload
+    auth = initializeAuth(app, {
+      persistence: getReactNativePersistence(AsyncStorage),
+    });
+    console.log('Firebase Auth initialized with AsyncStorage persistence');
 
     db = getFirestore(app);
     storage = getStorage(app);

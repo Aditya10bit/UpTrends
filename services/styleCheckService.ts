@@ -1,10 +1,5 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
-
-import { getSecureApiKey } from '../config/security';
-
-const API_KEY = getSecureApiKey();
-
-const genAI = new GoogleGenerativeAI(API_KEY);
+import { Image } from 'react-native';
+import { genAI } from './geminiService';
 
 // Enhanced rate limiter for better model usage
 class StyleCheckRateLimiter {
@@ -106,7 +101,7 @@ export const analyzeOutfitRating = async (input: StyleCheckInput): Promise<Style
 
   try {
     // Use Gemini 1.5 Flash for reliable analysis
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
 
     styleCheckRateLimiter.recordCall();
 
@@ -457,39 +452,25 @@ export const generateColorPalette = (skinTone: string): string[] => {
 // Image quality validation
 export const validateImageQuality = (imageUri: string): Promise<{ isValid: boolean; message?: string }> => {
   return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
+    Image.getSize(
+      imageUri,
+      (width, height) => {
+        const minWidth = 300;
+        const minHeight = 400;
 
-      if (!ctx) {
-        resolve({ isValid: false, message: 'Unable to process image' });
-        return;
+        if (width < minWidth || height < minHeight) {
+          resolve({
+            isValid: false,
+            message: `Image too small. Please use an image at least ${minWidth}x${minHeight} pixels.`
+          });
+          return;
+        }
+
+        resolve({ isValid: true });
+      },
+      (error) => {
+        resolve({ isValid: false, message: 'Invalid image format or unable to process image' });
       }
-
-      canvas.width = img.width;
-      canvas.height = img.height;
-      ctx.drawImage(img, 0, 0);
-
-      // Basic quality checks
-      const minWidth = 300;
-      const minHeight = 400;
-
-      if (img.width < minWidth || img.height < minHeight) {
-        resolve({
-          isValid: false,
-          message: `Image too small. Please use an image at least ${minWidth}x${minHeight} pixels.`
-        });
-        return;
-      }
-
-      resolve({ isValid: true });
-    };
-
-    img.onerror = () => {
-      resolve({ isValid: false, message: 'Invalid image format' });
-    };
-
-    img.src = imageUri;
+    );
   });
 };

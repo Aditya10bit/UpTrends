@@ -5,7 +5,6 @@ import { Stack, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
     Dimensions,
-    Linking,
     Modal,
     RefreshControl,
     ScrollView,
@@ -15,6 +14,7 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
 import Animated, {
     useAnimatedStyle,
     useSharedValue,
@@ -28,6 +28,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { generateTodaysOutfit } from '../services/geminiService';
 import { getUserProfile } from '../services/userService';
+import { getColorCode } from '../utils/colorResolver';
 import { clearWeatherCache, getCurrentWeather, getWeatherBasedTheme, WeatherData } from '../services/weatherService';
 import { checkUserGender, promptForGender } from '../utils/genderUtils';
 
@@ -493,7 +494,7 @@ export default function TodaysOutfitScreen() {
                       <TouchableOpacity
                         key={index}
                         style={[styles.shoppingLink, { backgroundColor: theme.background, borderColor: theme.borderLight }]}
-                        onPress={() => Linking.openURL(link.url)}
+                        onPress={() => WebBrowser.openBrowserAsync(link.url)}
                       >
                         <View style={[styles.shoppingIconContainer, { backgroundColor: weatherTheme?.primary || theme.primary }]}>
                           <Ionicons name={link.icon as any} size={20} color="#fff" />
@@ -575,131 +576,7 @@ export default function TodaysOutfitScreen() {
   );
 }
 
-const getColorCode = (colorName: string): string => {
-  const colorMap: { [key: string]: string } = {
-    // Basic colors
-    red: '#ef4444', 
-    blue: '#3b82f6', 
-    green: '#10b981', 
-    yellow: '#f59e0b',
-    purple: '#8b5cf6', 
-    pink: '#ec4899', 
-    orange: '#f97316', 
-    black: '#1f2937',
-    white: '#f9fafb', 
-    gray: '#6b7280', 
-    grey: '#6b7280',
-    brown: '#92400e', 
-    navy: '#1e3a8a',
-    beige: '#d2b48c', 
-    cream: '#fef7cd', 
-    gold: '#fbbf24', 
-    silver: '#9ca3af',
-    
-    // Extended color variations
-    'light blue': '#7dd3fc',
-    'dark blue': '#1e40af',
-    'navy blue': '#1e3a8a',
-    'sky blue': '#0ea5e9',
-    'royal blue': '#2563eb',
-    
-    'light green': '#4ade80',
-    'dark green': '#15803d',
-    'forest green': '#166534',
-    'mint green': '#6ee7b7',
-    'olive green': '#65a30d',
-    
-    'light red': '#f87171',
-    'dark red': '#dc2626',
-    'crimson': '#dc143c',
-    'maroon': '#7f1d1d',
-    
-    'light pink': '#f9a8d4',
-    'hot pink': '#ec4899',
-    'rose': '#f43f5e',
-    'magenta': '#d946ef',
-    
-    'light purple': '#c084fc',
-    'dark purple': '#7c3aed',
-    'violet': '#8b5cf6',
-    'lavender': '#ddd6fe',
-    
-    'light yellow': '#fde047',
-    'golden yellow': '#eab308',
-    'mustard': '#ca8a04',
-    
-    'light orange': '#fb923c',
-    'dark orange': '#ea580c',
-    'coral': '#ff7f50',
-    'peach': '#fed7aa',
-    
-    'light gray': '#d1d5db',
-    'dark gray': '#374151',
-    'charcoal': '#1f2937',
-    'slate': '#64748b',
-    
-    'light brown': '#d2b48c',
-    'dark brown': '#78350f',
-    'tan': '#d2b48c',
-    'khaki': '#f0e68c',
-    
-    'off white': '#fefefe',
-    'ivory': '#fffff0',
-    'pearl': '#f8f8ff',
-    
-    'turquoise': '#06b6d4',
-    'teal': '#0d9488',
-    'cyan': '#06b6d4',
-    'aqua': '#00ffff',
-    
-    'burgundy': '#7f1d1d',
-    'wine': '#722f37',
-    'plum': '#86198f',
-    
-    'emerald': '#059669',
-    'jade': '#10b981',
-    'lime': '#84cc16',
-    
-    'indigo': '#4f46e5',
-    'cobalt': '#1e40af',
-    'sapphire': '#1e3a8a',
-    
-    'bronze': '#cd7f32',
-    'copper': '#b87333',
-    'rose gold': '#e8b4b8',
-  };
-  
-  // Normalize the color name by removing extra spaces and converting to lowercase
-  const normalizedColor = colorName.toLowerCase().trim();
-  
-  // First try exact match
-  if (colorMap[normalizedColor]) {
-    return colorMap[normalizedColor];
-  }
-  
-  // Try to find partial matches for compound color names
-  for (const [key, value] of Object.entries(colorMap)) {
-    if (normalizedColor.includes(key) || key.includes(normalizedColor)) {
-      return value;
-    }
-  }
-  
-  // If no match found, return a default color based on common color keywords
-  if (normalizedColor.includes('blue')) return '#3b82f6';
-  if (normalizedColor.includes('red')) return '#ef4444';
-  if (normalizedColor.includes('green')) return '#10b981';
-  if (normalizedColor.includes('yellow')) return '#f59e0b';
-  if (normalizedColor.includes('purple') || normalizedColor.includes('violet')) return '#8b5cf6';
-  if (normalizedColor.includes('pink')) return '#ec4899';
-  if (normalizedColor.includes('orange')) return '#f97316';
-  if (normalizedColor.includes('brown')) return '#92400e';
-  if (normalizedColor.includes('gray') || normalizedColor.includes('grey')) return '#6b7280';
-  if (normalizedColor.includes('black')) return '#1f2937';
-  if (normalizedColor.includes('white')) return '#f9fafb';
-  
-  // Default fallback color (neutral gray)
-  return '#6b7280';
-};
+
 
 const styles = StyleSheet.create({
   container: {

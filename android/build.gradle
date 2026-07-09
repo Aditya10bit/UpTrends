@@ -21,6 +21,9 @@ def reactNativeAndroidDir = new File(
 )
 
 allprojects {
+  ext {
+    ndkVersion = "26.1.10909125"
+  }
   repositories {
     maven {
       // All of React Native (JS, Obj-C sources, Android binaries) is installed from npm

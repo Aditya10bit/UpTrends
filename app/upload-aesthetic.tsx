@@ -25,7 +25,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
-import { analyzeImageAndGenerateOutfits, generateOutfitLinks, generateOutfitsFromPrompt, OutfitSuggestion, StyleAnalysisResult } from '../services/geminiService';
+import { analyzeImageAndGenerateOutfits, generateOutfitLinks, generateOutfitsFromPrompt, getActiveKeySource, OutfitSuggestion, StyleAnalysisResult } from '../services/geminiService';
 import { getUserProfile } from '../services/userService';
 import { checkUserGender, promptForGender } from '../utils/genderUtils';
 
@@ -175,13 +175,32 @@ export default function UploadAesthetic() {
 
       setSuggestions(result);
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error generating suggestions:', error);
-      Alert.alert(
-        'Generation Failed',
-        'Unable to generate outfit suggestions. Please try again.',
-        [{ text: 'OK' }]
-      );
+      const errorMsg = error?.message || '';
+      const isQuotaError = errorMsg.includes('429') || errorMsg.includes('Quota') || errorMsg.includes('Too Many Requests') || errorMsg.includes('Max retries exceeded');
+
+      if (isQuotaError) {
+        const keySource = await getActiveKeySource();
+        if (keySource === 'default') {
+          Alert.alert(
+            'AI Limit Reached \u26a1',
+            'The shared AI quota has been reached. Set up your own free API key for unlimited access!\n\nIt only takes 1 minute.',
+            [
+              { text: 'Later', style: 'cancel' },
+              { text: 'Set Up My Key', onPress: () => router.push('/profile') }
+            ]
+          );
+        } else {
+          Alert.alert('Quota Exceeded', 'Your API key has hit its rate limit. Please wait a moment and try again.', [{ text: 'OK' }]);
+        }
+      } else {
+        Alert.alert(
+          'Generation Failed',
+          'Unable to generate outfit suggestions. Please try again.',
+          [{ text: 'OK' }]
+        );
+      }
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setIsGenerating(false);

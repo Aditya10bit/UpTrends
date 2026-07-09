@@ -381,79 +381,93 @@ const generateOutfitLinks = async (
       finalGender = 'male';
     }
 
-    // FINAL VALIDATION: Ensure we have the right gender for links
-    console.log(`🎯 FINAL LINK GENDER: ${finalGender} (will generate ${finalGender === 'male' ? 'men' : 'women'}'s links)`);
-
     const genderTerm = finalGender === 'male' ? 'men' : 'women';
 
-    // Create gender-specific search queries
-    const mainQuery = `${genderTerm} ${outfit.title} ${outfit.items.join(' ')}`;
-    const colorQuery = `${genderTerm} ${outfit.colors.join(' ')} ${outfit.title}`;
-    const occasionQuery = `${genderTerm} ${outfit.occasion} ${outfit.title} outfit`;
-    const categoryQuery = `${genderTerm} ${category.replace('male-', '').replace('female-', '')} outfit`;
+    // --- Build SPECIFIC color+item queries instead of generic ones ---
 
-    console.log('🔗 Generating gender-specific links for:', {
-      category,
-      userProfileGender: userProfile?.gender,
-      finalGender,
+    // Each item from the AI already tends to include color (e.g., "Beige trench coat")
+    // Take top 2 items for individual shopping links
+    const topItems = outfit.items.slice(0, 2).map(item => item.trim());
+
+    // Build a color-palette query for inspiration: combine colors + first 2 items
+    const colorPalette = outfit.colors.slice(0, 3).join(' ').toLowerCase();
+    const keyItemNames = topItems.map(i => i.toLowerCase()).join(' ');
+    const inspirationQuery = `${genderTerm} ${colorPalette} ${keyItemNames} outfit`.trim();
+
+    // For Google Shopping, combine top 2 items with gender
+    const googleShoppingQuery = `${genderTerm} ${topItems.join(' ')}`.trim();
+
+    console.log('🔗 Building specific color+item links:', {
       genderTerm,
-      mainQuery,
-      categoryQuery
+      topItems,
+      colorPalette,
+      inspirationQuery,
     });
 
-    // CRITICAL DEBUG: Log the actual shopping link descriptions
-    console.log('🛍️ SHOPPING LINK DESCRIPTIONS WILL BE:', {
-      amazon: `Shop similar ${genderTerm}'s items on Amazon`,
-      pinterest: `Find ${genderTerm}'s outfit inspiration`,
-      googleShopping: `Compare prices for ${genderTerm}'s items`
+    // --- Shopping links: one per top item for targeted results ---
+    const shopping: ShoppingLink[] = [];
+
+    // Add per-item Amazon links (top 2 items)
+    topItems.forEach((item, idx) => {
+      const itemQuery = `${genderTerm} ${item}`.trim();
+      shopping.push({
+        platform: idx === 0 ? 'Amazon' : 'Amazon',
+        url: `https://www.amazon.com/s?k=${encodeURIComponent(itemQuery)}&ref=nb_sb_noss`,
+        description: `Shop ${item}`,
+        icon: 'bag',
+      });
     });
 
-    const shopping: ShoppingLink[] = [
-      {
-        platform: "Amazon",
-        url: `https://www.amazon.com/s?k=${encodeURIComponent(mainQuery)}&ref=nb_sb_noss`,
-        description: `Shop similar ${genderTerm}'s items on Amazon`,
-        icon: "bag"
-      },
-      {
-        platform: "Myntra",
-        url: `https://www.myntra.com/search/${encodeURIComponent(mainQuery)}`,
-        description: `Shop similar ${genderTerm}'s items on Myntra`,
-        icon: "bag"
-      },
-      {
-        platform: "Pinterest",
-        url: `https://www.pinterest.com/search/pins/?q=${encodeURIComponent(mainQuery + ' outfit')}`,
-        description: `Find ${genderTerm}'s outfit inspiration`,
-        icon: "camera"
-      },
-      {
-        platform: "Google Shopping",
-        url: `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(mainQuery)}`,
-        description: `Compare prices for ${genderTerm}'s items`,
-        icon: "pricetag"
-      }
-    ];
+    // Add per-item Myntra link (top item only to avoid clutter)
+    if (topItems.length > 0) {
+      const myntraQuery = `${genderTerm} ${topItems[0]}`.trim();
+      shopping.push({
+        platform: 'Myntra',
+        url: `https://www.myntra.com/search/${encodeURIComponent(myntraQuery)}`,
+        description: `Shop ${topItems[0]}`,
+        icon: 'bag',
+      });
+    }
+
+    // Pinterest: use the color palette + key items for inspiration
+    shopping.push({
+      platform: 'Pinterest',
+      url: `https://www.pinterest.com/search/pins/?q=${encodeURIComponent(inspirationQuery)}`,
+      description: `${colorPalette} outfit inspiration`,
+      icon: 'camera',
+    });
+
+    // Google Shopping: combined top items
+    shopping.push({
+      platform: 'Google Shopping',
+      url: `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(googleShoppingQuery)}`,
+      description: `Compare prices for ${topItems[0] || 'items'}`,
+      icon: 'pricetag',
+    });
+
+    // --- Reference links: color-specific ---
+    const colorComboQuery = `${genderTerm} ${colorPalette} color combination fashion`;
+    const outfitIdeasQuery = `${genderTerm} ${colorPalette} ${topItems[0] || ''} outfit ideas`.trim();
 
     const reference: ReferenceLink[] = [
       {
-        platform: "Style Guide",
-        url: `https://www.google.com/search?q=${encodeURIComponent(occasionQuery + ' style guide')}`,
-        description: `Learn ${genderTerm}'s styling tips`,
-        icon: "book"
+        platform: 'Style Guide',
+        url: `https://www.google.com/search?q=${encodeURIComponent(`${genderTerm} ${topItems[0] || outfit.title} style guide`)}`,
+        description: `Styling tips for ${topItems[0] || outfit.title}`,
+        icon: 'book',
       },
       {
-        platform: "Color Matching",
-        url: `https://www.google.com/search?q=${encodeURIComponent(colorQuery + ' color combination fashion')}`,
-        description: `${genderTerm}'s color coordination ideas`,
-        icon: "color-palette"
+        platform: 'Color Matching',
+        url: `https://www.google.com/search?q=${encodeURIComponent(colorComboQuery)}`,
+        description: `${colorPalette} coordination ideas`,
+        icon: 'color-palette',
       },
       {
-        platform: "Outfit Ideas",
-        url: `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(categoryQuery + ' ideas')}`,
-        description: `Visual ${genderTerm}'s outfit references`,
-        icon: "images"
-      }
+        platform: 'Outfit Ideas',
+        url: `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(outfitIdeasQuery)}`,
+        description: `Visual ${colorPalette} outfit references`,
+        icon: 'images',
+      },
     ];
 
     return { shopping, reference };

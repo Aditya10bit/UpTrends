@@ -17,6 +17,7 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -1063,7 +1064,7 @@ function ResultsScreen({
   const insets = useSafeAreaInsets();
 
   const openLink = (url: string) => {
-    Linking.openURL(url);
+    WebBrowser.openBrowserAsync(url);
   };
 
   if (analyzing) {

@@ -32,9 +32,9 @@ export const PERFORMANCE_CONFIG = {
     GEMINI: {
         // Model selection based on request type
         MODELS: {
-            FAST: 'gemini-2.0-flash-exp',
-            BALANCED: 'gemini-2.5-flash',
-            QUALITY: 'gemini-2.5-pro',
+            FAST: 'gemini-3.1-flash-lite',
+            BALANCED: 'gemini-3.5-flash',
+            QUALITY: 'gemini-3.5-flash',
         },
 
         // Generation config for different use cases

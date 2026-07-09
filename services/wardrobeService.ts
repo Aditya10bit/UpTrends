@@ -1,8 +1,5 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import { geminiRateLimiter, getSecureApiKey } from '../config/security';
-
-const API_KEY = getSecureApiKey();
-const genAI = new GoogleGenerativeAI(API_KEY);
+import { geminiRateLimiter } from '../config/security';
+import { genAI } from './geminiService';
 
 export interface UserProfile {
   height?: number;
@@ -168,7 +165,7 @@ export const generateWardrobeOutfits = async (
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
 
     // Convert images to base64
     const imageParts = await Promise.all(

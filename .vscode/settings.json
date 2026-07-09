@@ -4,5 +4,13 @@
     "source.organizeImports": "explicit",
     "source.sortMembers": "explicit"
   },
-  "typescript.autoClosingTags": false
+  "typescript.autoClosingTags": false,
+  "java.compile.nullAnalysis.mode": "automatic",
+  "java.import.exclusions": [
+    "**/node_modules/**",
+    "**/.metadata/**",
+    "**/android/.gradle/**",
+    "**/android/build/**"
+  ],
+  "java.project.importHint": "disabled"
 }

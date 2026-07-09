@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { BlurView } from 'expo-blur';
+import * as WebBrowser from 'expo-web-browser';
 
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
@@ -14,7 +15,6 @@ import {
     Dimensions,
     Easing,
     KeyboardAvoidingView,
-    Linking,
     Platform,
     SafeAreaView,
     ScrollView,
@@ -987,12 +987,11 @@ export default function BodyAnalysisScreen() {
     const handleLinkPress = async (url: string) => {
         try {
             await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            const supported = await Linking.canOpenURL(url);
-            if (supported) {
-                await Linking.openURL(url);
-            } else {
-                Alert.alert('Error', 'Cannot open this link');
-            }
+            await WebBrowser.openBrowserAsync(url, {
+                readerMode: false,
+                enableBarCollapsing: true,
+                dismissButtonStyle: 'close',
+            });
         } catch (error) {
             console.error('Error opening link:', error);
             Alert.alert('Error', 'Failed to open link');

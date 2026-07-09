@@ -1,10 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
+import * as WebBrowser from 'expo-web-browser';
 import { router } from 'expo-router';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Dimensions,
   Image,
@@ -21,6 +24,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { isFirebaseInitialized, storage } from '../firebaseConfig';
+import { testApiKey, invalidateApiKeyCache, getActiveKeySource } from '../services/geminiService';
 
 import Animated, {
   useAnimatedStyle,
@@ -81,6 +85,14 @@ export default function ProfileScreen() {
   const [isExiting, setIsExiting] = useState(false);
   const { user, logout } = useAuth();
 
+  // --- API Key Settings State ---
+  const [apiKeyExpanded, setApiKeyExpanded] = useState(false);
+  const [customApiKey, setCustomApiKey] = useState('');
+  const [apiKeyStatus, setApiKeyStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
+  const [apiKeyError, setApiKeyError] = useState('');
+  const [activeKeySource, setActiveKeySource] = useState<'custom' | 'default'>('default');
+  const [showApiKey, setShowApiKey] = useState(false);
+
   // Animation values
   const scale = useSharedValue(1);
   const profileCardOpacity = useSharedValue(0);
@@ -94,7 +106,65 @@ export default function ProfileScreen() {
 
   useEffect(() => {
     loadUserData();
+    loadApiKeyStatus();
   }, []);
+
+  // Load the current API key source status
+  const loadApiKeyStatus = async () => {
+    try {
+      const source = await getActiveKeySource();
+      setActiveKeySource(source);
+      if (source === 'custom') {
+        const savedKey = await AsyncStorage.getItem('user_gemini_api_key');
+        if (savedKey) setCustomApiKey(savedKey);
+      }
+    } catch {}
+  };
+
+  // Handle verifying and saving a custom API key
+  const handleVerifyAndSaveKey = async () => {
+    if (!customApiKey.trim()) {
+      setApiKeyError('Please enter an API key.');
+      setApiKeyStatus('error');
+      return;
+    }
+    setApiKeyStatus('testing');
+    setApiKeyError('');
+    const result = await testApiKey(customApiKey.trim());
+    if (result.success) {
+      await AsyncStorage.setItem('user_gemini_api_key', customApiKey.trim());
+      invalidateApiKeyCache();
+      setApiKeyStatus('success');
+      setActiveKeySource('custom');
+    } else {
+      setApiKeyStatus('error');
+      setApiKeyError(result.error || 'Verification failed.');
+    }
+  };
+
+  // Handle resetting to the default developer key
+  const handleResetApiKey = async () => {
+    Alert.alert(
+      'Reset to Default Key',
+      'This will remove your custom API key and use the default. Continue?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: async () => {
+            await AsyncStorage.removeItem('user_gemini_api_key');
+            invalidateApiKeyCache();
+            setCustomApiKey('');
+            setApiKeyStatus('idle');
+            setApiKeyError('');
+            setActiveKeySource('default');
+            setShowApiKey(false);
+          }
+        }
+      ]
+    );
+  };
 
   // Use useFocusEffect to handle screen focus properly
   useFocusEffect(
@@ -699,6 +769,221 @@ export default function ProfileScreen() {
               <Text style={{ color: '#fff', fontSize: 18, fontWeight: '600' }}>Explore AI Fashion</Text>
             </TouchableOpacity>
           </View>
+        </Animated.View>
+
+        {/* AI Developer Settings Card */}
+        <Animated.View style={[
+          {
+            backgroundColor: theme.card,
+            marginHorizontal: 20,
+            marginTop: 20,
+            borderRadius: 16,
+            padding: 20,
+            shadowColor: theme.shadow,
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.1,
+            shadowRadius: 8,
+            elevation: 4,
+          },
+          contentAnimatedStyle
+        ]}>
+          {/* Header Row */}
+          <TouchableOpacity
+            onPress={() => setApiKeyExpanded(!apiKeyExpanded)}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+              <View style={{
+                width: 40, height: 40, borderRadius: 12,
+                backgroundColor: activeKeySource === 'custom' ? '#10b981' + '20' : theme.primary + '20',
+                justifyContent: 'center', alignItems: 'center',
+              }}>
+                <Ionicons
+                  name={activeKeySource === 'custom' ? 'key' : 'key-outline'}
+                  size={22}
+                  color={activeKeySource === 'custom' ? '#10b981' : theme.primary}
+                />
+              </View>
+              <View style={{ marginLeft: 12, flex: 1 }}>
+                <Text style={{ fontSize: 16, fontWeight: '700', color: theme.text }}>AI Developer Settings</Text>
+                <Text style={{ fontSize: 12, color: activeKeySource === 'custom' ? '#10b981' : theme.textTertiary, marginTop: 2 }}>
+                  {activeKeySource === 'custom' ? '✓ Using your custom key' : 'Using default key (shared limits)'}
+                </Text>
+              </View>
+            </View>
+            <Ionicons
+              name={apiKeyExpanded ? 'chevron-up' : 'chevron-down'}
+              size={20}
+              color={theme.textTertiary}
+            />
+          </TouchableOpacity>
+
+          {/* Expandable Content */}
+          {apiKeyExpanded && (
+            <View style={{ marginTop: 16 }}>
+              {/* Step-by-step Guide */}
+              <View style={{
+                backgroundColor: theme.background,
+                borderRadius: 12,
+                padding: 14,
+                marginBottom: 16,
+              }}>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: theme.text, marginBottom: 10 }}>
+                  🔑 Get Your Free API Key (1 min)
+                </Text>
+                <View style={{ marginBottom: 6 }}>
+                  <Text style={{ fontSize: 13, color: theme.textSecondary, lineHeight: 20 }}>
+                    <Text style={{ fontWeight: '700', color: theme.primary }}>Step 1:</Text> Tap the button below to open Google AI Studio
+                  </Text>
+                </View>
+                <View style={{ marginBottom: 6 }}>
+                  <Text style={{ fontSize: 13, color: theme.textSecondary, lineHeight: 20 }}>
+                    <Text style={{ fontWeight: '700', color: theme.primary }}>Step 2:</Text> Sign in with your Google account
+                  </Text>
+                </View>
+                <View style={{ marginBottom: 6 }}>
+                  <Text style={{ fontSize: 13, color: theme.textSecondary, lineHeight: 20 }}>
+                    <Text style={{ fontWeight: '700', color: theme.primary }}>Step 3:</Text> Tap "Create API Key" and copy it
+                  </Text>
+                </View>
+                <View>
+                  <Text style={{ fontSize: 13, color: theme.textSecondary, lineHeight: 20 }}>
+                    <Text style={{ fontWeight: '700', color: theme.primary }}>Step 4:</Text> Paste it below and tap "Verify & Save"
+                  </Text>
+                </View>
+              </View>
+
+              {/* Open AI Studio Button */}
+              <TouchableOpacity
+                onPress={() => WebBrowser.openBrowserAsync('https://aistudio.google.com/apikey')}
+                style={{
+                  backgroundColor: theme.primary,
+                  borderRadius: 12,
+                  paddingVertical: 14,
+                  paddingHorizontal: 20,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: 16,
+                }}
+              >
+                <Ionicons name="open-outline" size={18} color="#fff" />
+                <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15, marginLeft: 8 }}>
+                  Get Free Key from Google AI Studio
+                </Text>
+              </TouchableOpacity>
+
+              {/* API Key Input */}
+              <View style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: theme.background,
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: apiKeyStatus === 'success' ? '#10b981' : apiKeyStatus === 'error' ? '#ef4444' : theme.borderLight,
+                paddingHorizontal: 12,
+                marginBottom: 8,
+              }}>
+                <TextInput
+                  style={{
+                    flex: 1,
+                    fontSize: 14,
+                    color: theme.text,
+                    paddingVertical: 14,
+                    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+                  }}
+                  placeholder="Paste your API key here (AIza...)"
+                  placeholderTextColor={theme.textTertiary}
+                  value={customApiKey}
+                  onChangeText={(text) => {
+                    setCustomApiKey(text);
+                    setApiKeyStatus('idle');
+                    setApiKeyError('');
+                  }}
+                  secureTextEntry={!showApiKey}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+                <TouchableOpacity onPress={() => setShowApiKey(!showApiKey)} style={{ padding: 8 }}>
+                  <Ionicons name={showApiKey ? 'eye-off' : 'eye'} size={20} color={theme.textTertiary} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Status Messages */}
+              {apiKeyStatus === 'success' && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                  <Ionicons name="checkmark-circle" size={16} color="#10b981" />
+                  <Text style={{ color: '#10b981', fontSize: 13, fontWeight: '600', marginLeft: 6 }}>
+                    Key verified and activated!
+                  </Text>
+                </View>
+              )}
+              {apiKeyStatus === 'error' && apiKeyError ? (
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12 }}>
+                  <Ionicons name="alert-circle" size={16} color="#ef4444" style={{ marginTop: 1 }} />
+                  <Text style={{ color: '#ef4444', fontSize: 13, marginLeft: 6, flex: 1 }}>
+                    {apiKeyError}
+                  </Text>
+                </View>
+              ) : null}
+
+              {/* Action Buttons */}
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <TouchableOpacity
+                  onPress={handleVerifyAndSaveKey}
+                  disabled={apiKeyStatus === 'testing' || !customApiKey.trim()}
+                  style={{
+                    flex: 1,
+                    backgroundColor: apiKeyStatus === 'testing' ? theme.textTertiary : '#10b981',
+                    borderRadius: 12,
+                    paddingVertical: 14,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    opacity: !customApiKey.trim() ? 0.5 : 1,
+                  }}
+                >
+                  {apiKeyStatus === 'testing' ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Ionicons name="shield-checkmark" size={18} color="#fff" />
+                  )}
+                  <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14, marginLeft: 8 }}>
+                    {apiKeyStatus === 'testing' ? 'Verifying...' : 'Verify & Save'}
+                  </Text>
+                </TouchableOpacity>
+
+                {activeKeySource === 'custom' && (
+                  <TouchableOpacity
+                    onPress={handleResetApiKey}
+                    style={{
+                      backgroundColor: theme.background,
+                      borderRadius: 12,
+                      paddingVertical: 14,
+                      paddingHorizontal: 16,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderWidth: 1,
+                      borderColor: '#ef4444' + '40',
+                    }}
+                  >
+                    <Ionicons name="refresh" size={16} color="#ef4444" />
+                    <Text style={{ color: '#ef4444', fontWeight: '600', fontSize: 13, marginLeft: 6 }}>Reset</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {/* Info Note */}
+              <Text style={{ fontSize: 11, color: theme.textTertiary, marginTop: 12, lineHeight: 16, textAlign: 'center' }}>
+                Your key stays on this device only. It is never uploaded to any server.
+              </Text>
+            </View>
+          )}
         </Animated.View>
 
         {/* Settings Section */}

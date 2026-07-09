@@ -2,15 +2,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
 import {
-    Linking,
     StyleSheet,
     Text,
     TouchableOpacity,
     useColorScheme,
     View
 } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { OutfitSuggestion } from '../services/outfitService';
+import { getColorCode } from '../utils/colorResolver';
 
 type OutfitCardProps = {
   outfit: OutfitSuggestion;
@@ -169,7 +170,7 @@ export default function OutfitCard({
                   <TouchableOpacity
                     key={idx}
                     style={[styles.linkButton, { backgroundColor: isDark ? 'rgba(255,215,0,0.1)' : 'rgba(99,102,241,0.1)' }]}
-                    onPress={() => Linking.openURL(link.url)}
+                    onPress={() => WebBrowser.openBrowserAsync(link.url)}
                   >
                     <Ionicons
                       name={link.icon as any}
@@ -185,7 +186,7 @@ export default function OutfitCard({
                   <TouchableOpacity
                     key={`ref-${idx}`}
                     style={[styles.linkButton, { backgroundColor: isDark ? 'rgba(255,215,0,0.1)' : 'rgba(99,102,241,0.1)' }]}
-                    onPress={() => Linking.openURL(link.url)}
+                    onPress={() => WebBrowser.openBrowserAsync(link.url)}
                   >
                     <Ionicons
                       name={link.icon as any}
@@ -220,43 +221,7 @@ export default function OutfitCard({
   );
 }
 
-const getColorCode = (colorName: string): string => {
-  const colorMap: { [key: string]: string } = {
-    red: '#ef4444',
-    blue: '#3b82f6',
-    green: '#10b981',
-    yellow: '#f59e0b',
-    purple: '#8b5cf6',
-    pink: '#ec4899',
-    orange: '#f97316',
-    black: '#1f2937',
-    white: '#f9fafb',
-    gray: '#6b7280',
-    grey: '#6b7280',
-    brown: '#92400e',
-    navy: '#1e3a8a',
-    beige: '#d2b48c',
-    cream: '#fef7cd',
-    gold: '#fbbf24',
-    silver: '#9ca3af',
-    maroon: '#7f1d1d',
-    olive: '#65a30d',
-    teal: '#0d9488',
-    coral: '#fb7185',
-    lavender: '#c084fc',
-    mint: '#6ee7b7',
-    peach: '#fed7aa',
-    turquoise: '#06b6d4',
-    burgundy: '#7c2d12',
-    khaki: '#a3a3a3',
-    salmon: '#fca5a5',
-    ivory: '#fffbeb',
-    charcoal: '#374151',
-  };
 
-  const normalizedColor = colorName.toLowerCase().trim();
-  return colorMap[normalizedColor] || '#6b7280';
-};
 
 const styles = StyleSheet.create({
   container: {

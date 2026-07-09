@@ -28,7 +28,9 @@ module.exports = {
                 "READ_EXTERNAL_STORAGE",
                 "WRITE_EXTERNAL_STORAGE",
                 "INTERNET",
-                "ACCESS_NETWORK_STATE"
+                "ACCESS_NETWORK_STATE",
+                "ACCESS_FINE_LOCATION",
+                "ACCESS_COARSE_LOCATION"
             ],
             allowBackup: false,
             networkSecurityConfig: {
@@ -68,13 +70,14 @@ module.exports = {
             eas: {
                 projectId: "cf6d1cfe-ce05-470d-85d7-f721c607d414"
             },
-            // Firebase configuration from environment variables
-            EXPO_PUBLIC_FIREBASE_API_KEY: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
-            EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
-            EXPO_PUBLIC_FIREBASE_PROJECT_ID: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
-            EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
-            EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-            EXPO_PUBLIC_FIREBASE_APP_ID: process.env.EXPO_PUBLIC_FIREBASE_APP_ID
+        // Firebase configuration — these are public client-side keys (safe to embed).
+        // Fallback values ensure EAS cloud builds work even without a .env file.
+        EXPO_PUBLIC_FIREBASE_API_KEY: process.env.EXPO_PUBLIC_FIREBASE_API_KEY || 'AIzaSyCKJt0aN1utByOK_R0mv3UbBYVtdtbcQ7A',
+        EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN || 'uptrends-f893f.firebaseapp.com',
+        EXPO_PUBLIC_FIREBASE_PROJECT_ID: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || 'uptrends-f893f',
+        EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET || 'uptrends-f893f.firebasestorage.app',
+        EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || '734945715091',
+        EXPO_PUBLIC_FIREBASE_APP_ID: process.env.EXPO_PUBLIC_FIREBASE_APP_ID || '1:734945715091:web:1a0157e8cf96e172fc7e66'
         },
         owner: "aditya10das"
     }

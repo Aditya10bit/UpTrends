@@ -5,6 +5,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
+    Alert,
     Dimensions,
     RefreshControl,
     ScrollView,
@@ -26,6 +27,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import categoryData from '../../data/categoryData';
 import { getOutfitSuggestions, OutfitSuggestion } from '../../services/outfitService';
+import { getActiveKeySource } from '../../services/geminiService';
 import {
     getUserProfile
 } from '../../services/userService';
@@ -184,8 +186,25 @@ export default function CategoryScreen() {
         }
       }));
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching outfit suggestions:', error);
+      const errorMsg = error?.message || '';
+      const isQuotaError = errorMsg.includes('429') || errorMsg.includes('Quota') || errorMsg.includes('Too Many Requests') || errorMsg.includes('Max retries exceeded');
+      if (isQuotaError) {
+        const keySource = await getActiveKeySource();
+        if (keySource === 'default') {
+          Alert.alert(
+            'AI Limit Reached \u26a1',
+            'The shared AI quota has been reached. Set up your own free API key for unlimited access!\n\nIt only takes 1 minute.',
+            [
+              { text: 'Later', style: 'cancel' },
+              { text: 'Set Up My Key', onPress: () => router.push('/profile') }
+            ]
+          );
+        } else {
+          Alert.alert('Quota Exceeded', 'Your API key has hit its rate limit. Please wait a moment and try again.', [{ text: 'OK' }]);
+        }
+      }
       setOutfitError(true);
       setOutfitSuggestions([]);
     } finally {

@@ -558,6 +558,32 @@ export default function MainScreen() {
     });
   };
 
+  const navigateToMixMatch = async () => {
+    if (isNavigating || isExiting) return;
+    setIsNavigating(true);
+
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    Animated.sequence([
+      Animated.spring(cardAnim4, {
+        toValue: 0.92,
+        tension: 300,
+        friction: 10,
+        useNativeDriver: true,
+      }),
+      Animated.spring(cardAnim4, {
+        toValue: 1,
+        tension: 300,
+        friction: 10,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      startExitAnimation(() => {
+        router.push('/mix-match');
+        setTimeout(() => setIsNavigating(false), 500);
+      });
+    });
+  };
+
   const getGreeting = () => {
     const hour = currentTime.getHours();
     if (hour < 12) return 'Good Morning';
@@ -1017,6 +1043,51 @@ export default function MainScreen() {
                       </Animated.View>
                       <Text style={styles.cardTitle}>Learn About Your Body</Text>
                       <Text style={styles.cardDescription}>Get personalized tips</Text>
+                      <View style={styles.cardGlow} />
+                    </LinearGradient>
+                  </GlassCard>
+                </TouchableOpacity>
+              </Animated.View>
+
+              {/* Mix & Match Card */}
+              <Animated.View style={[
+                styles.cardContainer,
+                {
+                  transform: [
+                    { scale: cardAnim4 },
+                    {
+                      rotateX: morphAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ['0deg', '2deg']
+                      })
+                    }
+                  ]
+                }
+              ]}>
+                <TouchableOpacity
+                  onPress={navigateToMixMatch}
+                  activeOpacity={0.9}
+                  style={styles.cardTouchable}
+                >
+                  <GlassCard style={styles.navCard} intensity={60} tint="light">
+                    <LinearGradient
+                      colors={['rgba(236, 72, 153, 0.8)', 'rgba(219, 39, 119, 0.8)']}
+                      style={styles.cardGradient}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                    >
+                      <Animated.View style={[
+                        styles.cardIconContainer,
+                        {
+                          transform: [{
+                            scale: pulseAnim
+                          }]
+                        }
+                      ]}>
+                        <Ionicons name="color-palette-outline" size={32} color="#fff" />
+                      </Animated.View>
+                      <Text style={styles.cardTitle}>Mix & Match</Text>
+                      <Text style={styles.cardDescription}>Interactive styling canvas</Text>
                       <View style={styles.cardGlow} />
                     </LinearGradient>
                   </GlassCard>

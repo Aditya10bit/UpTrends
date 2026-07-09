@@ -11,7 +11,6 @@ import {
     Dimensions,
     Easing,
     Image,
-    Linking,
     ScrollView,
     StatusBar,
     StyleSheet,
@@ -19,11 +18,13 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
 import {
     analyzeOutfitCompatibility,
     generateWardrobeBasedOutfits,
+    getActiveKeySource,
     validateMultipleClothingImages
 } from '../services/geminiService';
 import { getLocationTopography } from '../services/topographyService';
@@ -239,7 +240,11 @@ export default function MakeOutfit() {
   const openShoppingLink = async (url: string) => {
     if (url) {
       try {
-        await Linking.openURL(url);
+        await WebBrowser.openBrowserAsync(url, {
+          readerMode: false,
+          enableBarCollapsing: true,
+          dismissButtonStyle: 'close',
+        });
       } catch (error) {
         console.error('Error opening shopping link:', error);
         Alert.alert('Error', 'Unable to open shopping link');
@@ -473,13 +478,37 @@ export default function MakeOutfit() {
       ]).start();
 
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error generating outfit:', error);
-      Alert.alert(
-        'Generation Failed',
-        'Unable to generate outfit combinations. Please try again.',
-        [{ text: 'OK' }]
-      );
+      const errorMsg = error?.message || '';
+      const isQuotaError = errorMsg.includes('429') || errorMsg.includes('Quota') || errorMsg.includes('Too Many Requests') || errorMsg.includes('Max retries exceeded');
+
+      if (isQuotaError) {
+        // Check if user already has a custom key
+        const keySource = await getActiveKeySource();
+        if (keySource === 'default') {
+          Alert.alert(
+            'AI Limit Reached \u26a1',
+            'The shared AI quota has been reached. Set up your own free API key for unlimited access!\n\nIt only takes 1 minute.',
+            [
+              { text: 'Later', style: 'cancel' },
+              { text: 'Set Up My Key', onPress: () => router.push('/profile') }
+            ]
+          );
+        } else {
+          Alert.alert(
+            'Quota Exceeded',
+            'Your API key has hit its rate limit. Please wait a moment and try again.',
+            [{ text: 'OK' }]
+          );
+        }
+      } else {
+        Alert.alert(
+          'Generation Failed',
+          'Unable to generate outfit combinations. Please try again.',
+          [{ text: 'OK' }]
+        );
+      }
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setIsGenerating(false);
