@@ -194,6 +194,8 @@ export default function UploadAesthetic() {
         } else {
           Alert.alert('Quota Exceeded', 'Your API key has hit its rate limit. Please wait a moment and try again.', [{ text: 'OK' }]);
         }
+      } else if (errorMsg.includes('Invalid Image')) {
+        Alert.alert('Invalid Image', errorMsg.replace('Error: ', ''), [{ text: 'OK' }]);
       } else {
         Alert.alert(
           'Generation Failed',

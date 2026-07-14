@@ -84,6 +84,14 @@ Create amazing outfits from clothes you already own!
 ✨ Missing Item Alerts: Know exactly what to buy to complete perfect looks
 "Upload 10 clothing items, get 20+ different outfit combinations!"
 
+🛡️ 7. Robust AI Image Validation - Prevents hallucinations!
+Smart guardrails to protect your experience!
+
+✅ Context-Aware Validation: AI checks if your uploaded image matches the feature you're using.
+🚫 Anti-Spam: Blocks irrelevant images (like random objects, food, memes) from being processed.
+💡 Helpful Feedback: Instantly tells you why an image was rejected instead of failing silently.
+"Upload a picture of a coffee mug to your wardrobe? The AI will catch it and ask for a real clothing item!"
+
 🛍️ Smart Shopping Features
 🔗 Instant Shopping Links
 🛒 Amazon Integration: Direct links to buy recommended items

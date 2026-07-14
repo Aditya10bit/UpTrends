@@ -412,7 +412,7 @@ function AnimatedProgressStep({ step, index, isActive, isCompleted, theme, prima
     transform: [
       { translateY: slideAnim.value },
       { scale: scaleAnim.value * pulseAnim.value }
-    ],
+    ] as any,
     opacity: opacityAnim.value,
   }));
 

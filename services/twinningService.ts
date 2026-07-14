@@ -1,4 +1,4 @@
-import { analyzeBodyImage, analyzePersonComprehensively, generateOutfitsFromPrompt } from './geminiService';
+import { analyzeBodyImage, analyzePersonComprehensively, generateOutfitsFromPrompt, validateImageContext } from './geminiService';
 
 export interface PersonAnalysis {
   name: string;
@@ -87,6 +87,18 @@ export const analyzeTwinningPhotos = async (
     if (!names.person1 || !names.person2) {
       throw new Error('Missing required names for analysis');
     }
+
+    // 0. Validate image contexts to prevent random uploads
+    console.log('🛡️ Validating uploaded images...');
+    const validations = await Promise.all([
+      validateImageContext(photos.person1, 'a person wearing an outfit'),
+      validateImageContext(photos.person2, 'a person wearing an outfit'),
+      validateImageContext(photos.place, 'a venue, location, interior, or exterior setting')
+    ]);
+
+    if (!validations[0].isValid) throw new Error(`Invalid photo for ${names.person1}: ${validations[0].reasoning}`);
+    if (!validations[1].isValid) throw new Error(`Invalid photo for ${names.person2}: ${validations[1].reasoning}`);
+    if (!validations[2].isValid) throw new Error(`Invalid venue photo: ${validations[2].reasoning}`);
 
     // STEP 1: Analyze Person 1 - Get from user profile (no gender detection needed)
     console.log(`👤 Analyzing ${names.person1 || 'first person'}'s style and body type...`);
@@ -1205,8 +1217,8 @@ export const generateShoppingLinks = (searchTerm: string, items?: string[], cate
   const platforms = [
     {
       platform: "Pinterest",
-      search_term: searchTerm,
-      url: `https://pinterest.com/search/pins/?q=${encodeURIComponent(searchTerm)}`,
+      search_term: itemsQuery,
+      url: `https://pinterest.com/search/pins/?q=${encodeURIComponent(itemsQuery)}`,
       icon: "logo-pinterest"
     },
     {

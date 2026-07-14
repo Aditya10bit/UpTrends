@@ -93,7 +93,7 @@ export default function TwinningScreen() {
     transform: [
       { translateY: slideAnim.value },
       { scale: scaleAnim.value },
-    ],
+    ] as any,
   }));
 
   return (

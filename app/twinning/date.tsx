@@ -414,7 +414,9 @@ export default function DateTwinningScreen() {
 
       let errorMessage = 'Failed to analyze photos. Please try again.';
       if (error instanceof Error) {
-        if (error.message.includes('Missing required photos')) {
+        if (error.message.includes('Invalid Image') || error.message.includes('Invalid photo') || error.message.includes('Invalid venue')) {
+          errorMessage = error.message.replace('Error: ', '');
+        } else if (error.message.includes('Missing required photos')) {
           errorMessage = 'Please upload all required photos before analyzing.';
         } else if (error.message.includes('Missing required names')) {
           errorMessage = 'Please enter both names before analyzing.';

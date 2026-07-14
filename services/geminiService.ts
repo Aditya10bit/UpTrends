@@ -22,11 +22,12 @@ const getGenAIInstance = async (): Promise<GoogleGenerativeAI> => {
       cachedCustomKey = await AsyncStorage.getItem(CUSTOM_KEY_STORAGE_KEY);
     }
 
-    if (cachedCustomKey && cachedCustomKey.startsWith('AIza') && cachedCustomKey.length > 10) {
+    const trimmedKey = (cachedCustomKey || '').trim();
+    if (trimmedKey && trimmedKey.length > 10) {
       // User has a valid custom key
       if (lastKeySource !== 'custom' || !cachedGenAIInstance) {
         console.log('[Gemini] Using user-provided custom API key');
-        cachedGenAIInstance = new GoogleGenerativeAI(cachedCustomKey.trim());
+        cachedGenAIInstance = new GoogleGenerativeAI(trimmedKey);
         lastKeySource = 'custom';
       }
       return cachedGenAIInstance;
@@ -62,7 +63,8 @@ export const invalidateApiKeyCache = () => {
 export const getActiveKeySource = async (): Promise<'custom' | 'default'> => {
   try {
     const customKey = await AsyncStorage.getItem(CUSTOM_KEY_STORAGE_KEY);
-    if (customKey && customKey.startsWith('AIza') && customKey.length > 10) {
+    const trimmed = (customKey || '').trim();
+    if (trimmed && trimmed.length > 10) {
       return 'custom';
     }
   } catch {}
@@ -75,11 +77,12 @@ export const getActiveKeySource = async (): Promise<'custom' | 'default'> => {
  */
 export const testApiKey = async (apiKey: string): Promise<{ success: boolean; error?: string }> => {
   try {
-    if (!apiKey || !apiKey.startsWith('AIza') || apiKey.length < 20) {
-      return { success: false, error: 'Invalid key format. Keys should start with "AIza" and be at least 20 characters.' };
+    const trimmedKey = (apiKey || '').trim();
+    if (!trimmedKey || trimmedKey.length < 15) {
+      return { success: false, error: 'API key is too short. Please provide a valid Gemini API key.' };
     }
-    const testGenAI = new GoogleGenerativeAI(apiKey.trim());
-    const testModel = testGenAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
+    const testGenAI = new GoogleGenerativeAI(trimmedKey);
+    const testModel = testGenAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
     const result = await testModel.generateContent('Respond with exactly one word: Ready');
     const text = result.response?.text?.();
     if (text) {
@@ -97,7 +100,7 @@ export const testApiKey = async (apiKey: string): Promise<{ success: boolean; er
     if (msg.includes('429') || msg.includes('Quota')) {
       return { success: false, error: 'This API key has exceeded its quota. Try again later or use a different key.' };
     }
-    return { success: false, error: `Connection failed: ${msg.slice(0, 120)}` };
+    return { success: false, error: `Connection failed: ${msg.slice(0, 500)}` };
   }
 };
 
@@ -310,6 +313,12 @@ export const analyzeImageAndGenerateOutfits = async (
   prompt: string,
   userProfile?: any
 ): Promise<StyleAnalysisResult> => {
+  // 1. Validate image content before processing
+  const validation = await validateImageContext(imageUri, 'an outfit, a fashion moodboard, or an aesthetic venue');
+  if (!validation.isValid) {
+    throw new Error(`Invalid Image: ${validation.reasoning}`);
+  }
+
   // Check memory pressure before making API call (temporarily disabled)
   // if (checkMemoryPressure()) {
   //   console.warn('High memory usage detected, using fallback response');
@@ -364,7 +373,7 @@ Return JSON only:
         {
           "platform": "Pinterest",
           "searchQuery": "outfit description",
-          "url": "https://www.pinterest.com/search/pins/?q=<URL_ENCODED_QUERY>",
+          "url": "Generate a Pinterest search URL using the specific clothing items from this outfit separated by +, for example: https://www.pinterest.com/search/pins/?q=beige+polo+shirt+white+trousers",
           "description": "Outfit inspiration"
         },
         {
@@ -462,7 +471,7 @@ JSON only:
         {
           "platform": "Pinterest",
           "searchQuery": "outfit description",
-          "url": "https://www.pinterest.com/search/pins/?q=<URL_ENCODED_QUERY>",
+          "url": "Generate a Pinterest search URL using the specific clothing items from this outfit separated by +, for example: https://www.pinterest.com/search/pins/?q=beige+polo+shirt+white+trousers",
           "description": "Outfit inspiration"
         },
         {
@@ -623,12 +632,13 @@ export const generateOutfitLinks = async (outfitDescription: string, userPrompt?
   // Extract 1-2 key item phrases from the outfit for product-oriented search (avoid searching full outfit)
   const keyItems = extractKeyItems(core, 2);
 
-  // For product searches (Amazon/Myntra), use only the key items without the prompt
+  // For product searches (Amazon/Myntra), use only the key items
   const productQuery = keyItems.join(' ').trim();
 
   // For inspiration searches (Pinterest/Google Images), use the full outfit description
-  const inspirationQuery = [core, 'outfit', limitPromptTerms(promptPart, 5)].filter(Boolean).join(' ').trim();
-  const googleImagesQuery = [core, 'outfit', limitPromptTerms(promptPart, 8)].filter(Boolean).join(' ').trim();
+  // We explicitly avoid the userPrompt here because it's usually a venue or vibe description which confuses Pinterest
+  const inspirationQuery = [core].filter(Boolean).join(' ').trim();
+  const googleImagesQuery = [core, 'outfit'].filter(Boolean).join(' ').trim();
 
   const links: OutfitLink[] = [
     {
@@ -1166,8 +1176,8 @@ const generateFallbackShoppingLinks = (outfit: string): OutfitLink[] => {
   return [
     {
       platform: "Pinterest",
-      searchQuery: `${outfit} outfit inspiration`,
-      url: `https://www.pinterest.com/search/pins/?q=${encodeURIComponent(outfit + ' outfit inspiration')}`,
+      searchQuery: searchQuery,
+      url: `https://www.pinterest.com/search/pins/?q=${encodeURIComponent(searchQuery)}`,
       description: "Outfit inspiration and styling ideas"
     },
     {
@@ -2419,7 +2429,7 @@ FORMAT YOUR RESPONSE AS JSON:
   "shopping_links": [
     {
       "platform": "Pinterest",
-      "url": "https://www.pinterest.com/search/pins/?q=${encodeURIComponent('outfit for ' + weather.condition + ' weather ' + userProfile.gender)}",
+      "url": "Generate a Pinterest search URL using the specific clothing items from this outfit separated by +, for example: https://www.pinterest.com/search/pins/?q=beige+polo+shirt+white+trousers",
       "description": "Find similar outfit inspiration",
       "icon": "camera"
     },
@@ -2642,7 +2652,7 @@ const generateFallbackTodaysOutfit = (userProfile: any, weather: any): any => {
     shopping_links: [
       {
         platform: "Pinterest",
-        url: `https://www.pinterest.com/search/pins/?q=${encodeURIComponent(outfit.title + ' outfit ' + userProfile.gender)}`,
+        url: `https://www.pinterest.com/search/pins/?q=${encodeURIComponent(outfit.items.join(' ') + ' outfit ' + userProfile.gender)}`,
         description: "Find similar outfit inspiration",
         icon: "camera"
       },
@@ -2779,8 +2789,8 @@ Please provide a detailed style analysis in the following JSON format:
       "shoppingLinks": [
         {
           "platform": "Pinterest",
-          "searchQuery": "<derive from outfit items; avoid generic examples>",
-          "url": "https://www.pinterest.com/search/pins/?q=<URL_ENCODED_QUERY>",
+          "searchQuery": "<specific clothing items from outfit>",
+          "url": "Generate a Pinterest search URL using the specific clothing items from this outfit separated by +, for example: https://www.pinterest.com/search/pins/?q=beige+polo+shirt+white+trousers",
           "description": "Outfit inspiration and styling ideas"
         },
         {
@@ -2938,8 +2948,8 @@ Please provide a detailed style analysis in the following JSON format:
       "shoppingLinks": [
         {
           "platform": "Pinterest",
-          "searchQuery": "<derive from outfit items; avoid generic examples>",
-          "url": "https://www.pinterest.com/search/pins/?q=<URL_ENCODED_QUERY>",
+          "searchQuery": "<specific clothing items from outfit>",
+          "url": "Generate a Pinterest search URL using the specific clothing items from this outfit separated by +, for example: https://www.pinterest.com/search/pins/?q=beige+polo+shirt+white+trousers",
           "description": "Outfit inspiration and styling ideas"
         },
         {
@@ -3563,7 +3573,7 @@ const generateWeatherConsiderations = (weather: any): string => {
   return considerations;
 };
 
-export const validateClothingImage = async (imageUri: string): Promise<{ isValid: boolean; confidence: number; reasoning: string; suggestedItems?: string[] }> => {
+export const validateImageContext = async (imageUri: string, expectedContext: string): Promise<{ isValid: boolean; confidence: number; reasoning: string; suggestedItems?: string[] }> => {
   // Check rate limit
   if (!geminiRateLimiter.canMakeCall()) {
     const waitTime = Math.ceil(geminiRateLimiter.getTimeUntilNextCall() / 1000);
@@ -3586,26 +3596,26 @@ export const validateClothingImage = async (imageUri: string): Promise<{ isValid
     };
 
     const validationPrompt = `
-Analyze this image to determine if it contains clothing items that can be used for outfit generation.
+Analyze this image to determine if it matches the expected context.
+
+EXPECTED CONTEXT: ${expectedContext}
 
 REQUIRED ANALYSIS:
-1. Is this image of clothing items? (Yes/No)
-2. What type of clothing items are visible? (List specific items)
+1. Does this image clearly represent the expected context? (Yes/No)
+2. What is visible in the image? (List key elements)
 3. Confidence level (1-100%)
 4. Reasoning for your assessment
 
 FORMAT YOUR RESPONSE EXACTLY AS:
-VALID_CLOTHING: [Yes/No]
+VALID_IMAGE: [Yes/No]
 CONFIDENCE: [percentage]%
-REASONING: [Brief explanation of why this is or isn't clothing]
-ITEMS: [List of visible clothing items, or "None" if not clothing]
+REASONING: [Brief explanation of why this does or doesn't match the expected context]
+ITEMS: [List of key visible items, or "None"]
 
 IMPORTANT GUIDELINES:
-- Only classify as clothing if you can clearly see wearable garments
-- Reject images of: screenshots, text, food, landscapes, people without visible clothing, objects, etc.
-- Accept images of: individual clothing items, outfits on hangers, clothing laid out, etc.
-- Be strict - if unsure, classify as invalid
-- Focus on whether the image can be used for fashion styling
+- Be strict - if unsure, classify as invalid.
+- Reject images of: screenshots of text, completely unrelated objects, or blank screens.
+- Focus on whether the image matches the EXPECTED CONTEXT.
 
 Make sure the response is in the exact format specified above, no additional text.
 `;
@@ -3614,7 +3624,7 @@ Make sure the response is in the exact format specified above, no additional tex
     const responseText = result.response.text();
 
     // Parse the response
-    const validMatch = responseText.match(/VALID_CLOTHING:\s*(Yes|No)/i);
+    const validMatch = responseText.match(/VALID_IMAGE:\s*(Yes|No)/i);
     const confidenceMatch = responseText.match(/CONFIDENCE:\s*(\d+)%/i);
     const reasoningMatch = responseText.match(/REASONING:\s*([^\n]+)/i);
     const itemsMatch = responseText.match(/ITEMS:\s*([^\n]+)/i);
@@ -3639,12 +3649,12 @@ Make sure the response is in the exact format specified above, no additional tex
     return {
       isValid: false,
       confidence: 0,
-      reasoning: "Unable to validate image due to processing error. Please upload a clear photo of clothing items."
+      reasoning: "Unable to validate image due to processing error. Please upload a clear photo matching the required context."
     };
   }
 };
 
-export const validateMultipleClothingImages = async (imageUris: string[]): Promise<{
+export const validateMultipleImagesContext = async (imageUris: string[], expectedContext: string): Promise<{
   validImages: string[];
   invalidImages: Array<{ uri: string; reason: string }>;
   validationResults: Array<{ uri: string; isValid: boolean; confidence: number; reasoning: string }>;
@@ -3652,7 +3662,7 @@ export const validateMultipleClothingImages = async (imageUris: string[]): Promi
   const validationResults = await Promise.all(
     imageUris.map(async (uri) => {
       try {
-        const result = await validateClothingImage(uri);
+        const result = await validateImageContext(uri, expectedContext);
         return {
           uri,
           isValid: result.isValid,
@@ -3960,7 +3970,6 @@ Make sure the response is in the exact format specified above, no additional tex
       recommendations,
       compatibilityScore
     };
-
   } catch (error: any) {
     console.error('Outfit compatibility analysis error:', error);
 
@@ -3975,5 +3984,100 @@ Make sure the response is in the exact format specified above, no additional tex
       ],
       compatibilityScore: 70
     };
+  }
+};
+
+export interface StyleComponent {
+  category: 'top' | 'bottom' | 'outerwear' | 'shoes' | 'accessory';
+  description: string;
+  matchStatus: 'exact' | 'similar' | 'missing';
+  matchedItemId?: string;
+  searchQuery?: string;
+}
+
+export const analyzeStyleInspiration = async (
+  imageUri: string,
+  wardrobeItems: any[],
+  userProfile: any
+): Promise<StyleComponent[]> => {
+  try {
+    const canCall = geminiRateLimiter.canMakeCall();
+    if (!canCall) {
+      throw new Error('Rate limit exceeded. Please wait a moment.');
+    }
+
+    const genAI = await getGenAIInstance();
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
+
+    let imagePart;
+    if (imageUri.startsWith('data:')) {
+      const mimeType = imageUri.split(';')[0].split(':')[1];
+      const base64Data = imageUri.split(',')[1];
+      imagePart = {
+        inlineData: { data: base64Data, mimeType }
+      };
+    } else {
+      const fileExt = imageUri.split('.').pop()?.toLowerCase();
+      let mimeType = 'image/jpeg';
+      if (fileExt === 'png') mimeType = 'image/png';
+      else if (fileExt === 'webp') mimeType = 'image/webp';
+
+      const response = await fetch(imageUri);
+      const blob = await response.blob();
+      const base64Data = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+
+      imagePart = {
+        inlineData: { data: base64Data, mimeType }
+      };
+    }
+
+    const wardrobeJson = JSON.stringify(wardrobeItems.map(item => ({
+      id: item.id,
+      name: item.name,
+      type: item.type,
+      colors: item.colors,
+      pattern: item.pattern,
+      fabric: item.fabric
+    })));
+
+    const prompt = `You are an elite fashion AI ("Aria"). I am providing you with an inspiration photo of an outfit.
+Your goal is to break down this outfit into its core components and see if I can recreate this exact look using ONLY the clothes in my digital closet.
+
+My current wardrobe items:
+${wardrobeJson}
+
+My profile:
+Gender: ${userProfile?.gender || 'unspecified'}
+
+Instructions:
+1. Identify each distinct clothing component in the photo (top, bottom, outerwear, shoes, accessory).
+2. For each component, search my wardrobe for the closest match.
+3. If a match is extremely close, set matchStatus to "exact" and provide the matchedItemId.
+4. If a match is passable but not perfect (e.g. they have grey jeans instead of white trousers), set matchStatus to "similar" and provide the matchedItemId.
+5. If I do NOT own anything close to it, set matchStatus to "missing". DO NOT provide a matchedItemId. Instead, generate a highly detailed, SEO-friendly \`searchQuery\` that I can plug straight into Google Shopping, Amazon, or Myntra to buy the exact item (e.g., "men's relaxed fit beige linen trousers").
+
+Respond ONLY with a valid JSON array of objects, with no markdown formatting. Each object must have:
+{
+  "category": "top" | "bottom" | "outerwear" | "shoes" | "accessory",
+  "description": "Detailed description of the item in the photo",
+  "matchStatus": "exact" | "similar" | "missing",
+  "matchedItemId": "id from wardrobe (if exact or similar)",
+  "searchQuery": "detailed search string to buy it (if missing)"
+}`;
+
+    const result = await model.generateContent([prompt, imagePart]);
+    const responseText = result.response.text();
+    const cleaned = responseText.replace(/```json\n?|\n?```/g, '').trim();
+    
+    return JSON.parse(cleaned) as StyleComponent[];
+
+  } catch (error) {
+    console.error('Style Inspiration error:', error);
+    throw error;
   }
 };

@@ -140,14 +140,14 @@ export const EnhancedLoader: React.FC<EnhancedLoaderProps> = ({
         transform: [
             { rotate: `${rotation.value}deg` },
             { scale: scale.value },
-        ],
+        ] as any,
     }));
 
     const particle1Style = useAnimatedStyle(() => ({
         transform: [
             { translateY: particle1.value * -30 },
             { translateX: particle1.value * 20 },
-        ],
+        ] as any,
         opacity: particle1.value,
     }));
 
@@ -155,7 +155,7 @@ export const EnhancedLoader: React.FC<EnhancedLoaderProps> = ({
         transform: [
             { translateY: particle2.value * -40 },
             { translateX: particle2.value * -15 },
-        ],
+        ] as any,
         opacity: particle2.value,
     }));
 
@@ -163,7 +163,7 @@ export const EnhancedLoader: React.FC<EnhancedLoaderProps> = ({
         transform: [
             { translateY: particle3.value * -25 },
             { translateX: particle3.value * 30 },
-        ],
+        ] as any,
         opacity: particle3.value,
     }));
 

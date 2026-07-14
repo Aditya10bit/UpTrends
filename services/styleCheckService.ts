@@ -1,5 +1,6 @@
 import { Image } from 'react-native';
-import { genAI } from './geminiService';
+import { geminiRateLimiter } from '../config/security';
+import { genAI, validateImageContext } from './geminiService';
 
 // Enhanced rate limiter for better model usage
 class StyleCheckRateLimiter {
@@ -100,6 +101,12 @@ export const analyzeOutfitRating = async (input: StyleCheckInput): Promise<Style
   }
 
   try {
+    // 1. Validate image content before processing
+    const validation = await validateImageContext(input.outfitImage, 'a person wearing an outfit');
+    if (!validation.isValid) {
+      throw new Error(`Invalid Image: ${validation.reasoning}`);
+    }
+
     // Use Gemini 1.5 Flash for reliable analysis
     const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
 

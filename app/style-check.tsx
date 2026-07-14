@@ -155,7 +155,11 @@ export default function StyleCheck() {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (error) {
       console.error('Error analyzing style:', error);
-      Alert.alert('Analysis Failed', 'Unable to analyze your style. Please try again.');
+      let errorMessage = 'Unable to analyze your style. Please try again.';
+      if (error instanceof Error && error.message.includes('Invalid Image')) {
+        errorMessage = error.message.replace('Error: ', '');
+      }
+      Alert.alert('Analysis Failed', errorMessage);
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setIsAnalyzing(false);

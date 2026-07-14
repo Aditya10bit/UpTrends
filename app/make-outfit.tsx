@@ -25,7 +25,7 @@ import {
     analyzeOutfitCompatibility,
     generateWardrobeBasedOutfits,
     getActiveKeySource,
-    validateMultipleClothingImages
+    validateMultipleImagesContext
 } from '../services/geminiService';
 import { getLocationTopography } from '../services/topographyService';
 import { getUserProfile } from '../services/userService';
@@ -284,7 +284,7 @@ export default function MakeOutfit() {
 
     setIsValidatingImages(true);
     try {
-      const results = await validateMultipleClothingImages(selectedImages);
+      const results = await validateMultipleImagesContext(selectedImages, 'clothing items on a flat surface or hanger');
       setValidationResults(results);
 
       if (results.invalidImages.length > 0) {
@@ -292,7 +292,13 @@ export default function MakeOutfit() {
       }
     } catch (error) {
       console.error('Error validating images:', error);
-      Alert.alert('Validation Error', 'Unable to validate images. Please try again.');
+      let errorMessage = 'Unable to validate images. Please try again.';
+      if (error instanceof Error && error.message.includes('Rate limit')) {
+        errorMessage = 'Too many requests. Please wait a moment and try again.';
+      } else if (error instanceof Error && error.message.includes('Invalid Image')) {
+        errorMessage = error.message.replace('Error: ', '');
+      }
+      Alert.alert('Validation Error', errorMessage);
     } finally {
       setIsValidatingImages(false);
     }

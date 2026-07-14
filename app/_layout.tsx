@@ -165,6 +165,13 @@ export default function RootLayout() {
                   presentation: 'card'
                 }}
               />
+              <Stack.Screen
+                name="wardrobe"
+                options={{
+                  title: 'My Closet',
+                  presentation: 'card'
+                }}
+              />
 
             </Stack>
           </AuthProvider>

@@ -7,7 +7,6 @@
     "icon": "./assets/images/icon.png",
     "scheme": "uptrends",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": false,
     "description": "AI-powered fashion styling app that helps you create perfect outfits for any occasion",
     "privacy": "public",
     "platforms": [

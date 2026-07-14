@@ -18,7 +18,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { getOutfitSuggestions, OutfitSuggestion } from '../services/outfitService';
 import { getActiveKeySource } from '../services/geminiService';
 import { getUserProfile } from '../services/userService';
-import { getColorCode, hexToHSL } from '../utils/colorResolver';
+import { getColorCode, hexToHSL, colorMap } from '../utils/colorResolver';
 import * as WebBrowser from 'expo-web-browser';
 import * as Haptics from 'expo-haptics';
 
@@ -87,7 +87,21 @@ export default function MixMatchScreen() {
       suggestions.forEach((outfit: OutfitSuggestion) => {
         outfit.items.forEach(item => {
           const lower = item.toLowerCase();
-          const itemColors = outfit.colors.filter(c => lower.includes(c.toLowerCase()));
+          let itemColors = outfit.colors.filter(c => lower.includes(c.toLowerCase()));
+          
+          // If the AI forgot to list this item's color in outfit.colors,
+          // let's extract it directly from the item description!
+          if (itemColors.length === 0) {
+            const matchedKeys = Object.keys(colorMap).filter(colorName => 
+              lower.includes(colorName)
+            );
+            if (matchedKeys.length > 0) {
+              // Prefer more specific color names (longest first)
+              matchedKeys.sort((a, b) => b.length - a.length);
+              itemColors = [matchedKeys[0]];
+            }
+          }
+
           const defaultColor = outfit.colors[0] || 'black';
           const resolvedColors = itemColors.length > 0 ? itemColors : [defaultColor];
 

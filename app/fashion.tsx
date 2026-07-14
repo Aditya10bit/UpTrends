@@ -41,7 +41,8 @@ const categoriesByGender = {
     { id: 6, name: 'Old Money', icon: '💎', colors: ['#3c6382', '#40739e'], trend: 'Luxury', description: 'Timeless elegance' },
     { id: 7, name: 'Twinning', icon: '👫', colors: ['#ff6b9d', '#c44569'], trend: 'New', description: 'Couple goals' },
     { id: 8, name: 'Make Me an Outfit', icon: '👗', colors: ['#ff9ff3', '#f368e0'], trend: 'Custom', description: 'Create your look' },
-    { id: 9, name: 'Upload Aesthetic', icon: '🎨', colors: ['#667eea', '#764ba2'], trend: 'Trendy', description: 'Style for venues' }
+    { id: 9, name: 'Upload Aesthetic', icon: '🎨', colors: ['#667eea', '#764ba2'], trend: 'Trendy', description: 'Style for venues' },
+    { id: 10, name: 'My Closet', icon: '👚', colors: ['#f472b6', '#fb7185'], trend: 'New', description: 'Your digital wardrobe' }
   ],
   female: [
     { id: 0, name: "Today's Outfit", icon: '🌤️', colors: ['#FF6B35', '#F7931E'], trend: 'Weather', description: 'Perfect for today' },
@@ -53,7 +54,8 @@ const categoriesByGender = {
     { id: 6, name: 'Elegant', icon: '👑', colors: ['#3c6382', '#40739e'], trend: 'Luxury', description: 'Royal vibes' },
     { id: 7, name: 'Twinning', icon: '👫', colors: ['#ff6b9d', '#c44569'], trend: 'New', description: 'Match made' },
     { id: 8, name: 'Make Me an Outfit', icon: '👗', colors: ['#ff9ff3', '#f368e0'], trend: 'Custom', description: 'Create your look' },
-    { id: 9, name: 'Upload Aesthetic', icon: '🎨', colors: ['#667eea', '#764ba2'], trend: 'Trendy', description: 'Style for venues' }
+    { id: 9, name: 'Upload Aesthetic', icon: '🎨', colors: ['#667eea', '#764ba2'], trend: 'Trendy', description: 'Style for venues' },
+    { id: 10, name: 'My Closet', icon: '👚', colors: ['#f472b6', '#fb7185'], trend: 'New', description: 'Your digital wardrobe' }
   ]
 };
 
@@ -260,7 +262,7 @@ const ScrollSafeCategoryCard = ({
     outputRange: [0.3, 1, 0.3],
   });
 
-  const animatedStyle = {
+  const animatedStyle: any = {
     transform: [
       { scale: Animated.multiply(scaleValue, pulseValue) },
       { translateY: floatingTransform },
@@ -486,6 +488,8 @@ export default function Fashion() {
         router.push('/todays-outfit');
       } else if (categoryName === 'Twinning') {
         router.push('/twinning');
+      } else if (categoryName === 'My Closet') {
+        router.push('/wardrobe');
       } else {
         const categorySlug = `${selectedGender}-${categoryName.toLowerCase().replace(/\s+/g, '-')}`;
         router.push(`/category/${categorySlug}`);

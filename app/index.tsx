@@ -78,6 +78,10 @@ export default function MainScreen() {
   const cardAnim2 = useRef(new Animated.Value(0)).current;
   const cardAnim3 = useRef(new Animated.Value(0)).current;
   const cardAnim4 = useRef(new Animated.Value(0)).current;
+  const cardAnim5 = useRef(new Animated.Value(0)).current;
+  const cardAnim6 = useRef(new Animated.Value(0)).current;
+  const cardAnim7 = useRef(new Animated.Value(0)).current;
+  const cardAnim8 = useRef(new Animated.Value(0)).current;
 
   const floatingAnim1 = useRef(new Animated.Value(0)).current;
   const floatingAnim2 = useRef(new Animated.Value(0)).current;
@@ -127,6 +131,10 @@ export default function MainScreen() {
     cardAnim2.setValue(0);
     cardAnim3.setValue(0);
     cardAnim4.setValue(0);
+    cardAnim5.setValue(0);
+    cardAnim6.setValue(0);
+    cardAnim7.setValue(0);
+    cardAnim8.setValue(0);
 
     glowAnim.setValue(0);
     morphAnim.setValue(0);
@@ -213,6 +221,30 @@ export default function MainScreen() {
           useNativeDriver: true,
         }),
         Animated.spring(cardAnim4, {
+          toValue: 1,
+          tension: 100,
+          friction: 8,
+          useNativeDriver: true,
+        }),
+        Animated.spring(cardAnim5, {
+          toValue: 1,
+          tension: 100,
+          friction: 8,
+          useNativeDriver: true,
+        }),
+        Animated.spring(cardAnim6, {
+          toValue: 1,
+          tension: 100,
+          friction: 8,
+          useNativeDriver: true,
+        }),
+        Animated.spring(cardAnim7, {
+          toValue: 1,
+          tension: 100,
+          friction: 8,
+          useNativeDriver: true,
+        }),
+        Animated.spring(cardAnim8, {
           toValue: 1,
           tension: 100,
           friction: 8,
@@ -579,6 +611,109 @@ export default function MainScreen() {
     ]).start(() => {
       startExitAnimation(() => {
         router.push('/mix-match');
+        setTimeout(() => setIsNavigating(false), 500);
+      });
+    });
+  };
+  const navigateToWardrobe = async () => {
+    if (isNavigating || isExiting) return;
+    setIsNavigating(true);
+
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    Animated.sequence([
+      Animated.spring(cardAnim5, {
+        toValue: 0.92,
+        tension: 300,
+        friction: 10,
+        useNativeDriver: true,
+      }),
+      Animated.spring(cardAnim5, {
+        toValue: 1,
+        tension: 300,
+        friction: 10,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      startExitAnimation(() => {
+        router.push('/wardrobe');
+        setTimeout(() => setIsNavigating(false), 500);
+      });
+    });
+  };
+
+  const navigateToShoppingScanner = async () => {
+    if (isNavigating || isExiting) return;
+    setIsNavigating(true);
+
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    Animated.sequence([
+      Animated.spring(cardAnim6, {
+        toValue: 0.92,
+        tension: 300,
+        friction: 10,
+        useNativeDriver: true,
+      }),
+      Animated.spring(cardAnim6, {
+        toValue: 1,
+        tension: 300,
+        friction: 10,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      startExitAnimation(() => {
+        router.push('/shopping-scanner');
+        setTimeout(() => setIsNavigating(false), 500);
+      });
+    });
+  };
+
+  const navigateToStylistChat = async () => {
+    if (isNavigating || isExiting) return;
+    setIsNavigating(true);
+
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    Animated.sequence([
+      Animated.spring(cardAnim7, {
+        toValue: 0.92,
+        tension: 300,
+        friction: 10,
+        useNativeDriver: true,
+      }),
+      Animated.spring(cardAnim7, {
+        toValue: 1,
+        tension: 300,
+        friction: 10,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      startExitAnimation(() => {
+        router.push('/stylist-chat');
+        setTimeout(() => setIsNavigating(false), 500);
+      });
+    });
+  };
+
+  const navigateToStyleShazam = async () => {
+    if (isNavigating || isExiting) return;
+    setIsNavigating(true);
+
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    Animated.sequence([
+      Animated.spring(cardAnim8, {
+        toValue: 0.92,
+        tension: 300,
+        friction: 10,
+        useNativeDriver: true,
+      }),
+      Animated.spring(cardAnim8, {
+        toValue: 1,
+        tension: 300,
+        friction: 10,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      startExitAnimation(() => {
+        router.push('/style-shazam');
         setTimeout(() => setIsNavigating(false), 500);
       });
     });
@@ -1088,6 +1223,186 @@ export default function MainScreen() {
                       </Animated.View>
                       <Text style={styles.cardTitle}>Mix & Match</Text>
                       <Text style={styles.cardDescription}>Interactive styling canvas</Text>
+                      <View style={styles.cardGlow} />
+                    </LinearGradient>
+                  </GlassCard>
+                </TouchableOpacity>
+              </Animated.View>
+
+              {/* My Closet Card */}
+              <Animated.View style={[
+                styles.cardContainer,
+                {
+                  transform: [
+                    { scale: cardAnim5 },
+                    {
+                      rotateX: morphAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ['0deg', '-2deg']
+                      })
+                    }
+                  ]
+                }
+              ]}>
+                <TouchableOpacity
+                  onPress={navigateToWardrobe}
+                  activeOpacity={0.9}
+                  style={styles.cardTouchable}
+                >
+                  <GlassCard style={styles.navCard} intensity={60} tint="light">
+                    <LinearGradient
+                       colors={['rgba(244, 114, 182, 0.8)', 'rgba(251, 113, 133, 0.8)']}
+                      style={styles.cardGradient}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                    >
+                      <Animated.View style={[
+                        styles.cardIconContainer,
+                        {
+                          transform: [{
+                            scale: pulseAnim
+                          }]
+                        }
+                      ]}>
+                        <Ionicons name="grid-outline" size={32} color="#fff" />
+                      </Animated.View>
+                      <Text style={styles.cardTitle}>My Closet</Text>
+                      <Text style={styles.cardDescription}>Your digital wardrobe</Text>
+                      <View style={styles.cardGlow} />
+                    </LinearGradient>
+                  </GlassCard>
+                </TouchableOpacity>
+              </Animated.View>
+
+              {/* Shopping Scanner Card */}
+              <Animated.View style={[
+                styles.cardContainer,
+                {
+                  transform: [
+                    { scale: cardAnim6 },
+                    {
+                      rotateX: morphAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ['0deg', '2deg']
+                      })
+                    }
+                  ]
+                }
+              ]}>
+                <TouchableOpacity
+                  onPress={navigateToShoppingScanner}
+                  activeOpacity={0.9}
+                  style={styles.cardTouchable}
+                >
+                  <GlassCard style={styles.navCard} intensity={60} tint="light">
+                    <LinearGradient
+                      colors={['rgba(236, 72, 153, 0.8)', 'rgba(139, 92, 246, 0.8)']}
+                      style={styles.cardGradient}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                    >
+                      <Animated.View style={[
+                        styles.cardIconContainer,
+                        {
+                          transform: [{
+                            scale: pulseAnim
+                          }]
+                        }
+                      ]}>
+                        <Ionicons name="scan-outline" size={32} color="#fff" />
+                      </Animated.View>
+                      <Text style={styles.cardTitle}>Will It Match?</Text>
+                      <Text style={styles.cardDescription}>AI shopping scanner</Text>
+                      <View style={styles.cardGlow} />
+                    </LinearGradient>
+                  </GlassCard>
+                </TouchableOpacity>
+              </Animated.View>
+
+              {/* Stylist Chat Card */}
+              <Animated.View style={[
+                styles.cardContainer,
+                {
+                  transform: [
+                    { scale: cardAnim7 },
+                    {
+                      rotateX: morphAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ['0deg', '-2deg']
+                      })
+                    }
+                  ]
+                }
+              ]}>
+                <TouchableOpacity
+                  onPress={navigateToStylistChat}
+                  activeOpacity={0.9}
+                  style={styles.cardTouchable}
+                >
+                  <GlassCard style={styles.navCard} intensity={60} tint="light">
+                    <LinearGradient
+                      colors={['rgba(56, 189, 248, 0.8)', 'rgba(59, 130, 246, 0.8)']}
+                      style={styles.cardGradient}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                    >
+                      <Animated.View style={[
+                        styles.cardIconContainer,
+                        {
+                          transform: [{
+                            scale: pulseAnim
+                          }]
+                        }
+                      ]}>
+                        <Ionicons name="chatbubbles-outline" size={32} color="#fff" />
+                      </Animated.View>
+                      <Text style={styles.cardTitle}>Stylist Chat</Text>
+                      <Text style={styles.cardDescription}>Consult your AI stylist</Text>
+                      <View style={styles.cardGlow} />
+                    </LinearGradient>
+                  </GlassCard>
+                </TouchableOpacity>
+              </Animated.View>
+
+              {/* Style Shazam Card */}
+              <Animated.View style={[
+                styles.cardContainer,
+                {
+                  transform: [
+                    { scale: cardAnim8 },
+                    {
+                      rotateX: morphAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ['0deg', '2deg']
+                      })
+                    }
+                  ]
+                }
+              ]}>
+                <TouchableOpacity
+                  onPress={navigateToStyleShazam}
+                  activeOpacity={0.9}
+                  style={styles.cardTouchable}
+                >
+                  <GlassCard style={styles.navCard} intensity={60} tint="light">
+                    <LinearGradient
+                      colors={['rgba(0, 229, 255, 0.8)', 'rgba(29, 78, 216, 0.8)']}
+                      style={styles.cardGradient}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                    >
+                      <Animated.View style={[
+                        styles.cardIconContainer,
+                        {
+                          transform: [{
+                            scale: pulseAnim
+                          }]
+                        }
+                      ]}>
+                        <Ionicons name="sparkles-outline" size={32} color="#fff" />
+                      </Animated.View>
+                      <Text style={styles.cardTitle}>Steal the Look</Text>
+                      <Text style={styles.cardDescription}>Style Shazam closet match</Text>
                       <View style={styles.cardGlow} />
                     </LinearGradient>
                   </GlassCard>

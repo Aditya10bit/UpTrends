@@ -1,6 +1,6 @@
 // utils/colorResolver.ts
 
-const colorMap: { [key: string]: string } = {
+export const colorMap: { [key: string]: string } = {
   // Primaries & Basics
   red: '#ef4444',
   blue: '#3b82f6',
@@ -101,7 +101,7 @@ export const getColorCode = (colorName: string): string => {
 
   // 3. Substring matching (e.g. "dark mustard yellow" -> matches "mustard")
   for (const [name, code] of Object.entries(colorMap)) {
-    if (normalized.includes(name) || name.includes(normalized)) {
+    if (normalized.includes(name) || (normalized.length >= 3 && name.includes(normalized))) {
       return code;
     }
   }
