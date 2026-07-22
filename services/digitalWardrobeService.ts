@@ -1024,20 +1024,50 @@ RULES:
 
 // ─── Stylist Chat Service ────────────────────────────────────────────────────
 
+export interface PackingData {
+  selectedClosetItemIds: string[];
+  outfitCombinations: string[];
+  missingItems: { name: string; reason: string }[];
+}
+
 export interface ChatMessage {
   id: string;
   text: string;
   isUser: boolean;
   timestamp: Date;
   attachedItem?: WardrobeItem;
+  packingData?: PackingData;
 }
+
+export interface StylistResponse {
+  text: string;
+  packingData?: PackingData;
+}
+
+// Helper to fetch coordinates for a city name via Open-Meteo geocoding
+const fetchCityCoordinates = async (city: string): Promise<{ lat: number; lon: number } | null> => {
+  try {
+    const res = await fetch(
+      `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=en&format=json`
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data.results && data.results.length > 0) {
+      return { lat: data.results[0].latitude, lon: data.results[0].longitude };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+};
 
 export const sendMessageToStylist = async (
   message: string,
   history: ChatMessage[],
   attachedItem?: WardrobeItem,
-  userProfile?: any
-): Promise<string> => {
+  userProfile?: any,
+  wardrobeItems?: WardrobeItem[]
+): Promise<StylistResponse> => {
   if (!geminiRateLimiter.canMakeCall()) {
     throw new Error('Rate limit reached. Please wait a moment.');
   }
@@ -1046,7 +1076,7 @@ export const sendMessageToStylist = async (
     const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
 
     // Format chat history for Gemini
-    const historyPrompt = history.map(msg => 
+    const historyPrompt = history.map(msg =>
       `${msg.isUser ? 'User' : 'Stylist'}: ${msg.text}${msg.attachedItem ? ` (Attached Item: ${msg.attachedItem.name} — ${msg.attachedItem.type}/${msg.attachedItem.subType})` : ''}`
     ).join('\n');
 
@@ -1065,6 +1095,126 @@ export const sendMessageToStylist = async (
       itemContext = `The user has attached their wardrobe item: "${attachedItem.name}". Details: Type: ${attachedItem.type}/${attachedItem.subType}, Colors: ${attachedItem.colors.join(', ')}, Pattern: ${attachedItem.pattern}, Fabric: ${attachedItem.fabric}, Formality: ${attachedItem.formality}, Seasons: ${attachedItem.seasons.join(', ')}.`;
     }
 
+    // ── STEP 1: Detect if message is a travel/packing intent ──────────────────
+    const intentDetectPrompt = `You are a fashion assistant intent classifier.
+Given this user message: "${message}"
+Determine:
+1. Is this a travel, trip, packing list, or vacation request? Reply with YES or NO.
+2. If YES, extract the destination city name. Reply with just the city name.
+
+Reply in this exact JSON format, nothing else:
+{"isTravelRequest": true/false, "destinationCity": "city name or null"}`;
+
+    const intentResult = await model.generateContent(intentDetectPrompt);
+    let intentData = { isTravelRequest: false, destinationCity: null as string | null };
+    try {
+      const rawIntent = intentResult.response.text().trim().replace(/```json|```/g, '').trim();
+      intentData = JSON.parse(rawIntent);
+    } catch {
+      // If parsing fails, treat as normal chat
+    }
+
+    // ── STEP 2: If travel intent, fetch weather & build packing prompt ─────────
+    if (intentData.isTravelRequest && intentData.destinationCity && wardrobeItems && wardrobeItems.length > 0) {
+      console.log(`✈️ Travel intent detected! Destination: ${intentData.destinationCity}`);
+
+      // Fetch coordinates for the destination city
+      const coords = await fetchCityCoordinates(intentData.destinationCity);
+      let weatherContext = `Weather data for ${intentData.destinationCity} is currently unavailable.`;
+
+      if (coords) {
+        try {
+          const meteoRes = await fetch(
+            `https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lon}&current_weather=true&hourly=temperature_2m,weathercode,relative_humidity_2m&timezone=auto`
+          );
+          if (meteoRes.ok) {
+            const meteoData = await meteoRes.json();
+            const cw = meteoData.current_weather;
+            const hourlyHumidities = meteoData.hourly?.relative_humidity_2m || [];
+            const avgHumidity = hourlyHumidities.length > 0
+              ? Math.round(hourlyHumidities.slice(0, 8).reduce((a: number, b: number) => a + b, 0) / Math.min(8, hourlyHumidities.length))
+              : 'Unknown';
+            const weatherCode = cw?.weathercode;
+            const isRainy = weatherCode >= 51 && weatherCode <= 99;
+            const isHot = cw?.temperature >= 28;
+            const isCold = cw?.temperature <= 15;
+            weatherContext = `Current weather in ${intentData.destinationCity}: ${cw?.temperature}°C, ${isRainy ? 'Rainy/Wet' : isHot ? 'Hot and Sunny' : isCold ? 'Cool/Cold' : 'Mild'}. Average humidity: ${avgHumidity}%. Wind: ${cw?.windspeed} km/h.`;
+            console.log(`🌦️ Fetched weather for ${intentData.destinationCity}:`, weatherContext);
+          }
+        } catch (e) {
+          console.warn('Weather fetch failed for city:', e);
+        }
+      }
+
+      // Build wardrobe snapshot for AI (limit to 30 items to stay within context)
+      const wardrobeSnapshot = wardrobeItems.slice(0, 30).map(item => ({
+        id: item.id,
+        name: item.name,
+        type: item.type,
+        subType: item.subType,
+        colors: item.colors,
+        fabric: item.fabric,
+        seasons: item.seasons,
+        formality: item.formality,
+      }));
+
+      const packingPrompt = `You are Aria, a world-class personal fashion stylist and travel packing expert.
+
+USER PROFILE:
+- Gender: ${gender}, Body Type: ${bodyType}, Skin Tone: ${skinTone}, Style: ${stylePersonality}
+
+DESTINATION & WEATHER:
+${weatherContext}
+
+USER'S AVAILABLE WARDROBE (scan carefully for suitable items):
+${JSON.stringify(wardrobeSnapshot, null, 2)}
+
+USER'S REQUEST: "${message}"
+
+TASK: Create a smart, minimalist travel packing list that covers the entire trip using only items from the wardrobe above where possible. Every item you pick should be justified by the weather and occasion.
+
+INSTRUCTIONS:
+1. Select the MINIMUM items from the wardrobe that provide MAXIMUM outfit combinations. Prioritize versatile, mix-and-match pieces.
+2. For each outfit combination, describe specifically which items are worn together and for what occasion (sightseeing, dinner, temple visit, etc.).
+3. Identify MISSING items the user doesn't have in their closet but genuinely needs for this trip. Be specific (e.g., "A lightweight waterproof jacket for rain showers in ${intentData.destinationCity}"). Only add truly needed items, not nice-to-haves.
+4. Write a warm, friendly intro paragraph as Aria.
+
+Return your response as valid JSON ONLY in this exact format:
+{
+  "ariaText": "Your warm, conversational intro message here as Aria. Mention the weather and the destination. Do not repeat outfit details here, just a friendly overview.",
+  "selectedClosetItemIds": ["id1", "id2"],
+  "outfitCombinations": [
+    "Day 1 - Sightseeing: [Item Name] + [Item Name] — Light and comfortable for the heat.",
+    "Day 2 - Evening Dinner: [Item Name] + [Item Name] — Polished yet breathable."
+  ],
+  "missingItems": [
+    {"name": "Lightweight waterproof jacket", "reason": "Rainy season in ${intentData.destinationCity} means sudden showers."},
+    {"name": "Comfortable walking sandals", "reason": "Temple and street exploration requires easy-on footwear."}
+  ]
+}`;
+
+      const packingResult = await model.generateContent(packingPrompt);
+      let packingRaw = packingResult.response.text().trim().replace(/```json|```/g, '').trim();
+      
+      try {
+        const parsed = JSON.parse(packingRaw);
+        const packingData: PackingData = {
+          selectedClosetItemIds: parsed.selectedClosetItemIds || [],
+          outfitCombinations: parsed.outfitCombinations || [],
+          missingItems: parsed.missingItems || [],
+        };
+        return {
+          text: parsed.ariaText || `Here's your packing plan for ${intentData.destinationCity}!`,
+          packingData,
+        };
+      } catch (parseErr) {
+        console.warn('Packing JSON parse failed, falling back to text response:', parseErr);
+        // Fall through to normal text response with the raw text
+        return { text: packingResult.response.text().trim() };
+      }
+    }
+
+    // ── STEP 3: Regular conversation (non-travel) ─────────────────────────────
     const systemPrompt = `You are a world-class friendly personal fashion stylist and image consultant named "Aria". 
 You help users with styling advice, choosing colors, packing lists, wardrobe coordination, and figuring out what suits their body shape.
 
@@ -1096,7 +1246,7 @@ FORMATTING RULES:
 This is critical for mobile text display. Output clean, conversational plain text following these rules.`;
 
     const result = await model.generateContent(systemPrompt);
-    return result.response.text().trim();
+    return { text: result.response.text().trim() };
   } catch (error) {
     console.error('Stylist chat error:', error);
     throw error;

@@ -29,6 +29,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AnimatedProgress } from '../../components/TwinningSharedComponents';
 import { useTheme } from '../../contexts/ThemeContext';
+import PremiumBackground from '../../components/PremiumBackground';
 import { analyzeTwinningPhotos, TwinningAnalysis } from '../../services/twinningService';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -75,14 +76,6 @@ export default function DateTwinningScreen() {
       placeholder: 'Tap to add photo'
     },
     {
-      id: 'together',
-      title: 'Together Photo',
-      subtitle: 'Both of you in one frame',
-      icon: '👫',
-      required: true,
-      placeholder: 'Couple photo'
-    },
-    {
       id: 'place',
       title: 'Date Venue',
       subtitle: 'Where you\'re going',
@@ -94,12 +87,8 @@ export default function DateTwinningScreen() {
 
   const [names, setNames] = useState<{ person1: string; person2: string }>({ person1: '', person2: '' });
   const [dateContext, setDateContext] = useState({
-    dateType: '',
-    venue: '',
-    atmosphere: '',
-    duration: '',
-    specialOccasion: '',
-    stylePreferences: ''
+    occasion: '',
+    specificNotes: ''
   });
   const [analyzing, setAnalyzing] = useState(false);
   const [analysis, setAnalysis] = useState<TwinningAnalysis | null>(null);
@@ -193,19 +182,7 @@ export default function DateTwinningScreen() {
       const requiredPhotos = photos.filter(p => p.required);
       const hasAllRequired = requiredPhotos.every(p => p.image);
       const hasNames = names.person1?.trim() && names.person2?.trim();
-      const hasRequiredContext = dateContext.dateType?.trim() && dateContext.venue?.trim();
-
-      console.log('🔍 Validation check:', {
-        hasAllRequired,
-        hasNames,
-        hasRequiredContext,
-        requiredPhotosCount: requiredPhotos.length,
-        uploadedPhotosCount: requiredPhotos.filter(p => p.image).length,
-        person1Name: names.person1,
-        person2Name: names.person2,
-        dateType: dateContext.dateType,
-        venue: dateContext.venue
-      });
+      const hasRequiredContext = dateContext.occasion?.trim() !== '';
 
       return hasAllRequired && hasNames && hasRequiredContext;
     } catch (error) {
@@ -214,232 +191,78 @@ export default function DateTwinningScreen() {
     }
   };
 
-  const simulateAnalysisProgress = () => {
-    const initialSteps = [
-      `🎯 Starting comprehensive analysis for your perfect date coordination...`,
-      `👤 Analyzing ${names.person1 || 'Person 1'}'s style and body type...`,
-      `🔍 Deep-diving into ${names.person1 || 'Person 1'}'s unique style profile...`,
-      `📸 Processing ${names.person1 || 'Person 1'} photo with advanced AI analysis...`,
-      `✅ Successfully analyzed ${names.person1 || 'Person 1'} - Getting body type and skin tone...`,
-      `� Scanniing ${names.person2 || 'Person 2'}'s vibe and energy...`,
-      `�  Deep-diving into ${names.person2 || 'Person 2'}'s unique style profile...`,
-      `📸 Processing ${names.person2 || 'Person 2'} photo with advanced AI analysis...`,
-      `✅ Successfully analyzed ${names.person2 || 'Person 2'} - Getting appearance details...`,
-      `� Unde-rstanding your romantic chemistry and couple dynamic...`,
-      `🏛️ Analyzing the ${dateContext?.dateType || 'date'} setting and atmosphere...`,
-      `📍 Evaluating ${dateContext?.venue || 'venue'} requirements and dress code...`,
-      `🎨 Creating romantic color schemes for perfect coordination...`,
-      `🤖 Getting AI fashion recommendations for couples...`,
-      `� EGenerating coordinated date outfits based on analysis...`,
-      `🛍️ Creating specific shopping links for each outfit item...`,
-      `💡 Developing personalized styling tips for your date...`,
-      `✨ Finalizing your perfect romantic coordination...`
-    ];
-
-    // Different timing for different types of steps
-    const stepTimings = [
-      800,  // Starting
-      1000, // Analyzing person 1
-      1500, // Deep diving person 1
-      2000, // Processing photo 1 (longer for AI)
-      800,  // Success person 1
-      1000, // Analyzing person 2
-      1500, // Deep diving person 2
-      2000, // Processing photo 2 (longer for AI)
-      800,  // Success person 2
-      1200, // Romantic chemistry
-      1200, // Date setting analysis
-      1200, // Venue requirements
-      1000, // Color schemes
-      2500, // Getting AI recommendations (longer)
-      1500, // Generating outfits
-      1000, // Shopping links
-      800,  // Styling tips
-      800   // Finalizing
-    ];
-
-    // Safety check: ensure initialSteps is valid
-    if (!initialSteps || !Array.isArray(initialSteps) || initialSteps.length === 0) {
-      console.error('Invalid initialSteps:', initialSteps);
-      return {
-        cleanup: () => { },
-        addFinalStep: () => { }
-      };
-    }
-
-    // Safety check: ensure stepTimings is valid and matches initialSteps length
-    if (!stepTimings || !Array.isArray(stepTimings) || stepTimings.length !== initialSteps.length) {
-      console.error('Invalid stepTimings or length mismatch:', stepTimings, initialSteps.length);
-      return {
-        cleanup: () => { },
-        addFinalStep: () => { }
-      };
-    }
-
-    setProgressSteps(initialSteps);
-    setCurrentStep(0);
-    setCompletedSteps([]);
-
-    let stepIndex = 0;
-    let timeoutId: NodeJS.Timeout;
-
-    const showNextStep = () => {
-      try {
-        if (stepIndex < initialSteps.length) {
-          const currentStepText = initialSteps[stepIndex];
-          if (currentStepText && typeof currentStepText === 'string') {
-            setCurrentStep(stepIndex);
-            setCompletedSteps(prev => [...prev, currentStepText]);
-
-            const nextStepIndex = stepIndex + 1;
-            if (nextStepIndex < initialSteps.length) {
-              const stepTiming = stepTimings[stepIndex];
-              if (typeof stepTiming === 'number' && stepTiming > 0) {
-                timeoutId = setTimeout(showNextStep, stepTiming);
-              } else {
-                timeoutId = setTimeout(showNextStep, 1000); // Default timing
-              }
-            }
-            stepIndex++;
-          } else {
-            console.warn('Invalid step text at index:', stepIndex, currentStepText);
-            stepIndex++;
-          }
-        }
-      } catch (error) {
-        console.error('Error in progress simulation:', error);
-      }
-    };
-
-    showNextStep();
-
-    return {
-      cleanup: () => {
-        try {
-          if (timeoutId) clearTimeout(timeoutId);
-        } catch (error) {
-          console.error('Error in cleanup:', error);
-        }
-      },
-      addFinalStep: () => {
-        try {
-          const finalStepText = `🎉 Your perfect date coordination is ready!`;
-          if (finalStepText && typeof finalStepText === 'string') {
-            setCompletedSteps(prev => [...prev, finalStepText]);
-            setCurrentStep(prev => prev + 1);
-          }
-        } catch (error) {
-          console.error('Error adding final step:', error);
-        }
-      }
-    }
-  };
-
   const handleAnalyze = async () => {
+    if (analyzing) return;
     if (!canAnalyze()) {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       Alert.alert(
         'Missing Information',
-        'Please upload all required photos and enter both names to continue.',
+        'Please upload all required photos, names, and occasion to continue.',
         [{ text: 'OK', style: 'default' }]
       );
       return;
     }
 
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-
     setAnalyzing(true);
-
-    // Show results screen immediately with analyzing state
     setShowResults(true);
-    // Reset and animate slide
+
+    // Reset animations and progress
     slideAnim.value = 50;
     slideAnim.value = withSpring(0, { damping: 15, stiffness: 150 });
-
-    // Start progress simulation
-    let progressController;
-    try {
-      progressController = simulateAnalysisProgress();
-    } catch (error) {
-      console.error('Error starting progress simulation:', error);
-      // Create a minimal progress controller
-      progressController = {
-        cleanup: () => {
-          console.log('Minimal progress controller cleanup called');
-        },
-        addFinalStep: () => {
-          console.log('Minimal progress controller addFinalStep called');
-        }
-      };
-    }
+    setProgressSteps(['Starting analysis...']);
+    setCurrentStep(0);
+    setCompletedSteps([]);
 
     try {
       const photoData = {
         person1: photos.find(p => p.id === 'person1')?.image || '',
         person2: photos.find(p => p.id === 'person2')?.image || '',
-        together: photos.find(p => p.id === 'together')?.image,
         place: photos.find(p => p.id === 'place')?.image || '',
       };
 
-      // Validate photo data before sending to analysis
-      if (!photoData.person1 || !photoData.person2 || !photoData.place) {
-        throw new Error('Missing required photos for analysis');
-      }
+      // Real progress callback
+      const onProgress = (step: number, total: number, message: string) => {
+        setCompletedSteps(prev => {
+          const newCompleted = [...prev];
+          if (progressSteps[0] && !newCompleted.includes(progressSteps[0])) {
+            newCompleted.push(progressSteps[0]);
+          }
+          return newCompleted;
+        });
+        setProgressSteps([message]);
+        setCurrentStep(step - 1);
+      };
 
       const result = await analyzeTwinningPhotos(
         photoData,
         names,
         'date',
-        `${dateContext.dateType} at ${dateContext.venue}`,
-        dateContext
+        `${dateContext.occasion} - ${dateContext.specificNotes}`,
+        dateContext,
+        onProgress
       );
 
-      // Add final success step when analysis is complete
-      if (progressController && typeof progressController.addFinalStep === 'function') {
-        try {
-          progressController.addFinalStep();
-        } catch (error) {
-          console.error('Error adding final step:', error);
-        }
-      }
+      // Final success step
+      setCompletedSteps(prev => [...prev, progressSteps[0]]);
+      setProgressSteps(['🎉 Your perfect romantic coordination is ready!']);
+      setCurrentStep(5);
 
-      // Small delay to show the final step
       await new Promise(resolve => setTimeout(resolve, 1000));
-
       setAnalysis(result);
-      // Keep results screen open to show the analysis results
     } catch (error) {
       console.error('Analysis error:', error);
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
 
       let errorMessage = 'Failed to analyze photos. Please try again.';
       if (error instanceof Error) {
-        if (error.message.includes('Invalid Image') || error.message.includes('Invalid photo') || error.message.includes('Invalid venue')) {
-          errorMessage = error.message.replace('Error: ', '');
-        } else if (error.message.includes('Missing required photos')) {
-          errorMessage = 'Please upload all required photos before analyzing.';
-        } else if (error.message.includes('Missing required names')) {
-          errorMessage = 'Please enter both names before analyzing.';
-        } else if (error.message.includes('Rate limit')) {
-          errorMessage = 'Too many requests. Please wait a moment and try again.';
-        } else if (error.message.includes('overloaded') || error.message.includes('503')) {
-          errorMessage = 'AI service is busy. Please try again in a few minutes.';
-        }
+        errorMessage = error.message.replace('Error: ', '');
       }
 
       Alert.alert('Analysis Error', errorMessage);
-      // Close results screen on error
       setShowResults(false);
     } finally {
-      if (progressController && typeof progressController.cleanup === 'function') {
-        try {
-          progressController.cleanup();
-        } catch (error) {
-          console.error('Error cleaning up progress controller:', error);
-        }
-      }
       setAnalyzing(false);
-      // Only close results screen if there was an error (handled above)
     }
   };
 
@@ -501,9 +324,9 @@ export default function DateTwinningScreen() {
   }
 
   return (
-    <>
+    <PremiumBackground variant="twinning">
       <Stack.Screen options={{ headerShown: false }} />
-      <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <View style={[styles.container]}>
         <StatusBar barStyle="light-content" backgroundColor={theme.statusBar.twinning} />
 
         {/* Header */}
@@ -616,64 +439,22 @@ export default function DateTwinningScreen() {
               {theme ? (
                 <>
                   <ContextInputCard
-                    title="Date Type"
+                    title="Occasion"
                     icon="heart"
-                    placeholder="e.g., Dinner date, Coffee meetup, Movie night..."
-                    value={dateContext.dateType}
-                    onChangeText={(text) => setDateContext(prev => ({ ...prev, dateType: text || '' }))}
+                    placeholder="e.g., Anniversary, First Date, Valentine's, Movie Night..."
+                    value={dateContext.occasion}
+                    onChangeText={(text) => setDateContext(prev => ({ ...prev, occasion: text || '' }))}
                     theme={theme}
                     primaryColor="#ff6b9d"
                     required
                   />
 
                   <ContextInputCard
-                    title="Venue Description"
-                    icon="location"
-                    placeholder="e.g., Rooftop restaurant, Cozy cafe, Beach walk..."
-                    value={dateContext.venue}
-                    onChangeText={(text) => setDateContext(prev => ({ ...prev, venue: text || '' }))}
-                    theme={theme}
-                    primaryColor="#ff6b9d"
-                    required
-                  />
-
-                  <ContextInputCard
-                    title="Atmosphere"
-                    icon="sunny"
-                    placeholder="e.g., Romantic, Casual, Elegant, Fun..."
-                    value={dateContext.atmosphere}
-                    onChangeText={(text) => setDateContext(prev => ({ ...prev, atmosphere: text || '' }))}
-                    theme={theme}
-                    primaryColor="#ff6b9d"
-                  />
-
-                  <ContextInputCard
-                    title="Duration & Time"
-                    icon="time"
-                    placeholder="e.g., Evening dinner, Afternoon coffee, All day..."
-                    value={dateContext.duration}
-                    onChangeText={(text) => setDateContext(prev => ({ ...prev, duration: text || '' }))}
-                    theme={theme}
-                    primaryColor="#ff6b9d"
-                  />
-
-                  <ContextInputCard
-                    title="Special Occasion"
-                    icon="gift"
-                    placeholder="e.g., Anniversary, First date, Birthday..."
-                    value={dateContext.specialOccasion}
-                    onChangeText={(text) => setDateContext(prev => ({ ...prev, specialOccasion: text || '' }))}
-                    theme={theme}
-                    primaryColor="#ff6b9d"
-                    multiline
-                  />
-
-                  <ContextInputCard
-                    title="Style Preferences"
-                    icon="shirt"
-                    placeholder="e.g., Matching colors, Complementary styles, Formal..."
-                    value={dateContext.stylePreferences}
-                    onChangeText={(text) => setDateContext(prev => ({ ...prev, stylePreferences: text || '' }))}
+                    title="Specific Notes (Optional)"
+                    icon="document-text"
+                    placeholder="Any specific colors, themes, or vibe you want?"
+                    value={dateContext.specificNotes}
+                    onChangeText={(text) => setDateContext(prev => ({ ...prev, specificNotes: text || '' }))}
                     theme={theme}
                     primaryColor="#ff6b9d"
                     multiline
@@ -816,7 +597,7 @@ export default function DateTwinningScreen() {
           </Animated.View>
         )}
       </View>
-    </>
+    </PremiumBackground>
   );
 }
 
@@ -872,6 +653,30 @@ function ContextInputCard({
           {required && <Text style={{ color: primaryColor }}> *</Text>}
         </Text>
       </View>
+
+      {title === 'Occasion' && (
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          style={styles.chipsContainer}
+          contentContainerStyle={{ paddingHorizontal: 12, gap: 8, paddingBottom: 12 }}
+        >
+          {['Dinner Date', 'Movie Night', 'Picnic', 'Coffee Date', 'Anniversary', 'First Date'].map(chip => (
+            <TouchableOpacity 
+              key={chip}
+              style={[
+                styles.chipButton, 
+                value === chip ? { backgroundColor: primaryColor, borderColor: primaryColor } : { borderColor: theme.borderLight }
+              ]}
+              onPress={() => onChangeText(chip)}
+            >
+              <Text style={{ color: value === chip ? '#fff' : theme.textSecondary, fontSize: 13 }}>
+                {chip}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
 
       <TextInput
         style={[
@@ -1228,6 +1033,14 @@ function ResultsScreen({
             {analysis.outfitSuggestions?.coordination?.overall_theme || 'Perfect coordination for your romantic date'}
           </Text>
 
+          {analysis.outfitSuggestions?.coordination?.color_palette && analysis.outfitSuggestions.coordination.color_palette.length > 0 && (
+            <View style={styles.colorPaletteContainer}>
+              {analysis.outfitSuggestions.coordination.color_palette.map((color, idx) => (
+                <View key={idx} style={[styles.colorSwatch, { backgroundColor: color }]} />
+              ))}
+            </View>
+          )}
+
           <View style={styles.tipsContainer}>
             {(analysis.outfitSuggestions?.coordination?.color_harmony || [])
               .filter(tip => tip && typeof tip === 'string')
@@ -1373,6 +1186,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     flex: 1,
+  },
+  chipsContainer: {
+    marginBottom: 12,
+  },
+  chipButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    marginRight: 8,
   },
   contextInput: {
     paddingHorizontal: 16,
@@ -1807,8 +1630,21 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   tipsContainer: {
+    gap: 12,
+  },
+  colorPaletteContainer: {
+    flexDirection: 'row',
     gap: 8,
-    alignItems: 'stretch',
+    marginVertical: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  colorSwatch: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.1)',
   },
   tipRow: {
     flexDirection: 'row',

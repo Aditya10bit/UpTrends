@@ -24,6 +24,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
+import PremiumBackground from '../components/PremiumBackground';
 import {
   addWardrobeItem,
   deleteWardrobeItem,
@@ -797,7 +798,8 @@ export default function WardrobeScreen() {
   // ─── Main Render ────────────────────────────────────────────────────────────
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
+    <PremiumBackground variant="wardrobe">
+    <View style={[styles.container]}>
       <Stack.Screen options={{ headerShown: false }} />
       <StatusBar barStyle="light-content" />
 
@@ -1081,6 +1083,7 @@ export default function WardrobeScreen() {
 
       {renderItemModal()}
     </View>
+    </PremiumBackground>
   );
 }
 

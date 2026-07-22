@@ -26,6 +26,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
+import PremiumBackground from '../components/PremiumBackground';
 import { generateTodaysOutfit } from '../services/geminiService';
 import { getUserProfile } from '../services/userService';
 import { getColorCode } from '../utils/colorResolver';
@@ -294,7 +295,8 @@ export default function TodaysOutfitScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <PremiumBackground variant="todaysOutfit">
+      <View style={[styles.container]}>
         <StatusBar barStyle="light-content" backgroundColor="#6366f1" />
         <LinearGradient
           colors={['#6366f1', '#8b5cf6']}
@@ -306,15 +308,16 @@ export default function TodaysOutfitScreen() {
           <Text style={styles.loadingText}>Getting today's perfect outfit...</Text>
         </LinearGradient>
       </View>
+      </PremiumBackground>
     );
   }
 
   const gradientColors = weatherTheme ? weatherTheme.background : ['#6366f1', '#8b5cf6'];
 
   return (
-    <>
+    <PremiumBackground variant="todaysOutfit">
       <Stack.Screen options={{ headerShown: false }} />
-      <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <View style={[styles.container]}>
         <StatusBar barStyle="light-content" backgroundColor={gradientColors[0]} />
 
         {/* Header */}
@@ -487,30 +490,69 @@ export default function TodaysOutfitScreen() {
                 {/* Shopping Links */}
                 <View style={styles.shoppingContainer}>
                   <Text style={[styles.sectionTitle, { color: weatherTheme?.primary || theme.primary }]}>
-                    Shop the Look
+                    Shop Each Piece
                   </Text>
                   <View style={styles.shoppingGrid}>
-                    {todaysOutfit.shopping_links.map((link, index) => (
+                    {todaysOutfit.shopping_links
+                      .filter((link: any) => link.platform !== 'Pinterest')
+                      .map((link: any, index: number) => (
                       <TouchableOpacity
                         key={index}
                         style={[styles.shoppingLink, { backgroundColor: theme.background, borderColor: theme.borderLight }]}
-                        onPress={() => WebBrowser.openBrowserAsync(link.url)}
+                        onPress={() => WebBrowser.openBrowserAsync(link.url, {
+                          readerMode: false,
+                          enableBarCollapsing: true,
+                          dismissButtonStyle: 'close',
+                        })}
                       >
                         <View style={[styles.shoppingIconContainer, { backgroundColor: weatherTheme?.primary || theme.primary }]}>
                           <Ionicons name={link.icon as any} size={20} color="#fff" />
                         </View>
                         <View style={styles.shoppingContent}>
-                          <Text style={[styles.shoppingPlatform, { color: theme.text }]}>
-                            {link.platform}
+                          <Text style={[styles.shoppingPlatform, { color: theme.text }]} numberOfLines={1}>
+                            {link.item || link.platform}
                           </Text>
-                          <Text style={[styles.shoppingDescription, { color: theme.textSecondary }]}>
-                            {link.description}
+                          <Text style={[styles.shoppingDescription, { color: theme.textSecondary }]} numberOfLines={1}>
+                            {link.platform} — {link.description}
                           </Text>
                         </View>
                         <Ionicons name="chevron-forward" size={16} color={theme.textSecondary} />
                       </TouchableOpacity>
                     ))}
                   </View>
+
+                  {/* Pinterest Look Link */}
+                  {todaysOutfit.shopping_links
+                    .filter((link: any) => link.platform === 'Pinterest')
+                    .map((link: any, index: number) => (
+                    <TouchableOpacity
+                      key={`pinterest-${index}`}
+                      style={[styles.shoppingLink, {
+                        backgroundColor: theme.background,
+                        borderColor: '#E60023',
+                        borderWidth: 1.5,
+                        marginTop: 12,
+                      }]}
+                      onPress={() => WebBrowser.openBrowserAsync(link.url, {
+                        readerMode: false,
+                        enableBarCollapsing: true,
+                        dismissButtonStyle: 'close',
+                      })}
+                    >
+                      <View style={[styles.shoppingIconContainer, { backgroundColor: '#E60023' }]}>
+                        <Ionicons name="logo-pinterest" size={20} color="#fff" />
+                      </View>
+                      <View style={styles.shoppingContent}>
+                        <Text style={[styles.shoppingPlatform, { color: theme.text }]}>
+                          Complete Look Inspiration
+                        </Text>
+                        <Text style={[styles.shoppingDescription, { color: theme.textSecondary }]}>
+                          See how it all comes together on Pinterest
+                        </Text>
+                      </View>
+                      <Ionicons name="chevron-forward" size={16} color="#E60023" />
+                    </TouchableOpacity>
+                  ))}
                 </View>
               </View>
             </Animated.View>
@@ -572,7 +614,7 @@ export default function TodaysOutfitScreen() {
           </View>
         </Modal>
       </View>
-    </>
+    </PremiumBackground>
   );
 }
 

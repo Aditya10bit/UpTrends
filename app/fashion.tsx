@@ -20,6 +20,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
+import PremiumBackground from '../components/PremiumBackground';
 import { getUserProfile, updateUserProfile } from '../services/userService';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -534,7 +535,8 @@ export default function Fashion() {
   // Show loading screen while profile is loading to prevent gender toggle flash
   if (isLoadingProfile) {
     return (
-      <View style={[styles.safeArea, { backgroundColor: theme.background, paddingTop: insets.top }]}>
+      <PremiumBackground variant="fashion">
+      <View style={[styles.safeArea, { paddingTop: insets.top }]}>
         <StatusBar barStyle={theme.background === '#0f172a' ? "light-content" : "dark-content"} backgroundColor={theme.background} />
         <View style={styles.loadingContainer}>
           <View style={[styles.loadingCard, { backgroundColor: theme.card }]}>
@@ -551,15 +553,16 @@ export default function Fashion() {
           </View>
         </View>
       </View>
+      </PremiumBackground>
     );
   }
 
   return (
+    <PremiumBackground variant="fashion">
     <Animated.View
       style={[
         styles.safeArea,
         {
-          backgroundColor: theme.background,
           paddingTop: insets.top,
           opacity: fadeAnim,
           transform: [{ translateY: contentSlideAnim }]
@@ -604,6 +607,7 @@ export default function Fashion() {
         <ScrollView
           showsVerticalScrollIndicator={false}
           style={styles.scrollView}
+          contentContainerStyle={{ paddingBottom: insets.bottom + 30 }}
           scrollEventThrottle={16}
           removeClippedSubviews={true}
           keyboardShouldPersistTaps="handled"
@@ -729,6 +733,7 @@ export default function Fashion() {
         </View>
       </Modal>
     </Animated.View>
+    </PremiumBackground>
   );
 }
 

@@ -21,6 +21,7 @@ import {
 import * as WebBrowser from 'expo-web-browser';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
+import PremiumBackground from '../components/PremiumBackground';
 import {
     analyzeOutfitCompatibility,
     generateWardrobeBasedOutfits,
@@ -305,6 +306,7 @@ export default function MakeOutfit() {
   };
 
   const generateOutfit = async () => {
+    if (isGenerating) return;
     if (selectedImages.length === 0) {
       Alert.alert('No Images', 'Please upload at least one image to generate an outfit');
       return;
@@ -531,7 +533,8 @@ export default function MakeOutfit() {
   });
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background, paddingTop: insets.top }]}>
+    <PremiumBackground variant="makeOutfit">
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <StatusBar barStyle={theme.background === '#18181b' ? "light-content" : "dark-content"} backgroundColor={theme.background} />
 
       {/* Header */}
@@ -1146,12 +1149,13 @@ export default function MakeOutfit() {
                 setValidationResults(null);
               }}
             >
-              <Text style={[styles.validationAlertButtonText, { color: '#fff' }]}>Remove Invalid</Text>
+                            <Text style={[styles.validationAlertButtonText, { color: '#fff' }]}>Remove Invalid</Text>
             </TouchableOpacity>
           </View>
         </View>
       )}
     </View>
+    </PremiumBackground>
   );
 }
 

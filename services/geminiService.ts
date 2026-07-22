@@ -6,6 +6,46 @@ import { geminiRateLimiter, getSecureApiKey } from '../config/security';
 import { trackAIRequest } from './analyticsService';
 import { TopographyData } from './topographyService';
 
+/**
+ * Robust JSON extractor. Finds the first '{' or '[' and the last '}' or ']'
+ * to safely parse JSON wrapped in markdown or conversational text.
+ */
+export const extractJSON = (text: string): string => {
+  if (!text) return '';
+  const str = text.trim();
+  const firstBrace = str.indexOf('{');
+  const firstBracket = str.indexOf('[');
+  
+  let startIdx = -1;
+  if (firstBrace !== -1 && firstBracket !== -1) {
+    startIdx = Math.min(firstBrace, firstBracket);
+  } else if (firstBrace !== -1) {
+    startIdx = firstBrace;
+  } else if (firstBracket !== -1) {
+    startIdx = firstBracket;
+  }
+  
+  if (startIdx === -1) return str.replace(/```json\n?|\n?```/g, '').trim(); // Fallback
+  
+  const isObject = str[startIdx] === '{';
+  const endChar = isObject ? '}' : ']';
+  const endIdx = str.lastIndexOf(endChar);
+  
+  if (endIdx !== -1 && endIdx >= startIdx) {
+    let jsonStr = str.substring(startIdx, endIdx + 1);
+    // Remove trailing commas which break JSON.parse
+    jsonStr = jsonStr.replace(/,\s*([}\]])/g, '$1');
+    // Sanitize unescaped control characters inside strings using a safer method
+    // Replacing ALL literal newlines with spaces fixes "Bad control character in string" 
+    // errors without breaking JSON structure!
+    jsonStr = jsonStr.replace(/[\r\n]+/g, ' ');
+    jsonStr = jsonStr.replace(/\t/g, '  ');
+    return jsonStr;
+  }
+  
+  return str.replace(/```json\n?|\n?```/g, '').replace(/,\s*([}\]])/g, '$1').replace(/[\r\n]+/g, ' ').trim(); // Fallback
+};
+
 // --- Dynamic API Key Resolution ---
 // Checks AsyncStorage for a user-provided custom key first,
 // falls back to the developer's bundled key.
@@ -299,6 +339,7 @@ export interface StyleAnalysisResult {
   tips: string[];
   weatherConsiderations?: string;
   locationConsiderations?: string;
+  colorPalette?: string[];
 }
 
 export interface BodyAnalysisResult {
@@ -459,6 +500,7 @@ JSON only:
   "venue": "venue type",
   "ambiance": "atmosphere", 
   "dominantColors": ["color1", "color2", "color3"],
+  "colorPalette": ["#HEX1", "#HEX2", "#HEX3", "#HEX4"],
   "recommendations": [
     {
       "style": "style name",
@@ -489,9 +531,9 @@ JSON only:
 Provide 3 outfits for ${userProfile?.bodyType || 'average'} body type, ${userProfile?.gender || 'person'}.
 `;
 
-    // Use queued request for better performance
-    const responseText = await queueRequest(analysisPrompt, 'fast', 2);
-    const cleanedResponse = responseText.replace(/```json\n?|\n?```/g, '').trim();
+    // Use queued request for better performance - Twinning needs more tokens so use 'balanced'
+    const responseText = await queueRequest(analysisPrompt, 'balanced', 2);
+    const cleanedResponse = extractJSON(responseText);
 
     try {
       const result = JSON.parse(cleanedResponse);
@@ -499,11 +541,12 @@ Provide 3 outfits for ${userProfile?.bodyType || 'average'} body type, ${userPro
       console.log('✅ Prompt analysis successful');
       return result;
     } catch (parseError) {
-      console.log('⚠️ JSON parse failed, trying balanced model');
+      console.error('⚠️ JSON parse failed, logging raw string:', cleanedResponse);
+      console.log('⚠️ trying balanced model');
 
-      // Fallback to balanced model
-      const fallbackResponse = await queueRequest(analysisPrompt, 'balanced', 1);
-      const fallbackCleaned = fallbackResponse.replace(/```json\n?|\n?```/g, '').trim();
+      // Fallback to quality model if balanced fails
+      const fallbackResponse = await queueRequest(analysisPrompt, 'quality', 1);
+      const fallbackCleaned = extractJSON(fallbackResponse);
 
       try {
         const result = JSON.parse(fallbackCleaned);
@@ -517,6 +560,99 @@ Provide 3 outfits for ${userProfile?.bodyType || 'average'} body type, ${userPro
   } catch (error) {
     console.error('🚨 Prompt analysis failed:', error);
     return generateFallbackResponse(prompt, userProfile);
+  }
+};
+
+// Twinning-specific outfit generation with per-person separation
+export const generateTwinningOutfits = async (
+  twinningPrompt: string,
+  person1Name: string,
+  person2Name: string
+): Promise<any> => {
+  if (!geminiRateLimiter.canMakeCall()) {
+    throw new Error('Rate limit exceeded. Please wait before trying again.');
+  }
+
+  try {
+    const safePrompt = sanitizeForPrompt(twinningPrompt);
+
+    const analysisPrompt = `${safePrompt}
+
+CRITICAL: You MUST respond with ONLY a valid JSON object matching this EXACT structure.
+Each person gets their OWN separate outfit array with items specific to THEIR gender and body type.
+Do NOT combine both people into one outfit string.
+
+{
+  "colorPalette": ["#HEX1", "##HEX2", "#HEX3", "#HEX4", "#HEX5"],
+  "coordinationTheme": "Overall coordination theme name",
+  "person1Outfits": [
+    {
+      "styleName": "style theme name",
+      "items": ["specific item 1 for ${person1Name}", "specific item 2", "specific item 3"],
+      "colors": ["color1", "color2"],
+      "accessories": ["accessory1", "accessory2"],
+      "reasoning": "Why this outfit works specifically for ${person1Name}'s body type and skin tone",
+      "mood": "mood description"
+    }
+  ],
+  "person2Outfits": [
+    {
+      "styleName": "style theme name",
+      "items": ["specific item 1 for ${person2Name}", "specific item 2", "specific item 3"],
+      "colors": ["color1", "color2"],
+      "accessories": ["accessory1", "accessory2"],
+      "reasoning": "Why this outfit works specifically for ${person2Name}'s body type and skin tone",
+      "mood": "mood description"
+    }
+  ],
+  "coordinationTips": ["tip about how the outfits complement each other"]
+}
+
+Provide 2 outfit options per person. Each outfit must be SPECIFIC to that person's gender, body type, and skin tone.
+${person1Name}'s items should be completely different from ${person2Name}'s items.
+Respond with ONLY the JSON object, no other text.`;
+
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-3.5-flash',
+      generationConfig: {
+        temperature: 0.8,
+        topK: 40,
+        topP: 0.95,
+        maxOutputTokens: 4096,
+      }
+    });
+
+    const result = await model.generateContent(analysisPrompt);
+    const responseText = result.response.text();
+    const cleanedResponse = extractJSON(responseText);
+
+    try {
+      const parsed = JSON.parse(cleanedResponse);
+      console.log('✅ Twinning per-person outfit generation successful');
+      return parsed;
+    } catch (parseError) {
+      console.error('⚠️ Twinning JSON parse failed, trying quality model...');
+      
+      // Retry with quality model
+      const qualityModel = genAI.getGenerativeModel({
+        model: 'gemini-3.5-flash',
+        generationConfig: {
+          temperature: 0.8,
+          topK: 40,
+          topP: 0.95,
+          maxOutputTokens: 8192,
+        }
+      });
+      const retryResult = await qualityModel.generateContent(analysisPrompt);
+      const retryText = retryResult.response.text();
+      const retryCleaned = extractJSON(retryText);
+      const retryParsed = JSON.parse(retryCleaned);
+      console.log('✅ Twinning retry successful');
+      return retryParsed;
+    }
+  } catch (error) {
+    console.error('🚨 Twinning outfit generation failed:', error);
+    throw error;
   }
 };
 
@@ -572,6 +708,7 @@ For FEMALES, choose from these body types:
 Skin tone options: Fair, Wheatish, Dusky, Dark
 
 Format response as:
+Gender: [Male/Female]
 Body Type: [specific type from above]
 Skin Tone: [Fair/Wheatish/Dusky/Dark]
 Confidence: [85-95]%
@@ -2428,28 +2565,32 @@ FORMAT YOUR RESPONSE AS JSON:
   "weather_reason": "Detailed explanation of why this outfit is perfect for ${weather.temperature}°C and ${weather.condition} weather",
   "shopping_links": [
     {
-      "platform": "Pinterest",
-      "url": "Generate a Pinterest search URL using the specific clothing items from this outfit separated by +, for example: https://www.pinterest.com/search/pins/?q=beige+polo+shirt+white+trousers",
-      "description": "Find similar outfit inspiration",
-      "icon": "camera"
-    },
-    {
+      "item": "First clothing item name from items array above",
       "platform": "Amazon Fashion",
-      "url": "https://www.amazon.com/s?k=${encodeURIComponent(userProfile.gender + ' clothing ' + weather.condition + ' weather')}&rh=n%3A7141123011",
-      "description": "Shop weather-appropriate clothing",
+      "url": "https://www.amazon.com/s?k=<URL_ENCODED: ${userProfile.gender === 'male' ? 'men' : 'women'} + first item name>",
+      "description": "Shop this specific item",
       "icon": "bag"
     },
     {
-      "platform": "Style Guide",
-      "url": "https://www.google.com/search?q=${encodeURIComponent('how to dress for ' + weather.condition + ' weather ' + userProfile.gender + ' style guide')}",
-      "description": "Learn weather dressing tips",
-      "icon": "book"
+      "item": "Second clothing item name from items array above",
+      "platform": "Amazon Fashion",
+      "url": "https://www.amazon.com/s?k=<URL_ENCODED: ${userProfile.gender === 'male' ? 'men' : 'women'} + second item name>",
+      "description": "Shop this specific item",
+      "icon": "bag"
     },
     {
-      "platform": "Color Matching",
-      "url": "https://www.google.com/search?q=${encodeURIComponent(userProfile.skinTone + ' skin tone best colors fashion ' + userProfile.gender)}",
-      "description": "Colors that suit your skin tone",
-      "icon": "color-palette"
+      "item": "Third clothing item name (generate one per item in the items array)",
+      "platform": "Amazon Fashion",
+      "url": "https://www.amazon.com/s?k=<URL_ENCODED: ${userProfile.gender === 'male' ? 'men' : 'women'} + third item name>",
+      "description": "Shop this specific item",
+      "icon": "bag"
+    },
+    {
+      "item": "Complete Look Inspiration",
+      "platform": "Pinterest",
+      "url": "https://www.pinterest.com/search/pins/?q=<URL_ENCODED: all clothing items combined + ${userProfile.gender} outfit>",
+      "description": "See the full look on Pinterest",
+      "icon": "camera"
     }
   ],
   "daily_quote": "An inspirational quote that matches the outfit mood and weather (e.g., 'Dress like you're already famous' or 'Style is a way to say who you are without having to speak')",
@@ -2464,6 +2605,9 @@ IMPORTANT GUIDELINES:
 - Make style tips specific to ${userProfile.bodyType} body type
 - Keep the daily quote inspiring and relevant to fashion/confidence
 - Make shopping URLs functional and properly encoded
+- CRITICAL: Generate ONE Amazon link for EACH clothing item in the items array. Use the SPECIFIC item name (e.g., "men light blue linen shirt", "women black ankle boots"). Do NOT use generic terms like "men clothing rainy weather".
+- For Pinterest, combine ALL items into one search URL for the complete look.
+- URL encode all search terms properly (spaces become + or %20).
 
 Return ONLY the JSON object, no additional text.
 `;
@@ -2476,6 +2620,29 @@ Return ONLY the JSON object, no additional text.
 
     try {
       const parsed = JSON.parse(cleanedResponse);
+      
+      // Programmatically override shopping links to guarantee correctness
+      const genderTerm = userProfile?.gender === 'male' ? 'men' : 'women';
+      const itemsQuery = parsed.items?.join(' ') || '';
+      
+      const amazonLinks = (parsed.items || []).map((item: string) => ({
+        item: item,
+        platform: "Amazon Fashion",
+        url: `https://amazon.com/s?k=${encodeURIComponent(`${genderTerm} ${item}`)}&rh=n%3A7141123011`,
+        description: `Shop for ${item}`,
+        icon: "bag"
+      }));
+      
+      const pinterestLink = {
+        item: "Complete Look Inspiration",
+        platform: "Pinterest",
+        url: `https://www.pinterest.com/search/pins/?q=${encodeURIComponent(`${itemsQuery} ${genderTerm} outfit`)}`,
+        description: "See the full look on Pinterest",
+        icon: "camera"
+      };
+      
+      parsed.shopping_links = [...amazonLinks, pinterestLink];
+      
       return parsed;
     } catch (parseError) {
       console.error('JSON Parse Error for today\'s outfit:', parseError);
@@ -2650,17 +2817,19 @@ const generateFallbackTodaysOutfit = (userProfile: any, weather: any): any => {
     ],
     weather_reason: `This outfit is designed for ${weather.temperature}°C ${weather.condition} weather, ensuring comfort throughout the day.`,
     shopping_links: [
-      {
-        platform: "Pinterest",
-        url: `https://www.pinterest.com/search/pins/?q=${encodeURIComponent(outfit.items.join(' ') + ' outfit ' + userProfile.gender)}`,
-        description: "Find similar outfit inspiration",
-        icon: "camera"
-      },
-      {
+      ...outfit.items.map((item: string) => ({
+        item: item,
         platform: "Amazon Fashion",
-        url: `https://www.amazon.com/s?k=${encodeURIComponent(userProfile.gender + ' clothing')}`,
-        description: "Shop similar items",
+        url: `https://www.amazon.com/s?k=${encodeURIComponent((isMale ? 'men ' : 'women ') + item)}`,
+        description: `Shop ${item}`,
         icon: "bag"
+      })),
+      {
+        item: "Complete Look Inspiration",
+        platform: "Pinterest",
+        url: `https://www.pinterest.com/search/pins/?q=${encodeURIComponent(outfit.items.join(' ') + ' ' + (isMale ? 'men' : 'women') + ' outfit')}`,
+        description: "See the full look on Pinterest",
+        icon: "camera"
       }
     ],
     daily_quote: "Style is a way to say who you are without having to speak.",

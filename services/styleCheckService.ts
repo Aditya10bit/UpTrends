@@ -185,6 +185,7 @@ CRITICAL INSTRUCTIONS:
 - IMPORTANT: ALL recommendations must be appropriate for ${input.userProfile.gender} gender ONLY
 - Do NOT suggest clothing, accessories, or styling that is typically associated with other genders
 - Ensure all shopping recommendations are gender-appropriate for ${input.userProfile.gender} individuals
+- For the platform in shoppingLinks, ALWAYS use "Google Shopping", "Amazon", or "Myntra" to ensure accessibility across all price ranges. Do NOT suggest high-end specific brands like Zara or H&M unless specifically requested.
 
 CRITICAL: Return ONLY valid JSON without any markdown formatting, code blocks, or additional text. Do not use backticks or markdown markers.
 
@@ -215,7 +216,7 @@ FORMAT YOUR RESPONSE AS VALID JSON:
       "category": "Accessories",
       "items": [
         {"name": "Statement Necklace", "url": "placeholder", "platform": "Amazon", "priceRange": "mid"},
-        {"name": "Leather Belt", "url": "placeholder", "platform": "Zara", "priceRange": "mid"}
+        {"name": "Leather Belt", "url": "placeholder", "platform": "Google Shopping", "priceRange": "mid"}
       ]
     },
     {

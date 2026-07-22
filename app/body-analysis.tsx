@@ -28,6 +28,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
+import PremiumBackground from '../components/PremiumBackground';
 import { analyzeBodyImage, analyzeProfileBodyTypeFromImage, generatePersonalizedFashionTips, getChatbotResponse } from '../services/geminiService';
 import { getUserProfile, updateUserProfile } from '../services/userService';
 
@@ -453,6 +454,7 @@ export default function BodyAnalysisScreen() {
     };
 
     const handleSendMessage = async () => {
+        if (isLoading) return;
         console.log('handleSendMessage called with inputText:', inputText);
         if (!inputText.trim()) {
             console.log('Input text is empty, returning');
@@ -573,6 +575,7 @@ export default function BodyAnalysisScreen() {
     };
 
     const handleOptionSelect = async (option: string) => {
+        if (isLoading) return;
         console.log('handleOptionSelect called with option:', option, 'currentStep:', currentStep);
         await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         addMessage(option, false, 'text');
@@ -1025,7 +1028,8 @@ export default function BodyAnalysisScreen() {
 
     if (isLoading) {
         return (
-            <View style={[styles.container, { backgroundColor: theme.background }]}>
+            <PremiumBackground variant="bodyAnalysis">
+            <View style={[styles.container]}>
                 <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
                 <View style={styles.loadingContainer}>
                     <Animated.View style={{
@@ -1038,11 +1042,13 @@ export default function BodyAnalysisScreen() {
                     </Text>
                 </View>
             </View>
+            </PremiumBackground>
         );
     }
 
     return (
-        <View style={[styles.container, { backgroundColor: theme.background }]}>
+        <PremiumBackground variant="bodyAnalysis">
+        <View style={[styles.container]}>
             <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
             {/* Gradient Background */}
@@ -1257,6 +1263,7 @@ export default function BodyAnalysisScreen() {
                 </KeyboardAvoidingView>
             </SafeAreaView>
         </View>
+        </PremiumBackground>
     );
 }
 

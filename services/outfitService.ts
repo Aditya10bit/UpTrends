@@ -404,30 +404,16 @@ const generateOutfitLinks = async (
       inspirationQuery,
     });
 
-    // --- Shopping links: one per top item for targeted results ---
-    const shopping: ShoppingLink[] = [];
-
-    // Add per-item Amazon links (top 2 items)
+    // Add per-item Google Shopping links
     topItems.forEach((item, idx) => {
       const itemQuery = `${genderTerm} ${item}`.trim();
       shopping.push({
-        platform: idx === 0 ? 'Amazon' : 'Amazon',
-        url: `https://www.amazon.com/s?k=${encodeURIComponent(itemQuery)}&ref=nb_sb_noss`,
+        platform: 'Google Shopping',
+        url: `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(itemQuery)}`,
         description: `Shop ${item}`,
-        icon: 'bag',
+        icon: 'pricetag',
       });
     });
-
-    // Add per-item Myntra link (top item only to avoid clutter)
-    if (topItems.length > 0) {
-      const myntraQuery = `${genderTerm} ${topItems[0]}`.trim();
-      shopping.push({
-        platform: 'Myntra',
-        url: `https://www.myntra.com/search/${encodeURIComponent(myntraQuery)}`,
-        description: `Shop ${topItems[0]}`,
-        icon: 'bag',
-      });
-    }
 
     // Pinterest: use the color palette + key items for inspiration
     shopping.push({
@@ -437,14 +423,13 @@ const generateOutfitLinks = async (
       icon: 'camera',
     });
 
-    // Google Shopping: combined top items
+    // Amazon fallback
     shopping.push({
-      platform: 'Google Shopping',
-      url: `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(googleShoppingQuery)}`,
-      description: `Compare prices for ${topItems[0] || 'items'}`,
-      icon: 'pricetag',
+      platform: 'Amazon',
+      url: `https://www.amazon.com/s?k=${encodeURIComponent(googleShoppingQuery)}`,
+      description: `Shop on Amazon`,
+      icon: 'bag',
     });
-
     // --- Reference links: color-specific ---
     const colorComboQuery = `${genderTerm} ${colorPalette} color combination fashion`;
     const outfitIdeasQuery = `${genderTerm} ${colorPalette} ${topItems[0] || ''} outfit ideas`.trim();

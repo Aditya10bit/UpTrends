@@ -1,4 +1,6 @@
-import { analyzeBodyImage, analyzePersonComprehensively, generateOutfitsFromPrompt, validateImageContext } from './geminiService';
+import { analyzeBodyImage, analyzePersonComprehensively, generateOutfitsFromPrompt, generateTwinningOutfits, validateImageContext } from './geminiService';
+import { getCurrentWeather } from './weatherService';
+import * as Location from 'expo-location';
 
 export interface PersonAnalysis {
   name: string;
@@ -59,13 +61,14 @@ export interface CoordinationTips {
   proportion_tips: string[];
   accessory_coordination: string[];
   overall_theme: string;
+  color_palette?: string[];
 }
 
 export const analyzeTwinningPhotos = async (
   photos: {
     person1: string; // base64 image
     person2: string; // base64 image
-    together?: string; // base64 image
+    together?: string; // base64 image (kept for backward compat but not used)
     place: string; // base64 image
   },
   names: {
@@ -74,9 +77,15 @@ export const analyzeTwinningPhotos = async (
   },
   category: string,
   occasion?: string,
-  context?: any
+  context?: any,
+  onProgress?: (step: number, total: number, message: string) => void
 ): Promise<TwinningAnalysis> => {
   console.log('🎯 Starting comprehensive twinning analysis for your perfect coordination...');
+  const totalSteps = 5;
+  const reportProgress = (step: number, message: string) => {
+    console.log(`[${step}/${totalSteps}] ${message}`);
+    onProgress?.(step, totalSteps, message);
+  };
 
   try {
     // Validate input parameters
@@ -88,47 +97,75 @@ export const analyzeTwinningPhotos = async (
       throw new Error('Missing required names for analysis');
     }
 
-    // 0. Validate image contexts to prevent random uploads
-    console.log('🛡️ Validating uploaded images...');
-    const validations = await Promise.all([
+    // Helper to get localized weather
+    const fetchLocalWeather = async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === 'granted') {
+          const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+          return await getCurrentWeather(location.coords.latitude, location.coords.longitude);
+        }
+        console.warn('⚠️ Location permission not granted, falling back to default weather location');
+        return await getCurrentWeather(); // Fallback
+      } catch (e) {
+        console.error('Error fetching local weather:', e);
+        return await getCurrentWeather(); // Fallback
+      }
+    };
+
+    // STEP 1: Validate image contexts & fetch weather in parallel
+    reportProgress(1, 'Validating your photos and checking weather...');
+    const validationsAndWeather = await Promise.all([
       validateImageContext(photos.person1, 'a person wearing an outfit'),
       validateImageContext(photos.person2, 'a person wearing an outfit'),
-      validateImageContext(photos.place, 'a venue, location, interior, or exterior setting')
+      validateImageContext(photos.place, 'a venue, location, interior, or exterior setting'),
+      fetchLocalWeather() // Uses expo-location to fetch local weather
     ]);
+
+    const validations = validationsAndWeather.slice(0, 3);
+    const weatherData = validationsAndWeather[3] as any;
 
     if (!validations[0].isValid) throw new Error(`Invalid photo for ${names.person1}: ${validations[0].reasoning}`);
     if (!validations[1].isValid) throw new Error(`Invalid photo for ${names.person2}: ${validations[1].reasoning}`);
     if (!validations[2].isValid) throw new Error(`Invalid venue photo: ${validations[2].reasoning}`);
 
-    // STEP 1: Analyze Person 1 - Get from user profile (no gender detection needed)
-    console.log(`👤 Analyzing ${names.person1 || 'first person'}'s style and body type...`);
-    const person1Analysis = await analyzeIndividualPerson(photos.person1, names.person1, null);
+    // STEP 2: Analyze both people AND venue in parallel (saves ~6-8 seconds vs sequential)
+    reportProgress(2, `Analyzing ${names.person1} and ${names.person2}'s styles...`);
+    const [person1Analysis, person2Analysis, placeAnalysis] = await Promise.all([
+      analyzeIndividualPerson(photos.person1, names.person1, null),
+      analyzeIndividualPerson(photos.person2, names.person2, context?.friendGender),
+      analyzeVenueFromPhoto(photos.place, category, context)
+    ]);
 
-    // STEP 2: Analyze Person 2 - Use provided gender from UI toggle
-    console.log(`👤 Scanning ${names.person2 || 'second person'}'s vibe and energy...`);
-    console.log(`🎯 FRIEND GENDER FROM UI: ${context?.friendGender || 'not provided'}`);
-    const person2Analysis = await analyzeIndividualPerson(photos.person2, names.person2, context?.friendGender);
-    
-    // CRITICAL DEBUG: Log friend's analysis results
-    console.log('🔍 FRIEND ANALYSIS RESULTS:', {
-      name: person2Analysis.name,
-      gender: person2Analysis.gender,
-      bodyType: person2Analysis.bodyType,
-      skinTone: person2Analysis.skinTone,
-      style: person2Analysis.style,
-      confidence: person2Analysis.confidence
+    console.log('✅ Parallel analysis complete:', {
+      person1: { body: person1Analysis.bodyType, skin: person1Analysis.skinTone },
+      person2: { body: person2Analysis.bodyType, skin: person2Analysis.skinTone },
+      venue: placeAnalysis.venue
     });
 
-    // STEP 3: Analyze Group Photo - Understand their dynamic and relationship
-    console.log('👥 Understanding your dynamic and chemistry together...');
-    const groupAnalysis = await analyzeGroupPhoto(photos.together, names, person1Analysis, person2Analysis);
+    // STEP 3: Derive group dynamic from individual analyses (no separate API call needed)
+    reportProgress(3, 'Understanding your coordination potential...');
+    const groupAnalysis = {
+      dynamic: `${person1Analysis.style} and ${person2Analysis.style} styles create a balanced, complementary look`,
+      chemistry: `${person1Analysis.skinTone} and ${person2Analysis.skinTone} tones pair beautifully`,
+      coordinationStyle: 'Complementary coordination',
+      visualHarmony: `${person1Analysis.bodyType} and ${person2Analysis.bodyType} silhouettes balance well`,
+      recommendations: [
+        `Use ${placeAnalysis.dominantColors?.[0] || 'neutral'} as a connecting color`,
+        `Balance ${person1Analysis.style} with ${person2Analysis.style} approaches`,
+        `Match formality to the ${placeAnalysis.venue} setting`
+      ]
+    };
 
-    // STEP 4: Analyze Place/Setting - Extract venue details, atmosphere, colors
-    console.log(`🏛️ Analyzing the ${category || 'venue'} setting and atmosphere...`);
-    const placeAnalysis = await analyzeVenueFromPhoto(photos.place, category, context);
+    // STEP 4: Generate coordinated outfits via AI
+    reportProgress(4, 'Generating your perfect coordinated outfits...');
+    
+    // Inject weather into context
+    const enrichedContext = {
+      ...context,
+      weather: weatherData ? `${weatherData.temperature}°C, ${weatherData.humidity}% humidity, ${weatherData.condition} in ${weatherData.location}` : 'Unknown weather'
+    };
 
-    // STEP 5: Create comprehensive prompt with all analyzed data
-    console.log('🧠 Processing all data to create personalized recommendations...');
     const comprehensivePrompt = createComprehensiveTwinningPrompt(
       person1Analysis,
       person2Analysis,
@@ -137,15 +174,12 @@ export const analyzeTwinningPhotos = async (
       names,
       category,
       occasion,
-      context
+      enrichedContext
     );
+    const aiRecommendations = await getAIFashionRecommendations(comprehensivePrompt, names);
 
-    // STEP 6: Get AI recommendations using the best model efficiently
-    console.log('✨ Generating your perfect coordinated outfits...');
-    const aiRecommendations = await getAIFashionRecommendations(comprehensivePrompt);
-
-    // STEP 7: Combine all data into final analysis
-    console.log('🎨 Finalizing your personalized style recommendations...');
+    // STEP 5: Combine all data into final analysis
+    reportProgress(5, 'Finalizing your style recommendations...');
     const finalAnalysis = combineAnalysisData(
       person1Analysis,
       person2Analysis,
@@ -160,10 +194,16 @@ export const analyzeTwinningPhotos = async (
     console.log('🎉 Your perfect twinning analysis is ready!');
     return finalAnalysis;
 
-  } catch (error) {
+  } catch (error: any) {
+    // If it's a validation error about the images, re-throw it to show the user
+    if (error?.message && (error.message.includes('Invalid photo') || error.message.includes('Invalid venue photo'))) {
+      console.error('❌ Validation failed:', error.message);
+      throw error;
+    }
+    
     console.error('❌ Analysis encountered an issue, creating backup recommendations...');
     console.error('Error details:', error);
-    // Fallback to simplified analysis
+    // Fallback to simplified analysis for other errors (like rate limits or API timeouts)
     return await fallbackTwinningAnalysis(photos, names, category, context);
   }
 };
@@ -1244,81 +1284,42 @@ export const generateShoppingLinks = (searchTerm: string, items?: string[], cate
   return platforms;
 };
 
-// New function to generate specific shopping links based on actual outfit items and colors
+// Generate per-item shopping links — each outfit item gets its own Amazon search
 export const generateSpecificShoppingLinks = (
   outfitItems: string[], 
   colors: string[], 
   gender: 'male' | 'female',
   coordinationColors?: string[]
 ) => {
-  // Clean and prepare items for search
+  const genderTerm = gender === 'male' ? 'men' : 'women';
+  
+  // Clean items for search
   const cleanItems = outfitItems.map(item => 
     item.toLowerCase()
-      .replace(/[^\w\s]/g, '') // Remove special characters
+      .replace(/[^\w\s]/g, '')
       .trim()
   ).filter(item => item.length > 0);
 
-  // Prepare colors for search (use coordination colors if available)
-  const searchColors = coordinationColors && coordinationColors.length > 0 
-    ? coordinationColors 
-    : colors;
-  
-  const cleanColors = searchColors.map(color => 
-    color.toLowerCase()
-      .replace(/[^\w\s]/g, '')
-      .trim()
-  ).filter(color => color.length > 0);
+  console.log('🔗 Generating per-item shopping links:', { items: cleanItems, gender: genderTerm });
 
-  // Create specific search terms for each platform
-  const genderTerm = gender === 'male' ? 'men' : 'women';
-  
-  // Main items search (e.g., "men classic shirt chinos")
-  const mainItemsSearch = `${genderTerm} ${cleanItems.slice(0, 3).join(' ')}`;
-  
-  // Color-specific search (e.g., "navy blue men shirt")
-  const colorItemsSearch = cleanColors.length > 0 
-    ? `${cleanColors[0]} ${genderTerm} ${cleanItems[0] || 'outfit'}`
-    : mainItemsSearch;
-  
-  // Specific item search (e.g., "men chinos loafers")
-  const specificItemsSearch = cleanItems.length > 1 
-    ? `${genderTerm} ${cleanItems.slice(0, 2).join(' ')}`
-    : mainItemsSearch;
+  // One Amazon link per item
+  const amazonLinks = cleanItems.map(item => ({
+    platform: "Amazon Fashion",
+    search_term: `${genderTerm} ${item}`,
+    url: `https://amazon.com/s?k=${encodeURIComponent(`${genderTerm} ${item}`)}&rh=n%3A7141123011`,
+    icon: "logo-amazon"
+  }));
 
-  console.log('🔗 Generating specific shopping links:', {
-    items: cleanItems,
-    colors: cleanColors,
-    mainSearch: mainItemsSearch,
-    colorSearch: colorItemsSearch,
-    specificSearch: specificItemsSearch
-  });
+  // One Pinterest link for the complete look
+  const pinterestSearch = `${genderTerm} ${cleanItems.join(' ')} outfit`;
+  const pinterestLink = {
+    platform: "Pinterest",
+    search_term: pinterestSearch,
+    url: `https://pinterest.com/search/pins/?q=${encodeURIComponent(pinterestSearch)}`,
+    icon: "logo-pinterest"
+  };
 
-  const platforms = [
-    {
-      platform: "Amazon Fashion",
-      search_term: mainItemsSearch,
-      url: `https://amazon.com/s?k=${encodeURIComponent(mainItemsSearch)}&rh=n%3A7141123011`,
-      icon: "logo-amazon"
-    },
-    {
-      platform: "Myntra",
-      search_term: colorItemsSearch,
-      url: `https://myntra.com/search?q=${encodeURIComponent(colorItemsSearch)}`,
-      icon: "shirt"
-    },
-    {
-      platform: "Zara",
-      search_term: specificItemsSearch,
-      url: `https://zara.com/search?searchTerm=${encodeURIComponent(specificItemsSearch)}`,
-      icon: "storefront"
-    },
-    {
-      platform: "Pinterest Style",
-      search_term: `${mainItemsSearch} ${cleanColors.slice(0, 2).join(' ')} outfit`,
-      url: `https://pinterest.com/search/pins/?q=${encodeURIComponent(`${mainItemsSearch} ${cleanColors.slice(0, 2).join(' ')} outfit`)}`,
-      icon: "logo-pinterest"
-    }
-  ];
+  const platforms = [...amazonLinks, pinterestLink];
 
   return platforms;
 };
@@ -1744,28 +1745,33 @@ TASK: Create 2-3 coordinated outfit options for each person that:
 6. Provide specific styling tips for each person
 7. Include shopping recommendations
 
-Focus on creating outfits that enhance their natural features, coordinate beautifully together, and are perfect for the analyzed venue and occasion.
+CRITICAL WEATHER ENFORCEMENT:
+If weather details are provided in the context, you MUST strictly adhere to them. Ensure all clothing choices, fabrics, and layers are highly practical for the provided weather conditions. Do not suggest heavy layering, thick fabrics (like wool or heavy denim), or outerwear (like trench coats or sport coats) if the weather is hot or highly humid. Prioritize breathable fabrics like cotton or linen for warm weather.
 
-Provide detailed, practical recommendations with clear reasoning based on the comprehensive analysis data.`;
+Focus on creating outfits that enhance their natural features, coordinate beautifully together, and are perfect for the analyzed venue, weather, and occasion.
+
+You MUST respond with ONLY a valid JSON object. Do not include any plain text explanation or conversational filler outside of the JSON block.`;
 };
 
-// STEP 5: Get AI recommendations using efficient model usage
-const getAIFashionRecommendations = async (prompt: string): Promise<any> => {
+// STEP 5: Get AI recommendations using per-person twinning API
+const getAIFashionRecommendations = async (prompt: string, names: { person1: string; person2: string }): Promise<any> => {
   console.log('🤖 Getting AI fashion recommendations...');
 
   try {
-    // Use the most efficient model for best results with free usage
-    const response = await generateOutfitsFromPrompt(prompt);
+    // Use the twinning-specific function that returns separate outfits per person
+    const response = await generateTwinningOutfits(prompt, names.person1, names.person2);
+    console.log('✅ Per-person twinning outfits received:', 
+      `${names.person1}: ${response?.person1Outfits?.length || 0} outfits,`,
+      `${names.person2}: ${response?.person2Outfits?.length || 0} outfits`
+    );
     return response;
   } catch (error) {
     console.log('⚠️ AI recommendations failed, using structured fallback');
     return {
-      recommendations: [{
-        style: 'Coordinated Smart Casual',
-        outfit: 'Complementary outfits based on analysis',
-        reasoning: 'Based on comprehensive photo analysis and venue assessment',
-        mood: 'Confident and coordinated'
-      }]
+      person1Outfits: [],
+      person2Outfits: [],
+      colorPalette: ['#dca3a3', '#f5f5dc', '#e6e6fa', '#c0c0c0'],
+      coordinationTips: ['Coordinate with complementary colors']
     };
   }
 };
@@ -1817,8 +1823,8 @@ const combineAnalysisData = (
       recommendations: groupAnalysis.recommendations
     },
     outfitSuggestions: {
-      person1: createEnhancedOutfitSuggestions(person1Analysis, placeAnalysis, category, context, aiRecommendations),
-      person2: createEnhancedOutfitSuggestions(person2Analysis, placeAnalysis, category, context, aiRecommendations),
+      person1: createEnhancedOutfitSuggestions(person1Analysis, placeAnalysis, category, context, aiRecommendations?.person1Outfits),
+      person2: createEnhancedOutfitSuggestions(person2Analysis, placeAnalysis, category, context, aiRecommendations?.person2Outfits),
       coordination: {
         color_harmony: [
           `Use ${placeAnalysis.dominantColors.join(' and ')} from the venue`,
@@ -1836,7 +1842,8 @@ const combineAnalysisData = (
           `Complement the ${placeAnalysis.style} venue style`,
           `Use ${placeAnalysis.dominantColors[0]} as accent color`
         ],
-        overall_theme: `${placeAnalysis.atmosphere} coordination highlighting both personalities`
+        overall_theme: `${placeAnalysis.atmosphere} coordination highlighting both personalities`,
+        color_palette: aiRecommendations?.colorPalette || ['#dca3a3', '#f5f5dc', '#e6e6fa', '#c0c0c0'] // Fallback palette if missing
       }
     }
   };
@@ -1848,12 +1855,52 @@ const createEnhancedOutfitSuggestions = (
   placeAnalysis: any,
   category: string,
   context?: any,
-  aiRecommendations?: any
+  personOutfits?: any[] // Already person-specific from the new API
 ): OutfitSuggestion[] => {
   const isMale = personAnalysis.gender === 'male';
   const baseColors = getColorsForSkinTone(personAnalysis.skinTone);
   const venueColors = placeAnalysis.dominantColors;
 
+  // Use real AI per-person outfits if available
+  if (personOutfits && Array.isArray(personOutfits) && personOutfits.length > 0) {
+    return personOutfits.map((outfit: any, index: number) => {
+      // Items are already specific to this person from the AI
+      const items = Array.isArray(outfit.items) && outfit.items.length > 0
+        ? outfit.items
+        : getItemsForBodyType(personAnalysis.bodyType, isMale, category);
+
+      const accessories = Array.isArray(outfit.accessories) && outfit.accessories.length > 0
+        ? outfit.accessories
+        : getAccessoriesForBodyType(personAnalysis.bodyType, isMale);
+
+      const colors = Array.isArray(outfit.colors) && outfit.colors.length > 0
+        ? outfit.colors
+        : [...baseColors.slice(0, 2), ...venueColors.slice(0, 1)];
+
+      // Generate person-specific shopping links from THEIR items
+      const shoppingLinks = generateSpecificShoppingLinks(
+        items,
+        colors,
+        personAnalysis.gender,
+        venueColors
+      );
+
+      return {
+        category: outfit.styleName || (index === 0 ? `${category} Perfect` : `Alternative ${category}`),
+        items,
+        colors,
+        accessories,
+        styling_tips: [
+          outfit.mood || `Perfect for ${placeAnalysis.atmosphere || 'this'} atmosphere`,
+          `Coordinates with ${placeAnalysis.venue || 'the'} setting`
+        ],
+        why_this_works: outfit.reasoning || `Tailored for ${personAnalysis.name}'s ${personAnalysis.bodyType} body type.`,
+        shopping_links: shoppingLinks
+      };
+    }).slice(0, 2);
+  }
+
+  // Fallback to structured logic if no AI recommendations
   return [
     {
       category: `${category} Perfect`,
@@ -1865,7 +1912,7 @@ const createEnhancedOutfitSuggestions = (
         `Perfect for ${placeAnalysis.atmosphere || 'this'} atmosphere`,
         `Coordinates with ${placeAnalysis.venue || 'the'} setting`
       ],
-      why_this_works: `Tailored for ${personAnalysis.bodyType || 'your'} body type, ${personAnalysis.skinTone || 'your'} skin tone, and ${placeAnalysis.venue || 'this'} venue. ${aiRecommendations?.recommendations?.[0]?.reasoning || 'Based on comprehensive analysis.'}`,
+      why_this_works: `Tailored for ${personAnalysis.bodyType || 'your'} body type, ${personAnalysis.skinTone || 'your'} skin tone, and ${placeAnalysis.venue || 'this'} venue.`,
       shopping_links: generateSpecificShoppingLinks(
         getItemsForBodyType(personAnalysis.bodyType, isMale, category),
         [...baseColors.slice(0, 2), ...venueColors.slice(0, 1)],

@@ -163,7 +163,11 @@ export default function AIAdviceModal({
                 {sources.map((url, idx) => (
                   <TouchableOpacity
                     key={idx}
-                    onPress={() => WebBrowser.openBrowserAsync(url)}
+                    onPress={() => WebBrowser.openBrowserAsync(url, {
+                      readerMode: false,
+                      enableBarCollapsing: true,
+                      dismissButtonStyle: 'close',
+                    })}
                     style={styles.sourceLink}
                   >
                     <Ionicons name="link" size={16} color={isDark ? '#ffd700' : '#6366f1'} />

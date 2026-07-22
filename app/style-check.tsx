@@ -24,6 +24,7 @@ import StyleRatingCard from '../components/StyleRatingCard';
 import StyleRecommendations from '../components/StyleRecommendations';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
+import PremiumBackground from '../components/PremiumBackground';
 import { analyzeOutfitRating, StyleCheckResult } from '../services/styleCheckService';
 import { getUserProfile } from '../services/userService';
 import { checkUserGender, promptForGender } from '../utils/genderUtils';
@@ -107,6 +108,7 @@ export default function StyleCheck() {
   };
 
   const analyzeStyle = async () => {
+    if (isAnalyzing) return;
     if (!outfitImage) {
       Alert.alert('Missing Photo', 'Please upload your outfit photo to get started.');
       return;
@@ -178,7 +180,8 @@ export default function StyleCheck() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+    <PremiumBackground variant="styleCheck">
+    <SafeAreaView style={[styles.container]}>
       <StatusBar barStyle={theme.background === '#0f172a' ? 'light-content' : 'dark-content'} />
 
       {/* Header */}
@@ -443,6 +446,7 @@ export default function StyleCheck() {
         </Animated.View>
       )}
     </SafeAreaView>
+    </PremiumBackground>
   );
 }
 

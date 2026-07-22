@@ -252,7 +252,11 @@ export default function MixMatchScreen() {
     const bottomName = bottoms[bottomIdx]?.name || '';
     const query = `men ${topName} ${bottomName} outfit`;
     const searchUrl = `https://www.pinterest.com/search/pins/?q=${encodeURIComponent(query)}`;
-    await WebBrowser.openBrowserAsync(searchUrl);
+    await WebBrowser.openBrowserAsync(searchUrl, {
+      readerMode: false,
+      enableBarCollapsing: true,
+      dismissButtonStyle: 'close',
+    });
   };
 
   const selectCategory = (catId: string) => {

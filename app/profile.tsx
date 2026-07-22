@@ -23,6 +23,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
+import PremiumBackground from '../components/PremiumBackground';
 import { isFirebaseInitialized, storage } from '../firebaseConfig';
 import { testApiKey, invalidateApiKeyCache, getActiveKeySource } from '../services/geminiService';
 
@@ -442,18 +443,21 @@ export default function ProfileScreen() {
   // Don't render anything until data is loaded to prevent lag
   if (loading) {
     return (
-      <View style={{ flex: 1, backgroundColor: theme.background, justifyContent: 'center', alignItems: 'center' }}>
-        <StatusBar barStyle={theme.background === '#18181b' ? "light-content" : "dark-content"} backgroundColor={theme.primary} />
-        <Ionicons name="sparkles" size={48} color={theme.primary} />
-        <Text style={{ color: theme.text, fontSize: 18, fontWeight: '600', marginTop: 16 }}>
-          Loading your profile...
-        </Text>
-      </View>
+      <PremiumBackground variant="profile">
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <StatusBar barStyle={theme.background === '#18181b' ? "light-content" : "dark-content"} backgroundColor={theme.primary} />
+          <Ionicons name="sparkles" size={48} color={theme.primary} />
+          <Text style={{ color: theme.text, fontSize: 18, fontWeight: '600', marginTop: 16 }}>
+            Loading your profile...
+          </Text>
+        </View>
+      </PremiumBackground>
     );
   }
 
   return (
-    <Animated.View style={[{ flex: 1, backgroundColor: theme.background }, screenAnimatedStyle]}>
+    <PremiumBackground variant="profile">
+    <Animated.View style={[{ flex: 1 }, screenAnimatedStyle]}>
       <StatusBar barStyle={theme.background === '#18181b' ? "light-content" : "dark-content"} backgroundColor={theme.primary} />
       {/* Back Button */}
       <Animated.View style={[
@@ -1025,5 +1029,6 @@ export default function ProfileScreen() {
       </ScrollView>
 
     </Animated.View>
+    </PremiumBackground>
   );
 }

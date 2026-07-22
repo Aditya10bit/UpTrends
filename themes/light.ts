@@ -1,14 +1,14 @@
 const lightTheme = {
-  // Ultra-modern backgrounds with premium gradients and depth
-  background: '#f8fafc',
-  backgroundGradient: ['#f8fafc', '#f1f5f9', '#e2e8f0'],
-  card: '#ffffff',
-  cardSecondary: '#f8fafc',
-  cardTertiary: '#f1f5f9',
-  backgroundSecondary: '#f1f5f9',
-  backgroundAccent: '#eef2ff',
-  surfaceElevated: '#ffffff',
-  surfaceOverlay: 'rgba(255, 255, 255, 0.95)',
+  // Ultra-modern backgrounds – slightly tinted base that lets the mesh shine
+  background: '#f0f4ff',
+  backgroundGradient: ['#f0f4ff', '#eef2ff', '#e8ecf8'],
+  card: 'rgba(255, 255, 255, 0.72)',
+  cardSecondary: 'rgba(248, 250, 252, 0.65)',
+  cardTertiary: 'rgba(241, 245, 249, 0.6)',
+  backgroundSecondary: 'rgba(241, 245, 249, 0.7)',
+  backgroundAccent: 'rgba(238, 242, 255, 0.6)',
+  surfaceElevated: 'rgba(255, 255, 255, 0.82)',
+  surfaceOverlay: 'rgba(255, 255, 255, 0.88)',
   
   // Premium text colors with enhanced readability
   text: '#0f172a',
@@ -17,11 +17,11 @@ const lightTheme = {
   textAccent: '#6366f1',
   textMuted: '#94a3b8',
   
-  // Ultra-refined border colors with glass morphism support
-  border: '#e2e8f0',
-  borderLight: '#f1f5f9',
-  borderAccent: '#cbd5e0',
-  borderGlass: 'rgba(255, 255, 255, 0.2)',
+  // Ultra-refined border colors – frosted glass edges
+  border: 'rgba(203, 213, 225, 0.5)',
+  borderLight: 'rgba(241, 245, 249, 0.6)',
+  borderAccent: 'rgba(203, 213, 225, 0.65)',
+  borderGlass: 'rgba(255, 255, 255, 0.45)',
   borderGlow: 'rgba(99, 102, 241, 0.3)',
   
   // Next-gen primary colors with enhanced vibrancy
@@ -60,10 +60,10 @@ const lightTheme = {
   styleCheckAccent: '#10b981', // Emerald for style check
   
   // Premium shadows with glass morphism support
-  shadow: 'rgba(15, 23, 42, 0.08)',
-  shadowMedium: 'rgba(15, 23, 42, 0.12)',
-  shadowStrong: 'rgba(15, 23, 42, 0.16)',
-  shadowGlow: 'rgba(99, 102, 241, 0.25)',
+  shadow: 'rgba(15, 23, 42, 0.06)',
+  shadowMedium: 'rgba(15, 23, 42, 0.1)',
+  shadowStrong: 'rgba(15, 23, 42, 0.14)',
+  shadowGlow: 'rgba(99, 102, 241, 0.2)',
   shadowInset: 'inset 0 1px 0 rgba(255, 255, 255, 0.1)',
   
   // Next-gen gradients with enhanced visual impact
@@ -77,7 +77,7 @@ const lightTheme = {
   gradientMakeOutfit: ['#8b5cf6', '#ec4899', '#f59e0b'],
   gradientFashion: ['#f59e0b', '#f97316', '#dc2626'],
   gradientStyleCheck: ['#10b981', '#059669', '#047857'],
-  gradientGlass: ['rgba(255, 255, 255, 0.25)', 'rgba(255, 255, 255, 0.1)'],
+  gradientGlass: ['rgba(255, 255, 255, 0.35)', 'rgba(255, 255, 255, 0.15)'],
   
   // Additional modern colors for enhanced UI
   info: '#4299e1',           // Clear blue for information
@@ -95,10 +95,10 @@ const lightTheme = {
   gray800: '#1f2937',
   gray900: '#111827',
   
-  // Surface colors for layered UI
-  surface: '#ffffff',
-  surfaceSecondary: '#f8fafc',
-  surfaceTertiary: '#f1f5f9',
+  // Surface colors for layered UI – glassmorphic
+  surface: 'rgba(255, 255, 255, 0.75)',
+  surfaceSecondary: 'rgba(248, 250, 252, 0.65)',
+  surfaceTertiary: 'rgba(241, 245, 249, 0.55)',
   
   // Interactive states
   hover: 'rgba(102, 126, 234, 0.08)',

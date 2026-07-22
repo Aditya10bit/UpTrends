@@ -167,7 +167,11 @@ export default function AIAdviceCard({
               {sources.slice(0, 2).map((url, idx) => (
                 <TouchableOpacity
                   key={idx}
-                  onPress={() => WebBrowser.openBrowserAsync(url)}
+                  onPress={() => WebBrowser.openBrowserAsync(url, {
+                    readerMode: false,
+                    enableBarCollapsing: true,
+                    dismissButtonStyle: 'close',
+                  })}
                   style={styles.sourceLink}
                 >
                   <Ionicons name="link" size={14} color={isDark ? '#ffd700' : '#6366f1'} />

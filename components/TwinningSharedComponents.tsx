@@ -293,7 +293,7 @@ export function GenderToggle({ gender, onGenderChange, theme }: GenderToggleProp
   );
 }
 
-// Animated Progress Component
+// Orbit Progress Indicator — Modern step-by-step progress UI
 interface AnimatedProgressProps {
   steps: string[];
   currentStep: number;
@@ -303,147 +303,143 @@ interface AnimatedProgressProps {
 }
 
 export function AnimatedProgress({ steps, currentStep, completedSteps, theme, primaryColor }: AnimatedProgressProps) {
-  // Safety checks for props
-  if (!theme || !primaryColor) {
-    return null;
-  }
+  if (!theme || !primaryColor) return null;
   
   const safeSteps = steps || [];
   const safeCompletedSteps = completedSteps || [];
   const safeCurrentStep = currentStep || 0;
+  const totalSteps = Math.max(safeSteps.length, 1);
+  const progressPercent = Math.min(Math.round((safeCurrentStep / Math.max(totalSteps - 1, 1)) * 100), 100);
+
+  // Get the current active step text
+  const activeStepText = safeCompletedSteps.length > 0 
+    ? safeCompletedSteps[safeCompletedSteps.length - 1] 
+    : safeSteps[0] || 'Starting...';
 
   return (
     <View style={progressStyles.container}>
-      <View style={progressStyles.stepsContainer}>
-        {safeCompletedSteps
-          .filter(step => step && typeof step === 'string')
-          .map((step, index) => (
-            <AnimatedProgressStep
-              key={index}
-              step={step}
-              index={index}
-              isActive={index === safeCurrentStep}
-              isCompleted={index < safeCurrentStep}
-              theme={theme}
-              primaryColor={primaryColor}
-            />
-          ))}
+      {/* Central Active Step */}
+      <View style={progressStyles.activeStepContainer}>
+        <ActiveStepIndicator 
+          primaryColor={primaryColor} 
+          isComplete={progressPercent >= 100} 
+        />
+        <Text style={[progressStyles.activeStepText, { color: theme.text }]} numberOfLines={2}>
+          {activeStepText?.replace(/^[^\w]*/, '') || 'Processing...'}
+        </Text>
       </View>
 
+      {/* Dot Indicators */}
+      <View style={progressStyles.dotsRow}>
+        {safeSteps.slice(0, Math.min(safeSteps.length, 8)).map((_, index) => (
+          <View
+            key={index}
+            style={[
+              progressStyles.dot,
+              {
+                backgroundColor: index < safeCurrentStep 
+                  ? '#22c55e' 
+                  : index === safeCurrentStep 
+                    ? primaryColor 
+                    : `${primaryColor}30`,
+                width: index === safeCurrentStep ? 12 : 8,
+                height: index === safeCurrentStep ? 12 : 8,
+                borderRadius: index === safeCurrentStep ? 6 : 4,
+              }
+            ]}
+          />
+        ))}
+      </View>
+      <Text style={[progressStyles.stepCounter, { color: theme.textSecondary }]}>
+        Step {Math.min(safeCurrentStep + 1, totalSteps)} of {totalSteps}
+      </Text>
+
+      {/* Gradient Progress Bar */}
       <View style={progressStyles.progressBarContainer}>
-        <View style={[progressStyles.progressBar, { backgroundColor: `${primaryColor}20` }]}>
+        <View style={[progressStyles.progressBar, { backgroundColor: `${primaryColor}15` }]}>
           <Animated.View
             style={[
               progressStyles.progressFill,
               {
-                width: `${(safeCurrentStep / Math.max((safeSteps?.length || 1) - 1, 1)) * 100}%`,
-                backgroundColor: primaryColor
+                width: `${progressPercent}%`,
+                backgroundColor: primaryColor,
               }
             ]}
           />
         </View>
-        <Text style={[progressStyles.progressText, { color: theme.textSecondary }]}>
-          {safeCurrentStep + 1} of {safeSteps?.length || 0} steps completed
+        <Text style={[progressStyles.percentText, { color: primaryColor }]}>
+          {progressPercent}%
         </Text>
       </View>
+
+      {/* Completed Steps (compact list) */}
+      {safeCompletedSteps.length > 1 && (
+        <View style={progressStyles.completedContainer}>
+          {safeCompletedSteps.slice(0, -1).slice(-4).map((step, index) => (
+            <View key={index} style={progressStyles.completedRow}>
+              <Ionicons name="checkmark-circle" size={14} color="#22c55e" />
+              <Text 
+                style={[progressStyles.completedText, { color: theme.textSecondary }]} 
+                numberOfLines={1}
+              >
+                {step?.replace(/^[^\w]*/, '') || ''}
+              </Text>
+            </View>
+          ))}
+        </View>
+      )}
     </View>
   );
 }
 
-interface AnimatedProgressStepProps {
-  step: string;
-  index: number;
-  isActive: boolean;
-  isCompleted: boolean;
-  theme: any;
-  primaryColor: string;
-}
-
-function AnimatedProgressStep({ step, index, isActive, isCompleted, theme, primaryColor }: AnimatedProgressStepProps) {
-  // Safety check: if step is invalid, don't render anything
-  if (!step || typeof step !== 'string') {
-    return null;
-  }
-
-  // Safety check: ensure theme and primaryColor are valid
-  if (!theme || !primaryColor) {
-    return null;
-  }
-
-  const slideAnim = useSharedValue(50);
-  const opacityAnim = useSharedValue(0);
-  const scaleAnim = useSharedValue(0.8);
+// Pulsing active step icon
+function ActiveStepIndicator({ primaryColor, isComplete }: { primaryColor: string; isComplete: boolean }) {
   const pulseAnim = useSharedValue(1);
-
-  // Check if this is the AI recommendations step
-  const isAIStep = step.includes('🤖 Getting AI fashion recommendations');
+  const glowAnim = useSharedValue(0.3);
 
   useEffect(() => {
-    // Animate in from bottom
-    slideAnim.value = withSpring(0, { damping: 15, stiffness: 300 });
-    opacityAnim.value = withTiming(1, { duration: 500 });
-    scaleAnim.value = withSpring(1, { damping: 12, stiffness: 200 });
-
-    // Special pulsing animation for AI step
-    if (isActive && isAIStep) {
+    if (!isComplete) {
       pulseAnim.value = withRepeat(
         withSequence(
-          withTiming(1.1, { duration: 800 }),
-          withTiming(1, { duration: 800 })
+          withTiming(1.15, { duration: 1000 }),
+          withTiming(1, { duration: 1000 })
+        ),
+        -1,
+        true
+      );
+      glowAnim.value = withRepeat(
+        withSequence(
+          withTiming(0.6, { duration: 1000 }),
+          withTiming(0.2, { duration: 1000 })
         ),
         -1,
         true
       );
     } else {
-      pulseAnim.value = withTiming(1, { duration: 300 });
+      pulseAnim.value = withSpring(1);
+      glowAnim.value = withTiming(0);
     }
+  }, [isComplete]);
 
-    // If completed, animate out after a delay
-    if (isCompleted && !isActive) {
-      setTimeout(() => {
-        slideAnim.value = withSpring(-20, { damping: 15, stiffness: 300 });
-        opacityAnim.value = withTiming(0.6, { duration: 300 });
-        scaleAnim.value = withSpring(0.9, { damping: 12, stiffness: 200 });
-      }, 1000);
-    }
-  }, [isActive, isCompleted, isAIStep]);
+  const pulseStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: pulseAnim.value }],
+  }));
 
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateY: slideAnim.value },
-      { scale: scaleAnim.value * pulseAnim.value }
-    ] as any,
-    opacity: opacityAnim.value,
+  const glowStyle = useAnimatedStyle(() => ({
+    opacity: glowAnim.value,
   }));
 
   return (
-    <Animated.View style={[progressStyles.stepContainer, animatedStyle]}>
-      <View style={progressStyles.stepContent}>
-        <View style={[
-          progressStyles.stepIcon,
-          {
-            backgroundColor: isActive ? primaryColor : isCompleted ? '#22c55e' : `${primaryColor}20`,
-          }
-        ]}>
-          {isCompleted ? (
-            <Ionicons name="checkmark" size={16} color="#fff" />
-          ) : isActive && isAIStep ? (
-            <Ionicons name="flash" size={16} color="#fff" />
-          ) : (
-            <View style={[progressStyles.stepDot, { backgroundColor: isActive ? '#fff' : primaryColor }]} />
-          )}
-        </View>
-        <Text style={[
-          progressStyles.stepText,
-          {
-            color: isActive ? theme.text : theme.textSecondary,
-            fontWeight: isActive ? '600' : '400'
-          }
-        ]}>
-          {step || 'Processing...'}
-        </Text>
-      </View>
-    </Animated.View>
+    <View style={progressStyles.activeIconWrapper}>
+      <Animated.View style={[progressStyles.activeGlow, glowStyle, { backgroundColor: primaryColor }]} />
+      <Animated.View style={[progressStyles.activeIcon, pulseStyle, { backgroundColor: primaryColor }]}>
+        <Ionicons 
+          name={isComplete ? "checkmark" : "sparkles"} 
+          size={24} 
+          color="#fff" 
+        />
+      </Animated.View>
+    </View>
   );
 }
 
@@ -451,61 +447,102 @@ const progressStyles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
-  },
-  stepsContainer: {
-    flex: 1,
-    justifyContent: 'flex-start',
-    paddingTop: 20,
-  },
-  stepContainer: {
-    marginBottom: 16,
-  },
-  stepContent: {
-    flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
   },
-  stepIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+  // Active step
+  activeStepContainer: {
+    alignItems: 'center',
+    marginBottom: 32,
+  },
+  activeStepText: {
+    fontSize: 18,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginTop: 16,
+    lineHeight: 24,
+    paddingHorizontal: 20,
+  },
+  activeIconWrapper: {
+    width: 72,
+    height: 72,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
   },
-  stepDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+  activeGlow: {
+    position: 'absolute',
+    width: 72,
+    height: 72,
+    borderRadius: 36,
   },
-  stepText: {
-    fontSize: 14,
-    flex: 1,
-    lineHeight: 20,
-  },
-  progressBarContainer: {
-    paddingTop: 20,
+  activeIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  // Dots
+  dotsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  dot: {
+    borderRadius: 6,
+  },
+  stepCounter: {
+    fontSize: 13,
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  // Progress bar
+  progressBarContainer: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 8,
+    marginBottom: 24,
   },
   progressBar: {
-    width: '100%',
-    height: 6,
-    borderRadius: 3,
+    flex: 1,
+    height: 8,
+    borderRadius: 4,
     overflow: 'hidden',
-    marginBottom: 12,
   },
   progressFill: {
     height: '100%',
-    borderRadius: 3,
+    borderRadius: 4,
   },
-  progressText: {
-    fontSize: 12,
-    textAlign: 'center',
+  percentText: {
+    fontSize: 14,
+    fontWeight: '700',
+    minWidth: 38,
+    textAlign: 'right',
+  },
+  // Completed steps
+  completedContainer: {
+    width: '100%',
+    paddingHorizontal: 8,
+    gap: 6,
+  },
+  completedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 4,
+  },
+  completedText: {
+    fontSize: 13,
+    flex: 1,
   },
 });
 

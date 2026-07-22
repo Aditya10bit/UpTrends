@@ -13,9 +13,11 @@ import {
   StatusBar,
   Modal,
   Dimensions,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import * as WebBrowser from 'expo-web-browser';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -26,6 +28,7 @@ import {
   sendMessageToStylist,
   WardrobeItem,
   ChatMessage,
+  PackingData,
 } from '../services/digitalWardrobeService';
 import { getUserProfile } from '../services/userService';
 
@@ -39,7 +42,8 @@ const PRESET_PROMPTS = [
 ];
 
 export default function StylistChatScreen() {
-  const { theme } = useTheme();
+  const { theme, mode } = useTheme();
+  const isDark = mode === 'dark';
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
@@ -62,7 +66,7 @@ export default function StylistChatScreen() {
     setMessages([
       {
         id: 'welcome',
-        text: "Hello! I'm Aria, your personal AI fashion stylist. Ask me anything about outfit matching, styling tips, packing lists, or color coordination. You can also tap the hanger icon below to attach an item from your closet to get styling advice!",
+        text: "Hello! I'm Aria, your personal AI fashion stylist. Ask me anything about outfit matching, styling tips, or packing lists for a trip. I can browse your closet and tell you exactly what to pack and what's missing! 🌍✨",
         isUser: false,
         timestamp: new Date(),
       },
@@ -108,14 +112,16 @@ export default function StylistChatScreen() {
         userMsg.text,
         messages.concat(userMsg),
         userMsg.attachedItem,
-        userProfile
+        userProfile,
+        wardrobeItems
       );
 
       const stylistMsg: ChatMessage = {
         id: `msg_${Date.now()}_reply`,
-        text: response,
+        text: response.text,
         isUser: false,
         timestamp: new Date(),
+        packingData: response.packingData,
       };
 
       setMessages(prev => [...prev, stylistMsg]);
@@ -141,6 +147,62 @@ export default function StylistChatScreen() {
       return { uri: `data:image/jpeg;base64,${item.imageBase64}` };
     }
     return { uri: item.imageUri };
+  };
+
+  const renderPackingCard = (packingData: PackingData) => {
+    const selectedItems = wardrobeItems.filter(w => packingData.selectedClosetItemIds.includes(w.id));
+    return (
+      <View style={[styles.packingCard, { backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.04)', borderColor: theme.primary + '40' }]}>
+        <View style={styles.packingCardHeader}>
+          <Text style={{ fontSize: 16 }}>🧳</Text>
+          <Text style={[styles.packingCardTitle, { color: theme.primary }]}>Your Packing List</Text>
+        </View>
+        {selectedItems.length > 0 && (
+          <View style={styles.packingSection}>
+            <Text style={[styles.packingSectionTitle, { color: theme.text }]}>From Your Closet</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              {selectedItems.map(item => (
+                <View key={item.id} style={[styles.packingItemThumb, { backgroundColor: theme.card }]}>
+                  <Image source={resolveImageSource(item)} style={styles.packingThumbImage as any} />
+                  <Text style={[styles.packingThumbName, { color: theme.text }]} numberOfLines={2}>{item.name}</Text>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+        {packingData.outfitCombinations.length > 0 && (
+          <View style={styles.packingSection}>
+            <Text style={[styles.packingSectionTitle, { color: theme.text }]}>Outfit Combos</Text>
+            {packingData.outfitCombinations.map((combo, idx) => (
+              <View key={idx} style={[styles.comboRow, { borderLeftColor: theme.primary }]}>
+                <Text style={[styles.comboText, { color: theme.textSecondary }]}>{combo}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+        {packingData.missingItems.length > 0 && (
+          <View style={styles.packingSection}>
+            <Text style={[styles.packingSectionTitle, { color: theme.text }]}>You'll Need to Buy</Text>
+            {packingData.missingItems.map((item, idx) => (
+              <TouchableOpacity
+                key={idx}
+                style={[styles.missingItemRow, { backgroundColor: isDark ? 'rgba(255,100,100,0.1)' : 'rgba(255,50,50,0.06)', borderColor: '#ff6b6b30' }]}
+                onPress={() => WebBrowser.openBrowserAsync(
+                  `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(item.name)}`,
+                  { dismissButtonStyle: 'close', enableBarCollapsing: true }
+                )}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.missingItemName, { color: theme.text }]}>🛒 {item.name}</Text>
+                  <Text style={[styles.missingItemReason, { color: theme.textSecondary }]}>{item.reason}</Text>
+                </View>
+                <Ionicons name="open-outline" size={14} color={theme.textSecondary} />
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+      </View>
+    );
   };
 
   const renderMessageItem = ({ item }: { item: ChatMessage }) => {
@@ -181,6 +243,7 @@ export default function StylistChatScreen() {
             >
               {item.text}
             </Text>
+            {!item.isUser && item.packingData && renderPackingCard(item.packingData)}
           </View>
           <Text style={styles.timestampText}>
             {item.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -194,7 +257,7 @@ export default function StylistChatScreen() {
     <KeyboardAvoidingView
       style={[styles.container, { backgroundColor: theme.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
       <Stack.Screen options={{ headerShown: false }} />
       <StatusBar barStyle="light-content" />
@@ -282,11 +345,16 @@ export default function StylistChatScreen() {
 
           <TextInput
             style={[styles.textInput, { color: theme.text, backgroundColor: theme.background, maxHeight: 100 }]}
-            placeholder="Ask styling questions..."
+            placeholder="Ask about styling or a trip.."
             placeholderTextColor={theme.textTertiary}
             value={inputText}
             onChangeText={setInputText}
             multiline
+            onFocus={() => {
+              setTimeout(() => {
+                flatListRef.current?.scrollToEnd({ animated: true });
+              }, 200);
+            }}
           />
 
           <TouchableOpacity
@@ -387,6 +455,21 @@ const styles = StyleSheet.create({
   attachedMiniThumb: { width: 24, height: 30, borderRadius: 4, resizeMode: 'cover' },
   attachmentText: { fontSize: 11, fontWeight: '600', maxWidth: 180 },
   attachmentClose: { marginLeft: 4 },
+
+  // Packing card styles
+  packingCard: { marginTop: 12, borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
+  packingCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, paddingBottom: 8 },
+  packingCardTitle: { fontSize: 15, fontWeight: '800' },
+  packingSection: { paddingHorizontal: 12, paddingBottom: 12 },
+  packingSectionTitle: { fontSize: 12, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 8, opacity: 0.7 },
+  packingItemThumb: { width: 70, height: 95, borderRadius: 10, marginRight: 8, overflow: 'hidden', alignItems: 'center', paddingBottom: 4 },
+  packingThumbImage: { width: '100%', height: 70, resizeMode: 'cover' },
+  packingThumbName: { fontSize: 9, fontWeight: '600', textAlign: 'center', paddingHorizontal: 2, marginTop: 4 },
+  comboRow: { borderLeftWidth: 3, paddingLeft: 10, marginBottom: 8 },
+  comboText: { fontSize: 12, lineHeight: 18 },
+  missingItemRow: { flexDirection: 'row', alignItems: 'center', borderRadius: 10, borderWidth: 1, padding: 10, marginBottom: 6 },
+  missingItemName: { fontSize: 13, fontWeight: '700', marginBottom: 2 },
+  missingItemReason: { fontSize: 11, lineHeight: 16 },
 
   // Modal styling
   modalContainer: { flex: 1 },
