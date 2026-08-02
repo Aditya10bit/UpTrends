@@ -15,7 +15,7 @@ export const extractJSON = (text: string): string => {
   const str = text.trim();
   const firstBrace = str.indexOf('{');
   const firstBracket = str.indexOf('[');
-  
+
   let startIdx = -1;
   if (firstBrace !== -1 && firstBracket !== -1) {
     startIdx = Math.min(firstBrace, firstBracket);
@@ -24,13 +24,13 @@ export const extractJSON = (text: string): string => {
   } else if (firstBracket !== -1) {
     startIdx = firstBracket;
   }
-  
+
   if (startIdx === -1) return str.replace(/```json\n?|\n?```/g, '').trim(); // Fallback
-  
+
   const isObject = str[startIdx] === '{';
   const endChar = isObject ? '}' : ']';
   const endIdx = str.lastIndexOf(endChar);
-  
+
   if (endIdx !== -1 && endIdx >= startIdx) {
     let jsonStr = str.substring(startIdx, endIdx + 1);
     // Remove trailing commas which break JSON.parse
@@ -42,7 +42,7 @@ export const extractJSON = (text: string): string => {
     jsonStr = jsonStr.replace(/\t/g, '  ');
     return jsonStr;
   }
-  
+
   return str.replace(/```json\n?|\n?```/g, '').replace(/,\s*([}\]])/g, '$1').replace(/[\r\n]+/g, ' ').trim(); // Fallback
 };
 
@@ -107,7 +107,7 @@ export const getActiveKeySource = async (): Promise<'custom' | 'default'> => {
     if (trimmed && trimmed.length > 10) {
       return 'custom';
     }
-  } catch {}
+  } catch { }
   return 'default';
 };
 
@@ -184,33 +184,39 @@ export const genAI = {
 const getModel = (config: any) => genAI.getGenerativeModel(config);
 
 const models = {
-  get fast() { return getModel({
-    model: 'gemini-3.5-flash',
-    generationConfig: {
-      temperature: 0.7,
-      topK: 40,
-      topP: 0.95,
-      maxOutputTokens: 2048,
-    }
-  }); },
-  get balanced() { return getModel({
-    model: 'gemini-3.5-flash',
-    generationConfig: {
-      temperature: 0.8,
-      topK: 40,
-      topP: 0.95,
-      maxOutputTokens: 4096,
-    }
-  }); },
-  get quality() { return getModel({
-    model: 'gemini-3.5-flash',
-    generationConfig: {
-      temperature: 0.9,
-      topK: 40,
-      topP: 0.95,
-      maxOutputTokens: 8192,
-    }
-  }); }
+  get fast() {
+    return getModel({
+      model: 'gemini-3.5-flash',
+      generationConfig: {
+        temperature: 0.7,
+        topK: 40,
+        topP: 0.95,
+        maxOutputTokens: 2048,
+      }
+    });
+  },
+  get balanced() {
+    return getModel({
+      model: 'gemini-3.5-flash',
+      generationConfig: {
+        temperature: 0.8,
+        topK: 40,
+        topP: 0.95,
+        maxOutputTokens: 4096,
+      }
+    });
+  },
+  get quality() {
+    return getModel({
+      model: 'gemini-3.5-flash',
+      generationConfig: {
+        temperature: 0.9,
+        topK: 40,
+        topP: 0.95,
+        maxOutputTokens: 8192,
+      }
+    });
+  }
 };
 
 // Performance optimization: Cache for frequently used responses
@@ -542,12 +548,11 @@ Provide 3 outfits for ${userProfile?.bodyType || 'average'} body type, ${userPro
       return result;
     } catch (parseError) {
       console.error('⚠️ JSON parse failed, logging raw string:', cleanedResponse);
-      console.log('⚠️ trying balanced model');
+      console.log('⚠️ retrying with quality model');
 
       // Fallback to quality model if balanced fails
       const fallbackResponse = await queueRequest(analysisPrompt, 'quality', 1);
       const fallbackCleaned = extractJSON(fallbackResponse);
-
       try {
         const result = JSON.parse(fallbackCleaned);
         setCache(cacheKey, fallbackCleaned, CACHE_TTL);
@@ -578,8 +583,7 @@ export const generateTwinningOutfits = async (
 
     const analysisPrompt = `${safePrompt}
 
-CRITICAL: You MUST respond with ONLY a valid JSON object matching this EXACT structure.
-Each person gets their OWN separate outfit array with items specific to THEIR gender and body type.
+  "colorPalette": ["#HEX1", "#HEX2", "#HEX3", "#HEX4", "#HEX5"],Each person gets their OWN separate outfit array with items specific to THEIR gender and body type.
 Do NOT combine both people into one outfit string.
 
 {
@@ -632,7 +636,7 @@ Respond with ONLY the JSON object, no other text.`;
       return parsed;
     } catch (parseError) {
       console.error('⚠️ Twinning JSON parse failed, trying quality model...');
-      
+
       // Retry with quality model
       const qualityModel = genAI.getGenerativeModel({
         model: 'gemini-3.5-flash',
@@ -1326,7 +1330,7 @@ const generateFallbackShoppingLinks = (outfit: string): OutfitLink[] => {
     {
       platform: "Myntra",
       searchQuery: searchQuery,
-      url: `https://www.myntra.com/search/${encodeURIComponent(searchQuery)}`,
+      url: `https://www.myntra.com/${encodeURIComponent(searchQuery)}?rawQuery=${encodeURIComponent(searchQuery)}`,
       description: "Shop similar items on Myntra"
     }
   ];
@@ -2620,11 +2624,11 @@ Return ONLY the JSON object, no additional text.
 
     try {
       const parsed = JSON.parse(cleanedResponse);
-      
+
       // Programmatically override shopping links to guarantee correctness
       const genderTerm = userProfile?.gender === 'male' ? 'men' : 'women';
       const itemsQuery = parsed.items?.join(' ') || '';
-      
+
       const amazonLinks = (parsed.items || []).map((item: string) => ({
         item: item,
         platform: "Amazon Fashion",
@@ -2632,7 +2636,7 @@ Return ONLY the JSON object, no additional text.
         description: `Shop for ${item}`,
         icon: "bag"
       }));
-      
+
       const pinterestLink = {
         item: "Complete Look Inspiration",
         platform: "Pinterest",
@@ -2640,9 +2644,9 @@ Return ONLY the JSON object, no additional text.
         description: "See the full look on Pinterest",
         icon: "camera"
       };
-      
+
       parsed.shopping_links = [...amazonLinks, pinterestLink];
-      
+
       return parsed;
     } catch (parseError) {
       console.error('JSON Parse Error for today\'s outfit:', parseError);
@@ -2689,7 +2693,7 @@ const generateFallbackWardrobeAnalysis = (clothingImages: string[], userProfile:
               {
                 platform: "Myntra",
                 searchQuery: isMale ? "casual blazer men" : "accessories women",
-                url: `https://www.myntra.com/search/${encodeURIComponent(isMale ? 'casual blazer men' : 'accessories women')}`,
+                url: `https://www.myntra.com/${encodeURIComponent(isMale ? 'casual blazer men' : 'accessories women')}?rawQuery=${encodeURIComponent(isMale ? 'casual blazer men' : 'accessories women')}`,
                 description: "Find similar items on Myntra"
               }
             ]
@@ -4242,7 +4246,7 @@ Respond ONLY with a valid JSON array of objects, with no markdown formatting. Ea
     const result = await model.generateContent([prompt, imagePart]);
     const responseText = result.response.text();
     const cleaned = responseText.replace(/```json\n?|\n?```/g, '').trim();
-    
+
     return JSON.parse(cleaned) as StyleComponent[];
 
   } catch (error) {

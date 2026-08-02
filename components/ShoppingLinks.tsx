@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useRef } from 'react';
-import { Alert, Animated, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Animated, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 
 interface ShoppingLinksProps {
@@ -148,23 +148,23 @@ const ShoppingItemCard: React.FC<{
       <TouchableOpacity
         onPress={handlePress}
         activeOpacity={0.8}
-        style={{ marginBottom: 12 }}
+        style={{ marginRight: 16, width: 220 }}
       >
         <View 
           style={{ 
             borderRadius: 16, 
-            padding: 16, 
+            padding: 12, 
             borderWidth: 1,
-            backgroundColor: theme.card,
+            backgroundColor: 'rgba(255,255,255,0.02)',
             borderColor: theme.border
           }}
         >
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', flex: 1 }}>
               <View 
                 style={{ 
-                  width: 40, 
-                  height: 40, 
+                  width: 36, 
+                  height: 36, 
                   borderRadius: 12, 
                   alignItems: 'center', 
                   justifyContent: 'center', 
@@ -202,14 +202,15 @@ const ShoppingItemCard: React.FC<{
               </View>
             </View>
             
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <View style={{ flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
               <PriceRangeBadge priceRange={item.priceRange} theme={theme} />
-              <Ionicons 
-                name="chevron-forward" 
-                size={20} 
-                color={theme.textTertiary} 
-                style={{ marginLeft: 8 }}
-              />
+              <View style={{ backgroundColor: theme.primary + '20', borderRadius: 12, padding: 4 }}>
+                <Ionicons 
+                  name="chevron-forward" 
+                  size={14} 
+                  color={theme.primary} 
+                />
+              </View>
             </View>
           </View>
         </View>
@@ -278,7 +279,7 @@ const ShoppingCategorySection: React.FC<{
         transform: [{ translateY: slideAnim }],
       }}
     >
-      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16, paddingHorizontal: 24 }}>
         <View 
           style={{ 
             width: 48, 
@@ -296,26 +297,29 @@ const ShoppingCategorySection: React.FC<{
             color={getCategoryColor(category.category)} 
           />
         </View>
-        <Text style={{ 
-          fontSize: 20, 
-          fontWeight: 'bold', 
-          flex: 1, 
-          color: theme.text 
-        }}>
-          {category.category}
-        </Text>
-        <Text 
-          style={{ 
+        <View style={{ flex: 1 }}>
+          <Text style={{ 
+            fontSize: 20, 
+            fontWeight: 'bold', 
+            color: theme.text 
+          }}>
+            {category.category}
+          </Text>
+          <Text style={{ 
             fontSize: 14, 
             fontWeight: '500', 
             color: theme.textSecondary 
-          }}
-        >
-          {category.items.length} items
-        </Text>
+          }}>
+            {category.items.length} items
+          </Text>
+        </View>
       </View>
       
-      <View>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 24 }}
+      >
         {category.items.map((item, index) => (
           <ShoppingItemCard
             key={index}
@@ -324,7 +328,7 @@ const ShoppingCategorySection: React.FC<{
             delay={delay + (index * 100)}
           />
         ))}
-      </View>
+      </ScrollView>
     </Animated.View>
   );
 };

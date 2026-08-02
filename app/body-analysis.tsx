@@ -127,6 +127,7 @@ export default function BodyAnalysisScreen() {
     const [currentStep, setCurrentStep] = useState(0);
     const [userData, setUserData] = useState<UserData>({ language: 'english' });
     const [isLoading, setIsLoading] = useState(true);
+    const [isProcessing, setIsProcessing] = useState(false);
     const [conversationContext, setConversationContext] = useState<string>('');
     const [isAnalysisComplete, setIsAnalysisComplete] = useState(false);
     const scrollViewRef = useRef<ScrollView>(null);
@@ -139,6 +140,7 @@ export default function BodyAnalysisScreen() {
     const floatingAnim = useRef(new Animated.Value(0)).current;
     const pulseAnim = useRef(new Animated.Value(1)).current;
     const typingAnim = useRef(new Animated.Value(0)).current;
+    const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
     useEffect(() => {
         loadUserData();
@@ -454,7 +456,7 @@ export default function BodyAnalysisScreen() {
     };
 
     const handleSendMessage = async () => {
-        if (isLoading) return;
+        if (isLoading || isProcessing) return;
         console.log('handleSendMessage called with inputText:', inputText);
         if (!inputText.trim()) {
             console.log('Input text is empty, returning');
@@ -462,11 +464,16 @@ export default function BodyAnalysisScreen() {
         }
 
         const userMessage = inputText.trim();
+        setIsProcessing(true);
         addMessage(userMessage, false, 'text');
         setInputText('');
 
-        // Process based on current step
-        await processUserInput(userMessage);
+        try {
+            // Process based on current step
+            await processUserInput(userMessage);
+        } finally {
+            setIsProcessing(false);
+        }
     };
 
     const processUserInput = async (input: string) => {
@@ -490,10 +497,9 @@ export default function BodyAnalysisScreen() {
 
                 const response = await getChatbotResponse(contextualPrompt);
 
-                setTimeout(() => {
-                    setIsTyping(false);
-                    addMessage(response, true, 'text');
-                }, 1500);
+                await delay(1500);
+                setIsTyping(false);
+                addMessage(response, true, 'text');
 
             } catch (error) {
                 console.error('Error getting contextual response:', error);
@@ -545,7 +551,8 @@ export default function BodyAnalysisScreen() {
                 if (height > 0) {
                     setUserData(prev => ({ ...prev, height }));
                     addMessage(`Great! I've noted your height as ${heightText}. 📏`, true, 'text');
-                    setTimeout(() => askForSkinTone(), 1000);
+                    await delay(1000);
+                    askForSkinTone();
                 } else {
                     const errorMessage = userData.heightUnit === 'cm'
                         ? 'Please enter your height in numbers (e.g., 170)'
@@ -557,28 +564,33 @@ export default function BodyAnalysisScreen() {
             case 2: // Skin tone input
                 setUserData(prev => ({ ...prev, skinTone: input }));
                 addMessage(`Perfect! I've noted your skin tone. 🌟`, true, 'text');
-                setTimeout(() => askForGender(), 1000);
+                await delay(1000);
+                askForGender();
                 break;
 
             case 3: // Gender input
                 setUserData(prev => ({ ...prev, gender: input }));
                 addMessage(`Thank you! Now I have all the information I need. 💫`, true, 'text');
-                setTimeout(() => performAnalysis(), 1500);
+                await delay(1500);
+                await performAnalysis();
                 break;
 
             default:
                 // If no step is set, provide a helpful response
                 addMessage('I\'m not sure what you\'re asking about. Let me help you get started with your fashion analysis! 😊', true, 'text');
-                setTimeout(() => startConversationFlow(), 1000);
+                await delay(1000);
+                startConversationFlow();
                 break;
         }
     };
 
     const handleOptionSelect = async (option: string) => {
-        if (isLoading) return;
-        console.log('handleOptionSelect called with option:', option, 'currentStep:', currentStep);
-        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        addMessage(option, false, 'text');
+        if (isLoading || isProcessing) return;
+        setIsProcessing(true);
+        try {
+            console.log('handleOptionSelect called with option:', option, 'currentStep:', currentStep);
+            await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            addMessage(option, false, 'text');
 
         switch (currentStep) {
             case 1: // Height options
@@ -596,11 +608,12 @@ export default function BodyAnalysisScreen() {
 
             case 2: // Skin tone options
                 if (option === 'Upload Photo' || option === '🔄 Try Photo Again') {
-                    handleImageUpload();
+                    await handleImageUpload();
                 } else {
                     setUserData(prev => ({ ...prev, skinTone: option }));
                     addMessage(`Perfect! I've noted your skin tone as ${option}. 🌟`, true, 'text');
-                    setTimeout(() => askForGender(), 1000);
+                    await delay(1000);
+                    askForGender();
                 }
                 break;
 
@@ -619,12 +632,13 @@ export default function BodyAnalysisScreen() {
             case 3: // Gender options
                 setUserData(prev => ({ ...prev, gender: option }));
                 addMessage(`Thank you! Now let's analyze your body type for better fashion recommendations. 💫`, true, 'text');
-                setTimeout(() => askForBodyTypeAnalysis(), 1000);
+                await delay(1000);
+                askForBodyTypeAnalysis();
                 break;
 
             case 3.5: // Body type analysis options
                 if (option.includes('Upload Photo') || option === '🔄 Try Photo Again') {
-                    handleBodyTypeImageUpload();
+                    await handleBodyTypeImageUpload();
                 } else {
                     // Show manual body type options
                     showManualBodyTypeOptions();
@@ -641,7 +655,8 @@ export default function BodyAnalysisScreen() {
                         : `Perfect! Your body type is ${option}. Now I'll prepare personalized fashion suggestions for you! ✨`;
 
                 addMessage(confirmMessage, true, 'text');
-                setTimeout(() => performAnalysis(), 1500);
+                await delay(1500);
+                await performAnalysis();
                 break;
 
             case 4: // Video tutorial options
@@ -656,19 +671,13 @@ export default function BodyAnalysisScreen() {
                             : 'No problem! Your fashion analysis is complete. 🎉\n\nI hope these tips will help you look amazing. Feel free to ask me any fashion questions anytime!\n\nThank you for using StyleBuddy! ✨';
 
                     addMessage(noVideoMessage, true, 'text');
-
-                    // Add final message
-                    setTimeout(() => {
-                        const finalMessage = lang === 'hindi'
-                            ? 'Happy styling! 👗✨'
-                            : lang === 'hinglish'
-                                ? 'Happy styling! 👗✨'
-                                : 'Happy styling! 👗✨';
-
-                        addMessage(finalMessage, true, 'text');
-                    }, 1000);
+                    await delay(1000);
+                    addMessage('Happy styling! 👗✨', true, 'text');
                 }
                 break;
+        }
+        } finally {
+            setIsProcessing(false);
         }
     };
 

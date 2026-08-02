@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import { router } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
@@ -34,6 +35,7 @@ const getResponsiveSize = (size: number) => (screenWidth / 375) * size;
 
 export default function StyleCheck() {
   const { theme } = useTheme();
+  const isDark = theme.background === '#0f172a';
   const { user } = useAuth();
   const [userProfile, setUserProfile] = useState<any>(null);
   const [outfitImage, setOutfitImage] = useState<string | null>(null);
@@ -81,6 +83,29 @@ export default function StyleCheck() {
       }),
     ]).start();
   };
+
+  // Pulsing animation for analyze button
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    if (isAnalyzing) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 0.6,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    } else {
+      pulseAnim.setValue(1);
+    }
+  }, [isAnalyzing]);
 
   const pickImage = async (type: 'outfit' | 'venue') => {
     try {
@@ -228,103 +253,66 @@ export default function StyleCheck() {
             }
           ]}
         >
-          <LinearGradient
-            colors={[theme.primary + '20', theme.secondary + '20']}
+          <BlurView
+            intensity={isDark ? 30 : 60}
+            tint={isDark ? 'dark' : 'light'}
             style={styles.uploadContainer}
           >
             <Text style={[styles.sectionTitle, { color: theme.text }]}>
-              📸 Upload Your Photos
+              📸 Upload Photos
             </Text>
             <Text style={[styles.sectionDescription, { color: theme.textSecondary }]}>
-              Get personalized style analysis with AI-powered insights
+              Add an outfit and optional venue for context
             </Text>
 
-            {/* Outfit Photo */}
-            <View style={styles.photoSection}>
-              <Text style={[styles.photoLabel, { color: theme.text }]}>
-                Your Outfit Photo *
-              </Text>
-              <TouchableOpacity
-                onPress={() => pickImage('outfit')}
-                style={[
-                  styles.photoUpload,
-                  {
-                    borderColor: outfitImage ? theme.primary : theme.border,
-                    backgroundColor: outfitImage ? theme.primary + '10' : theme.card
-                  }
-                ]}
-              >
-                {outfitImage ? (
-                  <View style={styles.photoPreview}>
-                    <Image
-                      source={{ uri: outfitImage }}
-                      style={styles.outfitImage}
-                      resizeMode="cover"
-                    />
-                    <Text style={[styles.photoStatus, { color: theme.primary }]}>
-                      ✓ Outfit Photo Added
-                    </Text>
-                    <Text style={[styles.photoHint, { color: theme.textSecondary }]}>
-                      Tap to change
-                    </Text>
-                  </View>
-                ) : (
-                  <View style={styles.photoPlaceholder}>
-                    <Ionicons name="camera" size={48} color={theme.textTertiary} />
-                    <Text style={[styles.photoPlaceholderTitle, { color: theme.text }]}>
-                      Add Your Outfit Photo
-                    </Text>
-                    <Text style={[styles.photoPlaceholderDesc, { color: theme.textSecondary }]}>
-                      Full body photo works best for accurate analysis
-                    </Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            </View>
+            <View style={styles.photoRow}>
+              {/* Outfit Photo */}
+              <View style={styles.photoSection}>
+                <TouchableOpacity
+                  onPress={() => pickImage('outfit')}
+                  style={[
+                    styles.photoUpload,
+                    {
+                      borderColor: outfitImage ? theme.primary : theme.border,
+                      backgroundColor: outfitImage ? theme.primary + '15' : 'transparent'
+                    }
+                  ]}
+                >
+                  {outfitImage ? (
+                    <Image source={{ uri: outfitImage }} style={styles.compactImage} resizeMode="cover" />
+                  ) : (
+                    <View style={styles.photoPlaceholder}>
+                      <Ionicons name="shirt-outline" size={32} color={theme.primary} />
+                      <Text style={[styles.photoPlaceholderTitle, { color: theme.text }]}>Outfit *</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              </View>
 
-            {/* Venue Photo */}
-            <View style={styles.photoSection}>
-              <Text style={[styles.photoLabel, { color: theme.text }]}>
-                Venue/Location Photo (Optional)
-              </Text>
-              <TouchableOpacity
-                onPress={() => pickImage('venue')}
-                style={[
-                  styles.photoUpload,
-                  {
-                    borderColor: venueImage ? theme.accent : theme.border,
-                    backgroundColor: venueImage ? theme.accent + '10' : theme.card
-                  }
-                ]}
-              >
-                {venueImage ? (
-                  <View style={styles.photoPreview}>
-                    <Image
-                      source={{ uri: venueImage }}
-                      style={styles.venueImage}
-                      resizeMode="cover"
-                    />
-                    <Text style={[styles.photoStatus, { color: theme.accent }]}>
-                      ✓ Venue Photo Added
-                    </Text>
-                    <Text style={[styles.photoHint, { color: theme.textSecondary }]}>
-                      Tap to change
-                    </Text>
-                  </View>
-                ) : (
-                  <View style={styles.photoPlaceholder}>
-                    <Ionicons name="location" size={48} color={theme.textTertiary} />
-                    <Text style={[styles.photoPlaceholderTitle, { color: theme.text }]}>
-                      Add Venue Photo
-                    </Text>
-                    <Text style={[styles.photoPlaceholderDesc, { color: theme.textSecondary }]}>
-                      Help us match your outfit to the occasion
-                    </Text>
-                  </View>
-                )}
-              </TouchableOpacity>
+              {/* Venue Photo */}
+              <View style={styles.photoSection}>
+                <TouchableOpacity
+                  onPress={() => pickImage('venue')}
+                  style={[
+                    styles.photoUpload,
+                    {
+                      borderColor: venueImage ? theme.accent : theme.border,
+                      backgroundColor: venueImage ? theme.accent + '15' : 'transparent'
+                    }
+                  ]}
+                >
+                  {venueImage ? (
+                    <Image source={{ uri: venueImage }} style={styles.compactImage} resizeMode="cover" />
+                  ) : (
+                    <View style={styles.photoPlaceholder}>
+                      <Ionicons name="location-outline" size={32} color={theme.accent} />
+                      <Text style={[styles.photoPlaceholderTitle, { color: theme.text }]}>Venue</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
-          </LinearGradient>
+          </BlurView>
         </Animated.View>
 
         {/* Analyze Button */}
@@ -332,7 +320,7 @@ export default function StyleCheck() {
           style={[
             styles.analyzeButtonContainer,
             {
-              opacity: fadeAnim,
+              opacity: isAnalyzing ? pulseAnim : fadeAnim,
               transform: [{ scale: scaleAnim }]
             }
           ]}
@@ -343,22 +331,20 @@ export default function StyleCheck() {
             style={styles.analyzeButton}
           >
             <LinearGradient
-              colors={outfitImage ? [theme.primary, theme.secondary] : [theme.border, theme.border]}
+              colors={outfitImage ? [theme.primary, theme.accent] : [theme.border, theme.border]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
               style={styles.analyzeButtonGradient}
             >
               {isAnalyzing ? (
                 <View style={styles.analyzeButtonContent}>
-                  <ActivityIndicator color="#fff" size="small" style={styles.analyzeButtonIcon} />
-                  <Text style={styles.analyzeButtonText}>
-                    Analyzing Your Style...
-                  </Text>
+                  <Ionicons name="scan-circle" size={24} color="#fff" style={styles.analyzeButtonIcon} />
+                  <Text style={styles.analyzeButtonText}>Scanning Style...</Text>
                 </View>
               ) : (
                 <View style={styles.analyzeButtonContent}>
                   <Ionicons name="sparkles" size={24} color="#fff" style={styles.analyzeButtonIcon} />
-                  <Text style={styles.analyzeButtonText}>
-                    Analyze My Style
-                  </Text>
+                  <Text style={styles.analyzeButtonText}>Analyze My Style</Text>
                 </View>
               )}
             </LinearGradient>
@@ -494,68 +480,50 @@ const styles = StyleSheet.create({
   },
   uploadContainer: {
     borderRadius: getResponsiveSize(24),
-    padding: getResponsiveSize(24),
+    padding: getResponsiveSize(20),
     marginBottom: getResponsiveSize(24),
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
   sectionTitle: {
     fontSize: getResponsiveSize(20),
     fontWeight: 'bold',
-    marginBottom: getResponsiveSize(8),
+    marginBottom: getResponsiveSize(4),
   },
   sectionDescription: {
-    fontSize: getResponsiveSize(16),
-    marginBottom: getResponsiveSize(24),
+    fontSize: getResponsiveSize(14),
+    marginBottom: getResponsiveSize(20),
+  },
+  photoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: getResponsiveSize(12),
   },
   photoSection: {
-    marginBottom: getResponsiveSize(24),
-  },
-  photoLabel: {
-    fontSize: getResponsiveSize(18),
-    fontWeight: '600',
-    marginBottom: getResponsiveSize(12),
+    flex: 1,
   },
   photoUpload: {
-    borderWidth: 2,
+    borderWidth: 1.5,
     borderStyle: 'dashed',
     borderRadius: getResponsiveSize(16),
-    padding: getResponsiveSize(24),
+    height: getResponsiveSize(140),
     alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
   },
-  photoPreview: {
-    alignItems: 'center',
-  },
-  outfitImage: {
-    width: getResponsiveSize(128),
-    height: getResponsiveSize(160),
-    borderRadius: getResponsiveSize(12),
-    marginBottom: getResponsiveSize(12),
-  },
-  venueImage: {
-    width: getResponsiveSize(160),
-    height: getResponsiveSize(128),
-    borderRadius: getResponsiveSize(12),
-    marginBottom: getResponsiveSize(12),
-  },
-  photoStatus: {
-    fontWeight: '600',
-    fontSize: getResponsiveSize(16),
-  },
-  photoHint: {
-    fontSize: getResponsiveSize(14),
-    marginTop: getResponsiveSize(4),
+  compactImage: {
+    width: '100%',
+    height: '100%',
   },
   photoPlaceholder: {
     alignItems: 'center',
+    justifyContent: 'center',
   },
   photoPlaceholderTitle: {
-    fontSize: getResponsiveSize(18),
-    fontWeight: '600',
-    marginTop: getResponsiveSize(12),
-  },
-  photoPlaceholderDesc: {
     fontSize: getResponsiveSize(14),
-    marginTop: getResponsiveSize(4),
-    textAlign: 'center',
+    fontWeight: '600',
+    marginTop: getResponsiveSize(8),
   },
   analyzeButtonContainer: {
     marginBottom: getResponsiveSize(32),

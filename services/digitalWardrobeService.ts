@@ -1025,7 +1025,7 @@ RULES:
 // ─── Stylist Chat Service ────────────────────────────────────────────────────
 
 export interface PackingData {
-  selectedClosetItemIds: string[];
+  selectedClosetItemNames: string[];
   outfitCombinations: string[];
   missingItems: { name: string; reason: string }[];
 }
@@ -1096,22 +1096,41 @@ export const sendMessageToStylist = async (
     }
 
     // ── STEP 1: Detect if message is a travel/packing intent ──────────────────
-    const intentDetectPrompt = `You are a fashion assistant intent classifier.
+    // Broad pre-filter list including common travel questions, weather actions, and destinations
+    const travelKeywords = [
+      'trip', 'pack', 'travel', 'vacation', 'holiday', 'tour', 'visit', 'going to', 'go to', 
+      'journey', 'destination', 'flight', 'weather in', 'wear in', 'suit for', 'pack for', 
+      'banaras', 'shimla', 'delhi', 'mumbai', 'kolkata', 'paris', 'london', 'tokyo', 'milan', 'new york',
+      'rome', 'switzerland', 'goa', 'manali', 'kashmir', 'beach', 'mountain', 'hill station'
+    ];
+    const messageLower = message.toLowerCase();
+    const hasTravelKeywords = travelKeywords.some(keyword => messageLower.includes(keyword));
+
+    let intentData = { isTravelRequest: false, destinationCity: null as string | null };
+
+    if (hasTravelKeywords) {
+      try {
+        const intentDetectPrompt = `You are a fashion assistant intent classifier.
 Given this user message: "${message}"
 Determine:
 1. Is this a travel, trip, packing list, or vacation request? Reply with YES or NO.
 2. If YES, extract the destination city name. Reply with just the city name.
 
 Reply in this exact JSON format, nothing else:
-{"isTravelRequest": true/false, "destinationCity": "city name or null"}`;
+{"isTravelRequest": true, "destinationCity": "city name or null"}`;
 
-    const intentResult = await model.generateContent(intentDetectPrompt);
-    let intentData = { isTravelRequest: false, destinationCity: null as string | null };
-    try {
-      const rawIntent = intentResult.response.text().trim().replace(/```json|```/g, '').trim();
-      intentData = JSON.parse(rawIntent);
-    } catch {
-      // If parsing fails, treat as normal chat
+        const intentResult = await model.generateContent(intentDetectPrompt);
+        const rawIntent = intentResult.response.text().trim().replace(/```json|```/g, '').trim();
+        const parsed = JSON.parse(rawIntent);
+        if (parsed && typeof parsed.isTravelRequest === 'boolean') {
+          intentData = {
+            isTravelRequest: parsed.isTravelRequest,
+            destinationCity: parsed.destinationCity || null
+          };
+        }
+      } catch (err) {
+        console.warn('⚠️ Intent detection failed, falling back to regular chat:', err);
+      }
     }
 
     // ── STEP 2: If travel intent, fetch weather & build packing prompt ─────────
@@ -1147,8 +1166,9 @@ Reply in this exact JSON format, nothing else:
       }
 
       // Build wardrobe snapshot for AI (limit to 30 items to stay within context)
+      // NOTE: Deliberately exclude id/imageUri/imageBase64 — AI doesn't need internal DB IDs
+      //       and was accidentally echoing them back in chat responses.
       const wardrobeSnapshot = wardrobeItems.slice(0, 30).map(item => ({
-        id: item.id,
         name: item.name,
         type: item.type,
         subType: item.subType,
@@ -1182,7 +1202,7 @@ INSTRUCTIONS:
 Return your response as valid JSON ONLY in this exact format:
 {
   "ariaText": "Your warm, conversational intro message here as Aria. Mention the weather and the destination. Do not repeat outfit details here, just a friendly overview.",
-  "selectedClosetItemIds": ["id1", "id2"],
+  "selectedClosetItemNames": ["Name 1", "Name 2"],
   "outfitCombinations": [
     "Day 1 - Sightseeing: [Item Name] + [Item Name] — Light and comfortable for the heat.",
     "Day 2 - Evening Dinner: [Item Name] + [Item Name] — Polished yet breathable."
@@ -1199,7 +1219,7 @@ Return your response as valid JSON ONLY in this exact format:
       try {
         const parsed = JSON.parse(packingRaw);
         const packingData: PackingData = {
-          selectedClosetItemIds: parsed.selectedClosetItemIds || [],
+          selectedClosetItemNames: parsed.selectedClosetItemNames || parsed.selectedClosetItemIds || [],
           outfitCombinations: parsed.outfitCombinations || [],
           missingItems: parsed.missingItems || [],
         };

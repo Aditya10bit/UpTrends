@@ -310,7 +310,7 @@ const generateShoppingUrl = (itemName: string, platform: string): string => {
 
   const platformUrls: { [key: string]: string } = {
     'Amazon': `https://www.amazon.com/s?k=${encodedItem}`,
-    'Myntra': `https://www.myntra.com/search/${encodedItem}`,
+    'Myntra': `https://www.myntra.com/${encodedItem}?rawQuery=${encodedItem}`,
     'Zara': `https://www.zara.com/search?searchTerm=${encodedItem}`,
     'H&M': `https://www2.hm.com/en_us/search-results.html?q=${encodedItem}`,
     'ASOS': `https://www.asos.com/search/?q=${encodedItem}`,

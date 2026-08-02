@@ -1,12 +1,17 @@
 import { Stack } from "expo-router";
 import { StatusBar } from 'expo-status-bar';
+import * as SplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from '../contexts/AuthContext';
-import { ThemeProvider } from '../contexts/ThemeContext';
+import { ThemeProvider, useTheme } from '../contexts/ThemeContext';
+import AnimatedSplash from '../components/AnimatedSplash';
 
 // Minimal error boundary for startup crashes
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import { Text, View } from 'react-native';
+
+// Keep the native splash visible until our custom splash is ready
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 interface ErrorBoundaryState {
   hasError: boolean;
@@ -47,134 +52,156 @@ try {
   console.warn('Polyfills not loaded:', error);
 }
 
+// Inner layout that has access to useTheme (must be inside ThemeProvider).
+function RootLayoutContent() {
+  const { theme } = useTheme();
+  const isDark = theme.background === '#0f172a';
+  const [showSplash, setShowSplash] = useState(true);
+
+  const handleSplashFinish = useCallback(async () => {
+    setShowSplash(false);
+    await SplashScreen.hideAsync();
+  }, []);
+
+  return (
+    <AuthProvider>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
+
+      {/* Animated splash overlay — renders on top of everything until animation completes */}
+      {showSplash && (
+        <AnimatedSplash isDark={isDark} onFinish={handleSplashFinish} />
+      )}
+
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          animation: 'slide_from_right',
+          gestureEnabled: true,
+        }}
+      >
+        <Stack.Screen
+          name="index"
+          options={{
+            title: 'UpTrends',
+          }}
+        />
+        <Stack.Screen
+          name="auth"
+          options={{
+            title: 'Authentication',
+            gestureEnabled: false,
+          }}
+        />
+        <Stack.Screen
+          name="fashion"
+          options={{
+            title: 'Fashion Categories',
+            presentation: 'card',
+          }}
+        />
+        <Stack.Screen
+          name="profile"
+          options={{
+            title: 'Profile',
+            presentation: 'card',
+          }}
+        />
+        <Stack.Screen
+          name="category/[slug]"
+          options={{
+            title: 'Category',
+            presentation: 'card',
+          }}
+        />
+        <Stack.Screen
+          name="profile-edit/[uid]"
+          options={{
+            title: 'Edit Profile',
+            presentation: 'modal'
+          }}
+        />
+        <Stack.Screen
+          name="upload-aesthetic"
+          options={{
+            title: 'Upload Aesthetic',
+            presentation: 'card'
+          }}
+        />
+        <Stack.Screen
+          name="make-outfit"
+          options={{
+            title: 'Make Outfit',
+            presentation: 'card'
+          }}
+        />
+        <Stack.Screen
+          name="twinning/friends"
+          options={{
+            title: 'Twin with Friends',
+            presentation: 'card'
+          }}
+        />
+        <Stack.Screen
+          name="twinning/date"
+          options={{
+            title: 'Twin for Date',
+            presentation: 'card'
+          }}
+        />
+        <Stack.Screen
+          name="style-check"
+          options={{
+            title: 'Style Check',
+            presentation: 'card'
+          }}
+        />
+        <Stack.Screen
+          name="body-analysis"
+          options={{
+            title: 'Body Analysis',
+            presentation: 'card'
+          }}
+        />
+        <Stack.Screen
+          name="todays-outfit"
+          options={{
+            title: 'Today\'s Outfit',
+            presentation: 'card'
+          }}
+        />
+        <Stack.Screen
+          name="outfit-detail"
+          options={{
+            title: 'Outfit Details',
+            presentation: 'card'
+          }}
+        />
+        <Stack.Screen
+          name="outfit-links"
+          options={{
+            title: 'Outfit Links',
+            presentation: 'card'
+          }}
+        />
+        <Stack.Screen
+          name="wardrobe"
+          options={{
+            title: 'My Closet',
+            presentation: 'card'
+          }}
+        />
+
+      </Stack>
+    </AuthProvider>
+  );
+}
+
 export default function RootLayout() {
   return (
     <StartupErrorBoundary>
       <SafeAreaProvider>
         <ThemeProvider>
-          <AuthProvider>
-            <StatusBar style="auto" />
-            <Stack
-              screenOptions={{
-                headerShown: false,
-                animation: 'slide_from_right',
-                gestureEnabled: true,
-              }}
-            >
-              <Stack.Screen
-                name="index"
-                options={{
-                  title: 'UpTrends',
-                }}
-              />
-              <Stack.Screen
-                name="auth"
-                options={{
-                  title: 'Authentication',
-                  gestureEnabled: false,
-                }}
-              />
-              <Stack.Screen
-                name="fashion"
-                options={{
-                  title: 'Fashion Categories',
-                  presentation: 'card',
-                }}
-              />
-              <Stack.Screen
-                name="profile"
-                options={{
-                  title: 'Profile',
-                  presentation: 'card',
-                }}
-              />
-              <Stack.Screen
-                name="category/[slug]"
-                options={{
-                  title: 'Category',
-                  presentation: 'card',
-                }}
-              />
-              <Stack.Screen
-                name="profile-edit/[uid]"
-                options={{
-                  title: 'Edit Profile',
-                  presentation: 'modal'
-                }}
-              />
-              <Stack.Screen
-                name="upload-aesthetic"
-                options={{
-                  title: 'Upload Aesthetic',
-                  presentation: 'card'
-                }}
-              />
-              <Stack.Screen
-                name="make-outfit"
-                options={{
-                  title: 'Make Outfit',
-                  presentation: 'card'
-                }}
-              />
-              <Stack.Screen
-                name="twinning/friends"
-                options={{
-                  title: 'Twin with Friends',
-                  presentation: 'card'
-                }}
-              />
-              <Stack.Screen
-                name="twinning/date"
-                options={{
-                  title: 'Twin for Date',
-                  presentation: 'card'
-                }}
-              />
-              <Stack.Screen
-                name="style-check"
-                options={{
-                  title: 'Style Check',
-                  presentation: 'card'
-                }}
-              />
-              <Stack.Screen
-                name="body-analysis"
-                options={{
-                  title: 'Body Analysis',
-                  presentation: 'card'
-                }}
-              />
-              <Stack.Screen
-                name="todays-outfit"
-                options={{
-                  title: 'Today\'s Outfit',
-                  presentation: 'card'
-                }}
-              />
-              <Stack.Screen
-                name="outfit-detail"
-                options={{
-                  title: 'Outfit Details',
-                  presentation: 'card'
-                }}
-              />
-              <Stack.Screen
-                name="outfit-links"
-                options={{
-                  title: 'Outfit Links',
-                  presentation: 'card'
-                }}
-              />
-              <Stack.Screen
-                name="wardrobe"
-                options={{
-                  title: 'My Closet',
-                  presentation: 'card'
-                }}
-              />
-
-            </Stack>
-          </AuthProvider>
+          <RootLayoutContent />
         </ThemeProvider>
       </SafeAreaProvider>
     </StartupErrorBoundary>

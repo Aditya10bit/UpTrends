@@ -50,8 +50,6 @@ export default function MakeOutfit() {
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [topography, setTopography] = useState<any>(null);
   const [isValidatingImages, setIsValidatingImages] = useState(false);
-  const [validationResults, setValidationResults] = useState<any>(null);
-  const [showValidationAlert, setShowValidationAlert] = useState(false);
   const [locationPermission, setLocationPermission] = useState<'granted' | 'denied' | 'undetermined'>('undetermined');
 
   // Animations
@@ -190,7 +188,9 @@ export default function MakeOutfit() {
 
     if (!result.canceled) {
       const newImages = result.assets.slice(0, 12 - selectedImages.length).map(asset => asset.uri);
-      setSelectedImages(prev => [...prev, ...newImages]);
+      // Temporarily add all images so the user sees them
+      const allImages = [...selectedImages, ...newImages];
+      setSelectedImages(allImages);
 
       // Animate image addition
       Animated.sequence([
@@ -206,6 +206,28 @@ export default function MakeOutfit() {
           useNativeDriver: true,
         }),
       ]).start();
+
+      // Auto-validate the newly added images in background
+      setIsValidatingImages(true);
+      try {
+        const results = await validateMultipleImagesContext(newImages, 'clothing items on a flat surface or hanger');
+        if (results.invalidImages.length > 0) {
+          // Remove invalid images automatically
+          const invalidUris = new Set(results.invalidImages.map(img => img.uri));
+          setSelectedImages(prev => prev.filter(uri => !invalidUris.has(uri)));
+          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+          Alert.alert(
+            '⚠️ Non-Clothing Images Removed',
+            `${results.invalidImages.length} image${results.invalidImages.length > 1 ? 's were' : ' was'} removed because ${results.invalidImages.length > 1 ? 'they don\'t' : 'it doesn\'t'} appear to be clothing items. Please upload clear photos of clothes only.`,
+            [{ text: 'OK' }]
+          );
+        }
+      } catch (error) {
+        console.warn('Auto-validation failed, allowing images:', error);
+        // If validation itself fails (rate limit, etc.), keep the images
+      } finally {
+        setIsValidatingImages(false);
+      }
     }
   };
 
@@ -213,11 +235,6 @@ export default function MakeOutfit() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const newImages = selectedImages.filter((_, i) => i !== index);
     setSelectedImages(newImages);
-
-    // Clear validation results when images change
-    if (validationResults) {
-      setValidationResults(null);
-    }
   };
 
   const showShoppingLinks = (suggestions: any[]) => {
@@ -277,33 +294,6 @@ export default function MakeOutfit() {
     }
   };
 
-  const validateImages = async () => {
-    if (selectedImages.length === 0) {
-      Alert.alert('No Images', 'Please upload at least one image to validate');
-      return;
-    }
-
-    setIsValidatingImages(true);
-    try {
-      const results = await validateMultipleImagesContext(selectedImages, 'clothing items on a flat surface or hanger');
-      setValidationResults(results);
-
-      if (results.invalidImages.length > 0) {
-        setShowValidationAlert(true);
-      }
-    } catch (error) {
-      console.error('Error validating images:', error);
-      let errorMessage = 'Unable to validate images. Please try again.';
-      if (error instanceof Error && error.message.includes('Rate limit')) {
-        errorMessage = 'Too many requests. Please wait a moment and try again.';
-      } else if (error instanceof Error && error.message.includes('Invalid Image')) {
-        errorMessage = error.message.replace('Error: ', '');
-      }
-      Alert.alert('Validation Error', errorMessage);
-    } finally {
-      setIsValidatingImages(false);
-    }
-  };
 
   const generateOutfit = async () => {
     if (isGenerating) return;
@@ -678,47 +668,8 @@ export default function MakeOutfit() {
 
             <Text style={[styles.imageCounter, { color: theme.textSecondary }]}>
               {selectedImages.length}/12 images uploaded
+              {isValidatingImages ? '  •  Verifying...' : ''}
             </Text>
-
-            {/* Validation Button */}
-            {selectedImages.length > 0 && (
-              <TouchableOpacity
-                style={[styles.validateButton, { backgroundColor: theme.primary }]}
-                onPress={validateImages}
-                disabled={isValidatingImages}
-              >
-                <Ionicons
-                  name={isValidatingImages ? "sync" : "checkmark-circle"}
-                  size={getResponsiveSize(16)}
-                  color="#fff"
-                />
-                <Text style={styles.validateButtonText}>
-                  {isValidatingImages ? 'Validating...' : 'Validate Images'}
-                </Text>
-              </TouchableOpacity>
-            )}
-
-            {/* Validation Results */}
-            {validationResults && (
-              <View style={[styles.validationResults, { backgroundColor: theme.card, borderColor: theme.borderLight }]}>
-                <Text style={[styles.validationTitle, { color: theme.text }]}>
-                  📸 Image Validation Results
-                </Text>
-                <View style={styles.validationStats}>
-                  <Text style={[styles.validationStat, { color: theme.primary }]}>
-                    ✅ {validationResults.validImages.length} Valid
-                  </Text>
-                  <Text style={[styles.validationStat, { color: theme.accent }]}>
-                    ❌ {validationResults.invalidImages.length} Invalid
-                  </Text>
-                </View>
-                {validationResults.invalidImages.length > 0 && (
-                  <Text style={[styles.validationNote, { color: theme.textSecondary }]}>
-                    Some images don't appear to be clothing items. Please upload clear photos of clothes only.
-                  </Text>
-                )}
-              </View>
-            )}
           </View>
 
           {/* Generate Button */}
@@ -1124,36 +1075,6 @@ export default function MakeOutfit() {
       </ScrollView>
 
       {/* Validation Alert */}
-      {showValidationAlert && validationResults && (
-        <View style={[styles.validationAlert, { backgroundColor: theme.card, borderColor: theme.borderLight }]}>
-          <Text style={[styles.validationAlertTitle, { color: theme.text }]}>
-            ⚠️ Some Images Need Attention
-          </Text>
-          <Text style={[styles.validationAlertText, { color: theme.textSecondary }]}>
-            {validationResults.invalidImages.length} of your uploaded images don't appear to be clothing items.
-          </Text>
-          <View style={styles.validationAlertActions}>
-            <TouchableOpacity
-              style={[styles.validationAlertButton, { backgroundColor: theme.background }]}
-              onPress={() => setShowValidationAlert(false)}
-            >
-              <Text style={[styles.validationAlertButtonText, { color: theme.text }]}>Continue Anyway</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.validationAlertButton, { backgroundColor: theme.primary }]}
-              onPress={() => {
-                setShowValidationAlert(false);
-                // Remove invalid images
-                const validUris = validationResults.validImages;
-                setSelectedImages(validUris);
-                setValidationResults(null);
-              }}
-            >
-                            <Text style={[styles.validationAlertButtonText, { color: '#fff' }]}>Remove Invalid</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
     </View>
     </PremiumBackground>
   );

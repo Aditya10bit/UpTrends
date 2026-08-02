@@ -14,104 +14,7 @@ interface StyleRecommendationsProps {
   theme: any;
 }
 
-const RecommendationCard: React.FC<{
-  title: string;
-  description: string;
-  icon: string;
-  color: string;
-  theme: any;
-  onPress?: () => void;
-  delay?: number;
-}> = ({ title, description, icon, color, theme, onPress, delay = 0 }) => {
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const scaleAnim = useRef(new Animated.Value(0.9)).current;
 
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 600,
-        delay,
-        useNativeDriver: true,
-      }),
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        tension: 100,
-        friction: 8,
-        delay,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [delay]);
-
-  const handlePress = async () => {
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (onPress) onPress();
-  };
-
-  return (
-    <Animated.View
-      style={{
-        opacity: fadeAnim,
-        transform: [{ scale: scaleAnim }],
-      }}
-    >
-      <TouchableOpacity
-        onPress={handlePress}
-        activeOpacity={0.8}
-        style={{ marginBottom: 16 }}
-      >
-        <LinearGradient
-          colors={[color + '10', color + '05']}
-          style={{ 
-            borderRadius: 16, 
-            padding: 16, 
-            borderWidth: 1,
-            borderColor: color + '30' 
-          }}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
-            <View 
-              style={{ 
-                width: 48, 
-                height: 48, 
-                borderRadius: 12, 
-                alignItems: 'center', 
-                justifyContent: 'center', 
-                marginRight: 16,
-                backgroundColor: color + '20' 
-              }}
-            >
-              <Ionicons name={icon as any} size={24} color={color} />
-            </View>
-            
-            <View style={{ flex: 1 }}>
-              <Text style={{ 
-                fontSize: 18, 
-                fontWeight: 'bold', 
-                marginBottom: 8, 
-                color: theme.text 
-              }}>
-                {title}
-              </Text>
-              <Text 
-                style={{ 
-                  fontSize: 16, 
-                  lineHeight: 24, 
-                  color: theme.textSecondary 
-                }}
-              >
-                {description}
-              </Text>
-            </View>
-            
-            <Ionicons name="chevron-forward" size={20} color={theme.textTertiary} />
-          </View>
-        </LinearGradient>
-      </TouchableOpacity>
-    </Animated.View>
-  );
-};
 
 const QuickTipCard: React.FC<{
   tip: string;
@@ -154,32 +57,39 @@ const QuickTipCard: React.FC<{
           backgroundColor: theme.card 
         }}
       >
-        <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
-          <View 
-            style={{ 
-              width: 32, 
-              height: 32, 
-              borderRadius: 16, 
-              alignItems: 'center', 
-              justifyContent: 'center', 
-              marginRight: 12, 
-              marginTop: 4,
-              backgroundColor: theme.primary + '20' 
-            }}
+          <LinearGradient
+            colors={[theme.primary + '10', theme.primary + '00']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={{ flex: 1, borderRadius: 16 }}
           >
-            <Ionicons name="bulb" size={16} color={theme.primary} />
-          </View>
-          <Text 
-            style={{ 
-              flex: 1, 
-              fontSize: 16, 
-              lineHeight: 24, 
-              color: theme.text 
-            }}
-          >
-            {tip}
-          </Text>
-        </View>
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', padding: 16 }}>
+              <View 
+                style={{ 
+                  width: 32, 
+                  height: 32, 
+                  borderRadius: 16, 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  marginRight: 12, 
+                  marginTop: 4,
+                  backgroundColor: theme.primary + '20' 
+                }}
+              >
+                <Ionicons name="bulb" size={16} color={theme.primary} />
+              </View>
+              <Text 
+                style={{ 
+                  flex: 1, 
+                  fontSize: 14, 
+                  lineHeight: 20, 
+                  color: theme.text 
+                }}
+              >
+                {tip}
+              </Text>
+            </View>
+          </LinearGradient>
       </View>
     </Animated.View>
   );
@@ -281,11 +191,17 @@ const MissingItemsGrid: React.FC<{
 
 const StyleRecommendations: React.FC<StyleRecommendationsProps> = ({ result, theme }) => {
   const headerFadeAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.timing(headerFadeAnim, {
       toValue: 1,
       duration: 600,
+      useNativeDriver: true,
+    }).start();
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 800,
       useNativeDriver: true,
     }).start();
   }, []);
@@ -304,19 +220,33 @@ const StyleRecommendations: React.FC<StyleRecommendationsProps> = ({ result, the
       </Animated.View>
       
       {/* Main Recommendations */}
-      <View style={{ marginBottom: 32 }}>
-        {result.analysis.recommendations.map((recommendation, index) => (
-          <RecommendationCard
-            key={index}
-            title={`Tip ${index + 1}`}
-            description={recommendation}
-            icon="checkmark-circle"
-            color={theme.primary}
-            theme={theme}
-            delay={index * 100}
-          />
-        ))}
-      </View>
+      {result.analysis.recommendations && result.analysis.recommendations.length > 0 && (
+        <Animated.View style={{ marginBottom: 32, opacity: fadeAnim }}>
+          <Text style={{ 
+            fontSize: 20, 
+            fontWeight: 'bold', 
+            marginHorizontal: 0, 
+            marginBottom: 16, 
+            color: theme.text 
+          }}>
+            Style Upgrades
+          </Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 16 }}
+          >
+            {result.analysis.recommendations.map((tip, index) => (
+              <QuickTipCard
+                key={index}
+                tip={tip}
+                theme={theme}
+                delay={index * 150}
+              />
+            ))}
+          </ScrollView>
+        </Animated.View>
+      )}
 
       {/* Missing Items */}
       {result.analysis.missingItems.length > 0 && (

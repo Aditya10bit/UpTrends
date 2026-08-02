@@ -150,7 +150,7 @@ export default function StylistChatScreen() {
   };
 
   const renderPackingCard = (packingData: PackingData) => {
-    const selectedItems = wardrobeItems.filter(w => packingData.selectedClosetItemIds.includes(w.id));
+    const selectedItems = wardrobeItems.filter(w => packingData.selectedClosetItemNames.includes(w.name));
     return (
       <View style={[styles.packingCard, { backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.04)', borderColor: theme.primary + '40' }]}>
         <View style={styles.packingCardHeader}>
