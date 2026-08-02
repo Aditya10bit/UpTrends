@@ -2,10 +2,9 @@
 // Custom animated splash screen with light/dark mode support.
 // All animations run on the UI thread via reanimated (zero JS-thread jank).
 // Shows brand logo badge, app name, tagline, floating particles, and loading dots.
-import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useMemo, useState } from 'react';
-import { Dimensions, Text, View } from 'react-native';
+import { Dimensions, Image, Text, View } from 'react-native';
 import Animated, {
   Easing,
   runOnJS,
@@ -339,18 +338,16 @@ const AnimatedSplashInner: React.FC<AnimatedSplashProps> = ({ isDark, onFinish }
         ]}
       />
 
-      {/* Brand badge */}
+      {/* Brand badge — actual app logo */}
       <Animated.View
         style={[
           {
             width: 120,
             height: 120,
             borderRadius: 36,
-            alignItems: 'center',
-            justifyContent: 'center',
+            overflow: 'hidden',
             borderWidth: 1.5,
             borderColor: isDark ? 'rgba(165,180,252,0.2)' : 'rgba(102,126,234,0.18)',
-            backgroundColor: isDark ? 'rgba(99,102,241,0.12)' : 'rgba(255,255,255,0.7)',
             shadowColor: '#667eea',
             shadowOpacity: isDark ? 0.5 : 0.35,
             shadowRadius: 28,
@@ -359,7 +356,11 @@ const AnimatedSplashInner: React.FC<AnimatedSplashProps> = ({ isDark, onFinish }
           badgeStyle,
         ]}
       >
-        <Ionicons name="flame" size={56} color={isDark ? '#a5b4fc' : '#667eea'} />
+        <Image
+          source={require('../assets/images/icon.png')}
+          style={{ width: 120, height: 120, borderRadius: 36 }}
+          resizeMode="cover"
+        />
       </Animated.View>
 
       {/* App name */}

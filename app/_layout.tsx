@@ -7,7 +7,7 @@ import { ThemeProvider, useTheme } from '../contexts/ThemeContext';
 import AnimatedSplash from '../components/AnimatedSplash';
 
 // Minimal error boundary for startup crashes
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
 
 // Keep the native splash visible until our custom splash is ready
@@ -58,9 +58,15 @@ function RootLayoutContent() {
   const isDark = theme.background === '#0f172a';
   const [showSplash, setShowSplash] = useState(true);
 
-  const handleSplashFinish = useCallback(async () => {
+  // Hide the native splash as soon as the custom splash has mounted & painted.
+  // If hideAsync() is deferred until the animation ends, the native splash
+  // (plain logo) stays on top and covers the custom animation entirely.
+  useEffect(() => {
+    SplashScreen.hideAsync();
+  }, []);
+
+  const handleSplashFinish = useCallback(() => {
     setShowSplash(false);
-    await SplashScreen.hideAsync();
   }, []);
 
   return (
