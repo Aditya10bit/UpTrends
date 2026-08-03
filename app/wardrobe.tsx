@@ -1105,7 +1105,7 @@ const styles = StyleSheet.create({
   viewTabText: { color: 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: '600' },
   viewTabTextActive: { color: '#fff' },
 
-  filterScroll: { maxHeight: 52 },
+  filterScroll: { flexGrow: 0, minHeight: 55, marginBottom: 4 },
   filterContainer: { paddingHorizontal: 12, paddingVertical: 10, gap: 8, alignItems: 'center' },
   filterChip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, gap: 5, borderWidth: 1 },
   filterLabel: { fontSize: 12, fontWeight: '600' },

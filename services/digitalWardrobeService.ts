@@ -342,6 +342,7 @@ export const addWardrobeItem = async (
           dateAdded: new Date(),
         });
         await setDoc(doc(db, WARDROBE_COLLECTION, itemId), firestoreData);
+        console.log(`✅ Successfully uploaded item ${itemId} to Firestore!`);
       } catch (innerError: any) {
         console.warn('Firestore setDoc failed, storing locally:', innerError.message || innerError);
       }
@@ -353,6 +354,7 @@ export const addWardrobeItem = async (
   // Step 6: Also save to local storage as backup (without base64 since it points to local uri file)
   await saveToLocalStorage(savedItem);
 
+  console.log(`🎉 Wardrobe item ${itemId} successfully added to your closet!`);
   return savedItem;
 };
 
