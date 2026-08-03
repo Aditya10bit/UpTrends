@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useRef } from 'react';
-import { Alert, Animated, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Animated, Linking, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 
 interface ShoppingLinksProps {
@@ -134,7 +134,15 @@ const ShoppingItemCard: React.FC<{
       });
     } catch (error) {
       console.error('Error opening link:', error);
-      Alert.alert('Error', 'Unable to open this link');
+      // Fallback to standard Linking if WebBrowser fails — same pattern as
+      // outfit-detail.tsx. Some URL formats are rejected by openBrowserAsync
+      // on Android release builds; Linking.openURL still opens them.
+      try {
+        await Linking.openURL(item.url);
+      } catch (linkError) {
+        console.error('Linking error:', linkError);
+        Alert.alert('Error', 'Unable to open this link');
+      }
     }
   };
 

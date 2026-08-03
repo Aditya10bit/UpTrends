@@ -404,14 +404,31 @@ const generateOutfitLinks = async (
       inspirationQuery,
     });
 
-    // Add per-item Google Shopping links
+    const shopping: ShoppingLink[] = [];
+
+    // Add per-item Google Shopping, Amazon, and Myntra links
     topItems.forEach((item, idx) => {
       const itemQuery = `${genderTerm} ${item}`.trim();
+      
       shopping.push({
         platform: 'Google Shopping',
         url: `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(itemQuery)}`,
         description: `Shop ${item}`,
         icon: 'pricetag',
+      });
+      
+      shopping.push({
+        platform: 'Amazon',
+        url: `https://www.amazon.com/s?k=${encodeURIComponent(itemQuery)}`,
+        description: `Shop on Amazon`,
+        icon: 'logo-amazon',
+      });
+      
+      shopping.push({
+        platform: 'Myntra',
+        url: `https://www.myntra.com/${encodeURIComponent(itemQuery)}`,
+        description: `Shop on Myntra`,
+        icon: 'bag',
       });
     });
 
@@ -420,15 +437,7 @@ const generateOutfitLinks = async (
       platform: 'Pinterest',
       url: `https://www.pinterest.com/search/pins/?q=${encodeURIComponent(inspirationQuery)}`,
       description: `${colorPalette} outfit inspiration`,
-      icon: 'camera',
-    });
-
-    // Amazon fallback
-    shopping.push({
-      platform: 'Amazon',
-      url: `https://www.amazon.com/s?k=${encodeURIComponent(googleShoppingQuery)}`,
-      description: `Shop on Amazon`,
-      icon: 'bag',
+      icon: 'logo-pinterest',
     });
     // --- Reference links: color-specific ---
     const colorComboQuery = `${genderTerm} ${colorPalette} color combination fashion`;

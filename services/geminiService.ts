@@ -1330,7 +1330,7 @@ const generateFallbackShoppingLinks = (outfit: string): OutfitLink[] => {
     {
       platform: "Myntra",
       searchQuery: searchQuery,
-      url: `https://www.myntra.com/${encodeURIComponent(searchQuery)}?rawQuery=${encodeURIComponent(searchQuery)}`,
+      url: `https://www.myntra.com/${encodeURIComponent(searchQuery)}`,
       description: "Shop similar items on Myntra"
     }
   ];
@@ -2693,7 +2693,7 @@ const generateFallbackWardrobeAnalysis = (clothingImages: string[], userProfile:
               {
                 platform: "Myntra",
                 searchQuery: isMale ? "casual blazer men" : "accessories women",
-                url: `https://www.myntra.com/${encodeURIComponent(isMale ? 'casual blazer men' : 'accessories women')}?rawQuery=${encodeURIComponent(isMale ? 'casual blazer men' : 'accessories women')}`,
+                url: `https://www.myntra.com/${encodeURIComponent(isMale ? 'casual blazer men' : 'accessories women')}`,
                 description: "Find similar items on Myntra"
               }
             ]

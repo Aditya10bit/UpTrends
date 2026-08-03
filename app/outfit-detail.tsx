@@ -493,11 +493,22 @@ export default function OutfitDetailScreen() {
                       <TouchableOpacity
                         key={index}
                         style={[styles.linkCard, { backgroundColor: theme.background, borderColor: theme.borderLight }]}
-                        onPress={() => WebBrowser.openBrowserAsync(link.url, {
-                          readerMode: false,
-                          enableBarCollapsing: true,
-                          dismissButtonStyle: 'close',
-                        })}
+                        onPress={async () => {
+                          try {
+                            await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                            await WebBrowser.openBrowserAsync(link.url, {
+                              readerMode: false,
+                              enableBarCollapsing: true,
+                              dismissButtonStyle: 'close',
+                            });
+                          } catch (error) {
+                            console.error('Error opening browser:', error);
+                            // Fallback to standard Linking if WebBrowser fails
+                            import('react-native').then(({ Linking }) => {
+                              Linking.openURL(link.url).catch(e => console.error('Linking error:', e));
+                            });
+                          }
+                        }}
                       >
                         <View style={[styles.linkIconContainer, { backgroundColor: theme.primary }]}>
                           <Ionicons name={link.icon as any} size={20} color="#fff" />
@@ -527,11 +538,21 @@ export default function OutfitDetailScreen() {
                       <TouchableOpacity
                         key={index}
                         style={[styles.linkCard, { backgroundColor: theme.background, borderColor: theme.borderLight }]}
-                        onPress={() => WebBrowser.openBrowserAsync(link.url, {
-                          readerMode: false,
-                          enableBarCollapsing: true,
-                          dismissButtonStyle: 'close',
-                        })}
+                        onPress={async () => {
+                          try {
+                            await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                            await WebBrowser.openBrowserAsync(link.url, {
+                              readerMode: false,
+                              enableBarCollapsing: true,
+                              dismissButtonStyle: 'close',
+                            });
+                          } catch (error) {
+                            console.error('Error opening browser:', error);
+                            import('react-native').then(({ Linking }) => {
+                              Linking.openURL(link.url).catch(e => console.error('Linking error:', e));
+                            });
+                          }
+                        }}
                       >
                         <View style={[styles.linkIconContainer, { backgroundColor: theme.primary }]}>
                           <Ionicons name={link.icon as any} size={20} color="#fff" />

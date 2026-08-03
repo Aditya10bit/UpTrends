@@ -1270,7 +1270,7 @@ export const generateShoppingLinks = (searchTerm: string, items?: string[], cate
     {
       platform: "Myntra",
       search_term: categorySpecificTerm,
-      url: `https://www.myntra.com/${encodeURIComponent(categorySpecificTerm)}?rawQuery=${encodeURIComponent(categorySpecificTerm)}`,
+      url: `https://www.myntra.com/${encodeURIComponent(categorySpecificTerm)}`,
       icon: "shirt"
     },
     {
