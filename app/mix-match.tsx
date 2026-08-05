@@ -19,7 +19,7 @@ import { getOutfitSuggestions, OutfitSuggestion } from '../services/outfitServic
 import { getActiveKeySource } from '../services/geminiService';
 import { getUserProfile } from '../services/userService';
 import { getColorCode, hexToHSL, colorMap } from '../utils/colorResolver';
-import * as WebBrowser from 'expo-web-browser';
+import { openExternalUrl } from '../utils/openExternalUrl';
 import * as Haptics from 'expo-haptics';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -252,11 +252,7 @@ export default function MixMatchScreen() {
     const bottomName = bottoms[bottomIdx]?.name || '';
     const query = `men ${topName} ${bottomName} outfit`;
     const searchUrl = `https://www.pinterest.com/search/pins/?q=${encodeURIComponent(query)}`;
-    await WebBrowser.openBrowserAsync(searchUrl, {
-      readerMode: false,
-      enableBarCollapsing: true,
-      dismissButtonStyle: 'close',
-    });
+    await openExternalUrl(searchUrl);
   };
 
   const selectCategory = (catId: string) => {

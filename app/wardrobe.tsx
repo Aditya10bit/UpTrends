@@ -2,8 +2,9 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Location from 'expo-location';
 import { router, Stack } from 'expo-router';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -22,9 +23,9 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import PremiumBackground from '../components/PremiumBackground';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
-import PremiumBackground from '../components/PremiumBackground';
 import {
   addWardrobeItem,
   deleteWardrobeItem,
@@ -38,9 +39,8 @@ import {
   WardrobeStats,
 } from '../services/digitalWardrobeService';
 import { getUserProfile } from '../services/userService';
-import { getColorCode } from '../utils/colorResolver';
 import { getCurrentWeather, WeatherData } from '../services/weatherService';
-import * as Location from 'expo-location';
+import { getColorCode } from '../utils/colorResolver';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const getResponsiveSize = (size: number) => (screenWidth / 375) * size;
@@ -59,6 +59,7 @@ const filterLabels: Record<FilterType, { label: string; icon: string }> = {
   top: { label: 'Tops', icon: '👔' },
   bottom: { label: 'Bottoms', icon: '👖' },
   outerwear: { label: 'Jackets', icon: '🧥' },
+
   footwear: { label: 'Shoes', icon: '👟' },
   accessory: { label: 'Accessories', icon: '⌚' },
   dress: { label: 'Dresses', icon: '👗' },
@@ -799,290 +800,290 @@ export default function WardrobeScreen() {
 
   return (
     <PremiumBackground variant="wardrobe">
-    <View style={[styles.container]}>
-      <Stack.Screen options={{ headerShown: false }} />
-      <StatusBar barStyle="light-content" />
+      <View style={[styles.container]}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <StatusBar barStyle="light-content" />
 
-      {/* Header */}
-      <Animated.View style={{ opacity: headerOpacity }}>
-        <LinearGradient
-          colors={[theme.primary, theme.secondary]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[styles.header, { paddingTop: insets.top + 8 }]}
-        >
-          <View style={styles.headerRow}>
-            <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-              <Ionicons name="chevron-back" size={24} color="#fff" />
-            </TouchableOpacity>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.headerTitle}>My Closet</Text>
-              <Text style={styles.headerSubtitle}>
-                {wardrobeItems.length} item{wardrobeItems.length !== 1 ? 's' : ''} • Score: {stats?.wardrobeScore || 0}/100
-              </Text>
-            </View>
-            {wardrobeItems.length >= 2 && (
-              <TouchableOpacity
-                style={styles.generateBtn}
-                onPress={() => handleGenerateOutfits()}
-                disabled={generatingOutfits}
-              >
-                {generatingOutfits ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Ionicons name="sparkles" size={20} color="#fff" />
-                )}
-                <Text style={styles.generateBtnText}>
-                  {generatingOutfits ? 'Creating...' : 'Make Outfits'}
-                </Text>
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {/* View Mode Tabs */}
-          <View style={styles.viewTabs}>
-            {([
-              { key: 'grid', label: 'Closet', icon: 'grid-outline' },
-              { key: 'outfits', label: 'Outfits', icon: 'shirt-outline' },
-              { key: 'stats', label: 'Analytics', icon: 'analytics-outline' },
-            ] as const).map(tab => (
-              <TouchableOpacity
-                key={tab.key}
-                style={[styles.viewTab, viewMode === tab.key && styles.viewTabActive]}
-                onPress={() => {
-                  setViewMode(tab.key);
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                }}
-              >
-                <Ionicons
-                  name={tab.icon as any}
-                  size={16}
-                  color={viewMode === tab.key ? '#fff' : 'rgba(255,255,255,0.6)'}
-                />
-                <Text style={[styles.viewTabText, viewMode === tab.key && styles.viewTabTextActive]}>
-                  {tab.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </LinearGradient>
-      </Animated.View>
-
-      {/* Loading Overlay */}
-      {(loading || adding) && (
-        <View style={styles.loadingOverlay}>
-          <View style={[styles.loadingCard, { backgroundColor: theme.card }]}>
-            <ActivityIndicator size="large" color={theme.primary} />
-            <Text style={[styles.loadingText, { color: theme.text }]}>
-              {adding ? '🧠 AI is analyzing your clothing...' : 'Loading wardrobe...'}
-            </Text>
-            {adding && (
-              <Text style={[styles.loadingSubtext, { color: theme.textTertiary }]}>
-                Detecting colors, fabric, style, and more
-              </Text>
-            )}
-          </View>
-        </View>
-      )}
-
-      {/* Content */}
-      {!loading && wardrobeItems.length === 0 ? (
-        renderEmptyState()
-      ) : viewMode === 'grid' ? (
-        <>
-          {/* Filter Chips */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.filterScroll}
-            contentContainerStyle={styles.filterContainer}
+        {/* Header */}
+        <Animated.View style={{ opacity: headerOpacity }}>
+          <LinearGradient
+            colors={[theme.primary, theme.secondary]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[styles.header, { paddingTop: insets.top + 8 }]}
           >
-            {(Object.keys(filterLabels) as FilterType[]).map(key => {
-              const info = filterLabels[key];
-              const count = key === 'all'
-                ? wardrobeItems.length
-                : wardrobeItems.filter(i => i.type === key).length;
-              if (key !== 'all' && count === 0) return null;
-
-              return (
+            <View style={styles.headerRow}>
+              <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+                <Ionicons name="chevron-back" size={24} color="#fff" />
+              </TouchableOpacity>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.headerTitle}>My Closet</Text>
+                <Text style={styles.headerSubtitle}>
+                  {wardrobeItems.length} item{wardrobeItems.length !== 1 ? 's' : ''} • Score: {stats?.wardrobeScore || 0}/100
+                </Text>
+              </View>
+              {wardrobeItems.length >= 2 && (
                 <TouchableOpacity
-                  key={key}
-                  style={[
-                    styles.filterChip,
-                    {
-                      backgroundColor: activeFilter === key ? theme.primary : theme.card,
-                      borderColor: activeFilter === key ? theme.primary : theme.borderLight,
-                    },
-                  ]}
+                  style={styles.generateBtn}
+                  onPress={() => handleGenerateOutfits()}
+                  disabled={generatingOutfits}
+                >
+                  {generatingOutfits ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Ionicons name="sparkles" size={20} color="#fff" />
+                  )}
+                  <Text style={styles.generateBtnText}>
+                    {generatingOutfits ? 'Creating...' : 'Make Outfits'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* View Mode Tabs */}
+            <View style={styles.viewTabs}>
+              {([
+                { key: 'grid', label: 'Closet', icon: 'grid-outline' },
+                { key: 'outfits', label: 'Outfits', icon: 'shirt-outline' },
+                { key: 'stats', label: 'Analytics', icon: 'analytics-outline' },
+              ] as const).map(tab => (
+                <TouchableOpacity
+                  key={tab.key}
+                  style={[styles.viewTab, viewMode === tab.key && styles.viewTabActive]}
                   onPress={() => {
-                    setActiveFilter(key);
+                    setViewMode(tab.key);
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   }}
                 >
-                  <Text style={{ fontSize: 14 }}>{info.icon}</Text>
-                  <Text
-                    style={[
-                      styles.filterLabel,
-                      { color: activeFilter === key ? '#fff' : theme.textSecondary },
-                    ]}
-                  >
-                    {info.label}
+                  <Ionicons
+                    name={tab.icon as any}
+                    size={16}
+                    color={viewMode === tab.key ? '#fff' : 'rgba(255,255,255,0.6)'}
+                  />
+                  <Text style={[styles.viewTabText, viewMode === tab.key && styles.viewTabTextActive]}>
+                    {tab.label}
                   </Text>
-                  <View style={[styles.filterCount, { backgroundColor: activeFilter === key ? 'rgba(255,255,255,0.3)' : theme.borderLight }]}>
-                    <Text style={{ color: activeFilter === key ? '#fff' : theme.textTertiary, fontSize: 10, fontWeight: '700' }}>
-                      {count}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-
-          {/* Grid */}
-          <FlatList
-            data={filteredItems}
-            renderItem={renderWardrobeItem}
-            keyExtractor={item => item.id}
-            numColumns={3}
-            contentContainerStyle={styles.gridContainer}
-            showsVerticalScrollIndicator={false}
-            ListFooterComponent={<View style={{ height: 100 }} />}
-          />
-        </>
-      ) : viewMode === 'outfits' ? (
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false}>
-          {weatherData && (
-            <View style={[styles.weatherBanner, { backgroundColor: theme.card }]}>
-              <Text style={styles.weatherIcon}>{weatherData.icon || '🌤️'}</Text>
-              <View style={{ flex: 1, marginLeft: 12 }}>
-                <Text style={[styles.weatherText, { color: theme.text }]}>
-                  Live Weather: {weatherData.location}
-                </Text>
-                <Text style={[styles.weatherDesc, { color: theme.textSecondary }]}>
-                  {weatherData.temperature}°C, {weatherData.description}. AI matches are optimized for today.
-                </Text>
-              </View>
-            </View>
-          )}
-
-          {/* AI Stylist Request Card */}
-          <View style={[styles.aiRequestCard, { backgroundColor: theme.card }]}>
-            <Text style={[styles.aiRequestTitle, { color: theme.text }]}>
-              🪄 Context-Aware AI Stylist
-            </Text>
-            <Text style={[styles.aiRequestSubtitle, { color: theme.textSecondary }]}>
-              What's the occasion, weather, or style vibe today?
-            </Text>
-            
-            <View style={[styles.inputContainer, { borderColor: theme.borderLight }]}>
-              <TextInput
-                style={[styles.contextInput, { color: theme.text }]}
-                placeholder="e.g. coffee date on a chilly day..."
-                placeholderTextColor={theme.textTertiary}
-                value={customContext}
-                onChangeText={setCustomContext}
-                onSubmitEditing={() => handleGenerateOutfits()}
-              />
-              {customContext ? (
-                <TouchableOpacity onPress={() => setCustomContext('')} style={styles.clearInputBtn}>
-                  <Ionicons name="close-circle" size={18} color={theme.textTertiary} />
-                </TouchableOpacity>
-              ) : null}
-            </View>
-
-            {/* Quick Chips */}
-            <ScrollView 
-              horizontal 
-              showsHorizontalScrollIndicator={false} 
-              style={styles.suggestionChipsScroll}
-              contentContainerStyle={styles.suggestionChipsContainer}
-            >
-              {suggestionChips.map((chip, idx) => (
-                <TouchableOpacity
-                  key={idx}
-                  style={[styles.suggestionChip, { backgroundColor: theme.primary + '15' }]}
-                  onPress={() => {
-                    setCustomContext(chip.value);
-                    handleGenerateOutfits(chip.value);
-                  }}
-                >
-                  <Text style={[styles.suggestionChipText, { color: theme.primary }]}>{chip.label}</Text>
                 </TouchableOpacity>
               ))}
+            </View>
+          </LinearGradient>
+        </Animated.View>
+
+        {/* Loading Overlay */}
+        {(loading || adding) && (
+          <View style={styles.loadingOverlay}>
+            <View style={[styles.loadingCard, { backgroundColor: theme.card }]}>
+              <ActivityIndicator size="large" color={theme.primary} />
+              <Text style={[styles.loadingText, { color: theme.text }]}>
+                {adding ? '🧠 AI is analyzing your clothing...' : 'Loading wardrobe...'}
+              </Text>
+              {adding && (
+                <Text style={[styles.loadingSubtext, { color: theme.textTertiary }]}>
+                  Detecting colors, fabric, style, and more
+                </Text>
+              )}
+            </View>
+          </View>
+        )}
+
+        {/* Content */}
+        {!loading && wardrobeItems.length === 0 ? (
+          renderEmptyState()
+        ) : viewMode === 'grid' ? (
+          <>
+            {/* Filter Chips */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.filterScroll}
+              contentContainerStyle={styles.filterContainer}
+            >
+              {(Object.keys(filterLabels) as FilterType[]).map(key => {
+                const info = filterLabels[key];
+                const count = key === 'all'
+                  ? wardrobeItems.length
+                  : wardrobeItems.filter(i => i.type === key).length;
+                if (key !== 'all' && count === 0) return null;
+
+                return (
+                  <TouchableOpacity
+                    key={key}
+                    style={[
+                      styles.filterChip,
+                      {
+                        backgroundColor: activeFilter === key ? theme.primary : theme.card,
+                        borderColor: activeFilter === key ? theme.primary : theme.borderLight,
+                      },
+                    ]}
+                    onPress={() => {
+                      setActiveFilter(key);
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    }}
+                  >
+                    <Text style={{ fontSize: 14 }}>{info.icon}</Text>
+                    <Text
+                      style={[
+                        styles.filterLabel,
+                        { color: activeFilter === key ? '#fff' : theme.textSecondary },
+                      ]}
+                    >
+                      {info.label}
+                    </Text>
+                    <View style={[styles.filterCount, { backgroundColor: activeFilter === key ? 'rgba(255,255,255,0.3)' : theme.borderLight }]}>
+                      <Text style={{ color: activeFilter === key ? '#fff' : theme.textTertiary, fontSize: 10, fontWeight: '700' }}>
+                        {count}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
             </ScrollView>
 
-            <TouchableOpacity
-              style={styles.generateActionButton}
-              onPress={() => handleGenerateOutfits()}
-              disabled={generatingOutfits}
-            >
-              <LinearGradient
-                colors={[theme.primary, theme.secondary]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.generateActionButtonGradient}
-              >
-                {generatingOutfits ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <>
-                    <Ionicons name="sparkles" size={18} color="#fff" />
-                    <Text style={styles.generateActionButtonText}>Style Me Now</Text>
-                  </>
-                )}
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
+            {/* Grid */}
+            <FlatList
+              data={filteredItems}
+              renderItem={renderWardrobeItem}
+              keyExtractor={item => item.id}
+              numColumns={3}
+              contentContainerStyle={styles.gridContainer}
+              showsVerticalScrollIndicator={false}
+              ListFooterComponent={<View style={{ height: 100 }} />}
+            />
+          </>
+        ) : viewMode === 'outfits' ? (
+          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16 }} showsVerticalScrollIndicator={false}>
+            {weatherData && (
+              <View style={[styles.weatherBanner, { backgroundColor: theme.card }]}>
+                <Text style={styles.weatherIcon}>{weatherData.icon || '🌤️'}</Text>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={[styles.weatherText, { color: theme.text }]}>
+                    Live Weather: {weatherData.location}
+                  </Text>
+                  <Text style={[styles.weatherDesc, { color: theme.textSecondary }]}>
+                    {weatherData.temperature}°C, {weatherData.description}. AI matches are optimized for today.
+                  </Text>
+                </View>
+              </View>
+            )}
 
-          {generatingOutfits ? (
-            <View style={styles.generatingContainer}>
-              <ActivityIndicator size="large" color={theme.primary} />
-              <Text style={[styles.generatingText, { color: theme.text }]}>
-                ✨ AI is crafting outfits for your vibe...
+            {/* AI Stylist Request Card */}
+            <View style={[styles.aiRequestCard, { backgroundColor: theme.card }]}>
+              <Text style={[styles.aiRequestTitle, { color: theme.text }]}>
+                🪄 Context-Aware AI Stylist
               </Text>
+              <Text style={[styles.aiRequestSubtitle, { color: theme.textSecondary }]}>
+                What's the occasion, weather, or style vibe today?
+              </Text>
+
+              <View style={[styles.inputContainer, { borderColor: theme.borderLight }]}>
+                <TextInput
+                  style={[styles.contextInput, { color: theme.text }]}
+                  placeholder="e.g. coffee date on a chilly day..."
+                  placeholderTextColor={theme.textTertiary}
+                  value={customContext}
+                  onChangeText={setCustomContext}
+                  onSubmitEditing={() => handleGenerateOutfits()}
+                />
+                {customContext ? (
+                  <TouchableOpacity onPress={() => setCustomContext('')} style={styles.clearInputBtn}>
+                    <Ionicons name="close-circle" size={18} color={theme.textTertiary} />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+
+              {/* Quick Chips */}
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.suggestionChipsScroll}
+                contentContainerStyle={styles.suggestionChipsContainer}
+              >
+                {suggestionChips.map((chip, idx) => (
+                  <TouchableOpacity
+                    key={idx}
+                    style={[styles.suggestionChip, { backgroundColor: theme.primary + '15' }]}
+                    onPress={() => {
+                      setCustomContext(chip.value);
+                      handleGenerateOutfits(chip.value);
+                    }}
+                  >
+                    <Text style={[styles.suggestionChipText, { color: theme.primary }]}>{chip.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              <TouchableOpacity
+                style={styles.generateActionButton}
+                onPress={() => handleGenerateOutfits()}
+                disabled={generatingOutfits}
+              >
+                <LinearGradient
+                  colors={[theme.primary, theme.secondary]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.generateActionButtonGradient}
+                >
+                  {generatingOutfits ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <>
+                      <Ionicons name="sparkles" size={18} color="#fff" />
+                      <Text style={styles.generateActionButtonText}>Style Me Now</Text>
+                    </>
+                  )}
+                </LinearGradient>
+              </TouchableOpacity>
             </View>
-          ) : outfitCombos.length > 0 ? (
-            <>
-              <View style={styles.sectionHeaderRow}>
-                <Text style={[styles.sectionTitle, { color: theme.text, marginBottom: 0 }]}>
-                  🔥 AI Recommended Outfits
+
+            {generatingOutfits ? (
+              <View style={styles.generatingContainer}>
+                <ActivityIndicator size="large" color={theme.primary} />
+                <Text style={[styles.generatingText, { color: theme.text }]}>
+                  ✨ AI is crafting outfits for your vibe...
                 </Text>
               </View>
-              {outfitCombos.map((combo, i) => renderOutfitCombo(combo, i))}
-              <View style={{ height: 100 }} />
-            </>
-          ) : (
-            <View style={styles.emptyOutfits}>
-              <Text style={{ fontSize: 48 }}>👔</Text>
-              <Text style={[styles.emptyTitle, { color: theme.text, fontSize: 18 }]}>
-                No Outfits Styled Yet
-              </Text>
-              <Text style={[styles.emptySubtitle, { color: theme.textSecondary, fontSize: 14 }]}>
-                Type a custom vibe above or tap a quick chip to generate style matches from your closet.
-              </Text>
-            </View>
-          )}
-        </ScrollView>
-      ) : (
-        renderStats()
-      )}
+            ) : outfitCombos.length > 0 ? (
+              <>
+                <View style={styles.sectionHeaderRow}>
+                  <Text style={[styles.sectionTitle, { color: theme.text, marginBottom: 0 }]}>
+                    🔥 AI Recommended Outfits
+                  </Text>
+                </View>
+                {outfitCombos.map((combo, i) => renderOutfitCombo(combo, i))}
+                <View style={{ height: 100 }} />
+              </>
+            ) : (
+              <View style={styles.emptyOutfits}>
+                <Text style={{ fontSize: 48 }}>👔</Text>
+                <Text style={[styles.emptyTitle, { color: theme.text, fontSize: 18 }]}>
+                  No Outfits Styled Yet
+                </Text>
+                <Text style={[styles.emptySubtitle, { color: theme.textSecondary, fontSize: 14 }]}>
+                  Type a custom vibe above or tap a quick chip to generate style matches from your closet.
+                </Text>
+              </View>
+            )}
+          </ScrollView>
+        ) : (
+          renderStats()
+        )}
 
-      {/* FAB */}
-      {!loading && wardrobeItems.length > 0 && viewMode === 'grid' && (
-        <Animated.View style={[styles.fab, { transform: [{ scale: fabScale }] }]}>
-          <TouchableOpacity onPress={showAddOptions} activeOpacity={0.85}>
-            <LinearGradient
-              colors={[theme.primary, theme.accent]}
-              style={styles.fabGradient}
-            >
-              <Ionicons name="add" size={28} color="#fff" />
-            </LinearGradient>
-          </TouchableOpacity>
-        </Animated.View>
-      )}
+        {/* FAB */}
+        {!loading && wardrobeItems.length > 0 && viewMode === 'grid' && (
+          <Animated.View style={[styles.fab, { transform: [{ scale: fabScale }] }]}>
+            <TouchableOpacity onPress={showAddOptions} activeOpacity={0.85}>
+              <LinearGradient
+                colors={[theme.primary, theme.accent]}
+                style={styles.fabGradient}
+              >
+                <Ionicons name="add" size={28} color="#fff" />
+              </LinearGradient>
+            </TouchableOpacity>
+          </Animated.View>
+        )}
 
-      {renderItemModal()}
-    </View>
+        {renderItemModal()}
+      </View>
     </PremiumBackground>
   );
 }
@@ -1210,7 +1211,7 @@ const styles = StyleSheet.create({
   occasionChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 },
   chipText: { fontSize: 12, fontWeight: '600', textTransform: 'capitalize' },
   pairTip: { fontSize: 13, lineHeight: 20, marginBottom: 4 },
-  
+
   // AI Request Card Styles
   aiRequestCard: {
     borderRadius: 20,

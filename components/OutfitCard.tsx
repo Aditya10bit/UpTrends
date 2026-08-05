@@ -8,10 +8,10 @@ import {
     useColorScheme,
     View
 } from 'react-native';
-import * as WebBrowser from 'expo-web-browser';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { OutfitSuggestion } from '../services/outfitService';
 import { getColorCode } from '../utils/colorResolver';
+import { openExternalUrl } from '../utils/openExternalUrl';
 
 type OutfitCardProps = {
   outfit: OutfitSuggestion;
@@ -170,11 +170,7 @@ export default function OutfitCard({
                   <TouchableOpacity
                     key={idx}
                     style={[styles.linkButton, { backgroundColor: isDark ? 'rgba(255,215,0,0.1)' : 'rgba(99,102,241,0.1)' }]}
-                    onPress={() => WebBrowser.openBrowserAsync(link.url, {
-                      readerMode: false,
-                      enableBarCollapsing: true,
-                      dismissButtonStyle: 'close',
-                    })}
+                    onPress={() => openExternalUrl(link.url)}
                   >
                     <Ionicons
                       name={link.icon as any}
@@ -190,11 +186,7 @@ export default function OutfitCard({
                   <TouchableOpacity
                     key={`ref-${idx}`}
                     style={[styles.linkButton, { backgroundColor: isDark ? 'rgba(255,215,0,0.1)' : 'rgba(99,102,241,0.1)' }]}
-                    onPress={() => WebBrowser.openBrowserAsync(link.url, {
-                      readerMode: false,
-                      enableBarCollapsing: true,
-                      dismissButtonStyle: 'close',
-                    })}
+                    onPress={() => openExternalUrl(link.url)}
                   >
                     <Ionicons
                       name={link.icon as any}

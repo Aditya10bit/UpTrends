@@ -14,15 +14,16 @@ import {
   Modal,
   Dimensions,
   ScrollView,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import * as WebBrowser from 'expo-web-browser';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
 import { useAuth } from '../contexts/AuthContext';
+import { openExternalUrl } from '../utils/openExternalUrl';
 import {
   getWardrobe,
   sendMessageToStylist,
@@ -35,10 +36,10 @@ import { getUserProfile } from '../services/userService';
 const { width: screenWidth } = Dimensions.get('window');
 
 const PRESET_PROMPTS = [
-  'What colors match beige?',
-  'Packing list for 3-day Paris trip',
+  'What matches my black dress from my closet?',
+  'Make a non-ethnic casual outfit for a pooja — no red',
+  'Packing list for a 3-day Paris trip',
   'Style advice for athletic bodies',
-  'How to layer for winter casual',
 ];
 
 export default function StylistChatScreen() {
@@ -66,7 +67,7 @@ export default function StylistChatScreen() {
     setMessages([
       {
         id: 'welcome',
-        text: "Hello! I'm Aria, your personal AI fashion stylist. Ask me anything about outfit matching, styling tips, or packing lists for a trip. I can browse your closet and tell you exactly what to pack and what's missing! 🌍✨",
+        text: "Hello! I'm Aria, your personal AI fashion stylist. I can see everything in your closet — ask what matches a specific item (like your black dress or kurta), build an outfit for any occasion with the colors you want, or pack for a trip. Ask away! ✨",
         isUser: false,
         timestamp: new Date(),
       },
@@ -122,6 +123,7 @@ export default function StylistChatScreen() {
         isUser: false,
         timestamp: new Date(),
         packingData: response.packingData,
+        closetItemNames: response.closetItemNames,
       };
 
       setMessages(prev => [...prev, stylistMsg]);
@@ -147,6 +149,69 @@ export default function StylistChatScreen() {
       return { uri: `data:image/jpeg;base64,${item.imageBase64}` };
     }
     return { uri: item.imageUri };
+  };
+
+  // Open a URL in the real browser (Chrome) so the user's saved login/cookies
+  // are reused — the in-app browser forces re-login on every open.
+  const openLink = async (url: string) => {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    await openExternalUrl(url);
+  };
+
+  // Map a URL to a shopping platform (icon + brand color) — matches the platform
+  // icons used on the outfit/style-check screens (Myntra=diamond, Google=search…).
+  const getShoppingPlatform = (url: string): { name: string; icon: any; color: string } => {
+    const lower = url.toLowerCase();
+    if (lower.includes('amazon.')) return { name: 'Amazon', icon: 'storefront', color: '#FF9900' };
+    if (lower.includes('myntra')) return { name: 'Myntra', icon: 'diamond', color: '#FF3F6C' };
+    if (lower.includes('google.com')) return { name: 'Google', icon: 'search', color: '#4285F4' };
+    if (lower.includes('pinterest')) return { name: 'Pinterest', icon: 'camera', color: '#E60023' };
+    return { name: 'Shop', icon: 'storefront', color: '#6366f1' };
+  };
+
+  // Render message text with shopping URLs converted to platform icon buttons
+  // (stylist messages only). The raw URL is stripped from the text so the bubble
+  // reads cleanly and the links look like the other category screens.
+  const renderMessageText = (text: string, isUser: boolean) => {
+    const baseStyle = isUser
+      ? [styles.messageText, { color: '#fff' }]
+      : [styles.messageText, { color: theme.text }];
+    if (isUser) return <Text style={baseStyle}>{text}</Text>;
+
+    const urlRegex = /https?:\/\/[^\s<>"']+/g;
+    const urls = (text.match(urlRegex) || [])
+      .map(u => u.replace(/[.,;:!?)\]}]+$/, ''))
+      .filter((u, i, arr) => arr.indexOf(u) === i); // dedupe repeated links
+    const cleanText = text
+      .replace(urlRegex, '')
+      .replace(/\s{2,}/g, ' ')
+      .replace(/\s+([.,;:!?])/g, '$1')
+      .trim();
+
+    return (
+      <>
+        {cleanText.length > 0 && <Text style={baseStyle}>{cleanText}</Text>}
+        {urls.length > 0 && (
+          <View style={styles.shoppingLinksRow}>
+            {urls.map((url, idx) => {
+              const platform = getShoppingPlatform(url);
+              return (
+                <TouchableOpacity
+                  key={idx}
+                  style={[styles.shoppingLinkBtn, { backgroundColor: platform.color }]}
+                  onPress={() => openLink(url)}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name={platform.icon} size={14} color="#fff" />
+                  <Text style={styles.shoppingLinkBtnText}>{platform.name}</Text>
+                  <Ionicons name="open-outline" size={11} color="rgba(255,255,255,0.8)" />
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
+      </>
+    );
   };
 
   const renderPackingCard = (packingData: PackingData) => {
@@ -182,14 +247,13 @@ export default function StylistChatScreen() {
         )}
         {packingData.missingItems.length > 0 && (
           <View style={styles.packingSection}>
-            <Text style={[styles.packingSectionTitle, { color: theme.text }]}>You'll Need to Buy</Text>
+            <Text style={[styles.packingSectionTitle, { color: theme.text }]}>{'You\'ll Need to Buy'}</Text>
             {packingData.missingItems.map((item, idx) => (
               <TouchableOpacity
                 key={idx}
                 style={[styles.missingItemRow, { backgroundColor: isDark ? 'rgba(255,100,100,0.1)' : 'rgba(255,50,50,0.06)', borderColor: '#ff6b6b30' }]}
-                onPress={() => WebBrowser.openBrowserAsync(
-                  `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(item.name)}`,
-                  { dismissButtonStyle: 'close', enableBarCollapsing: true }
+                onPress={() => openExternalUrl(
+                  `https://www.google.com/search?tbm=shop&q=${encodeURIComponent(item.name)}`
                 )}
               >
                 <View style={{ flex: 1 }}>
@@ -201,6 +265,29 @@ export default function StylistChatScreen() {
             ))}
           </View>
         )}
+      </View>
+    );
+  };
+
+  const renderClosetCard = (closetItemNames: string[]) => {
+    const matchedItems = wardrobeItems.filter(w => closetItemNames.includes(w.name));
+    if (matchedItems.length === 0) return null;
+    return (
+      <View style={[styles.packingCard, { backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.04)', borderColor: theme.primary + '40' }]}>
+        <View style={styles.packingCardHeader}>
+          <Text style={{ fontSize: 16 }}>👗</Text>
+          <Text style={[styles.packingCardTitle, { color: theme.primary }]}>From Your Closet</Text>
+        </View>
+        <View style={styles.packingSection}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            {matchedItems.map(item => (
+              <View key={item.id} style={[styles.packingItemThumb, { backgroundColor: theme.card }]}>
+                <Image source={resolveImageSource(item)} style={styles.packingThumbImage as any} />
+                <Text style={[styles.packingThumbName, { color: theme.text }]} numberOfLines={2}>{item.name}</Text>
+              </View>
+            ))}
+          </ScrollView>
+        </View>
       </View>
     );
   };
@@ -235,15 +322,9 @@ export default function StylistChatScreen() {
                 </View>
               </View>
             )}
-            <Text
-              style={[
-                styles.messageText,
-                item.isUser ? { color: '#fff' } : { color: theme.text },
-              ]}
-            >
-              {item.text}
-            </Text>
+            {renderMessageText(item.text, item.isUser)}
             {!item.isUser && item.packingData && renderPackingCard(item.packingData)}
+            {!item.isUser && item.closetItemNames && item.closetItemNames.length > 0 && renderClosetCard(item.closetItemNames)}
           </View>
           <Text style={styles.timestampText}>
             {item.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -286,6 +367,12 @@ export default function StylistChatScreen() {
         keyExtractor={item => item.id}
         contentContainerStyle={[styles.chatList, { paddingBottom: 24 }]}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        onContentSizeChange={() => {
+          if (messages.length > 0) {
+            requestAnimationFrame(() => flatListRef.current?.scrollToEnd({ animated: true }));
+          }
+        }}
         ListFooterComponent={
           loading ? (
             <View style={styles.stylistRow}>
@@ -455,6 +542,11 @@ const styles = StyleSheet.create({
   attachedMiniThumb: { width: 24, height: 30, borderRadius: 4, resizeMode: 'cover' },
   attachmentText: { fontSize: 11, fontWeight: '600', maxWidth: 180 },
   attachmentClose: { marginLeft: 4 },
+
+  // Shopping platform link buttons (below AI messages)
+  shoppingLinksRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
+  shoppingLinkBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20 },
+  shoppingLinkBtnText: { color: '#fff', fontSize: 12, fontWeight: '700' },
 
   // Packing card styles
   packingCard: { marginTop: 12, borderRadius: 14, borderWidth: 1, overflow: 'hidden' },

@@ -17,7 +17,6 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
-import * as WebBrowser from 'expo-web-browser';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -31,6 +30,7 @@ import { AnimatedProgress, GenderToggle } from '../../components/TwinningSharedC
 import { useTheme } from '../../contexts/ThemeContext';
 import PremiumBackground from '../../components/PremiumBackground';
 import { analyzeTwinningPhotos, TwinningAnalysis } from '../../services/twinningService';
+import { openExternalUrl } from '../../utils/openExternalUrl';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -887,7 +887,7 @@ function ResultsScreen({
   const insets = useSafeAreaInsets();
 
   const openLink = (url: string) => {
-    WebBrowser.openBrowserAsync(url);
+    openExternalUrl(url);
   };
 
   if (analyzing) {

@@ -1,5 +1,5 @@
 import { analyzeBodyImage, analyzePersonComprehensively, generateOutfitsFromPrompt, generateTwinningOutfits, validateImageContext } from './geminiService';
-import { getCurrentWeather } from './weatherService';
+import { getCurrentWeather, WeatherData } from './weatherService';
 import * as Location from 'expo-location';
 
 export interface PersonAnalysis {
@@ -122,8 +122,13 @@ export const analyzeTwinningPhotos = async (
       fetchLocalWeather() // Uses expo-location to fetch local weather
     ]);
 
-    const validations = validationsAndWeather.slice(0, 3);
-    const weatherData = validationsAndWeather[3] as any;
+    const validations = validationsAndWeather.slice(0, 3) as Array<{
+      isValid: boolean;
+      confidence: number;
+      reasoning: string;
+      suggestedItems?: string[];
+    }>;
+    const weatherData = validationsAndWeather[3] as WeatherData;
 
     if (!validations[0].isValid) throw new Error(`Invalid photo for ${names.person1}: ${validations[0].reasoning}`);
     if (!validations[1].isValid) throw new Error(`Invalid photo for ${names.person2}: ${validations[1].reasoning}`);

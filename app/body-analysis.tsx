@@ -1,7 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { BlurView } from 'expo-blur';
-import * as WebBrowser from 'expo-web-browser';
 
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
@@ -31,6 +30,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import PremiumBackground from '../components/PremiumBackground';
 import { analyzeBodyImage, analyzeProfileBodyTypeFromImage, generatePersonalizedFashionTips, getChatbotResponse } from '../services/geminiService';
 import { getUserProfile, updateUserProfile } from '../services/userService';
+import { openExternalUrl } from '../utils/openExternalUrl';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -997,17 +997,8 @@ export default function BodyAnalysisScreen() {
     };
 
     const handleLinkPress = async (url: string) => {
-        try {
-            await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            await WebBrowser.openBrowserAsync(url, {
-                readerMode: false,
-                enableBarCollapsing: true,
-                dismissButtonStyle: 'close',
-            });
-        } catch (error) {
-            console.error('Error opening link:', error);
-            Alert.alert('Error', 'Failed to open link');
-        }
+        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        await openExternalUrl(url);
     };
 
     const renderTextWithLinks = (text: string, textStyle: any) => {

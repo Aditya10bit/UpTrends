@@ -10,8 +10,8 @@ import {
     useColorScheme,
     View
 } from 'react-native';
-import * as WebBrowser from 'expo-web-browser';
 import Animated, { FadeInDown } from 'react-native-reanimated';
+import { openExternalUrl } from '../utils/openExternalUrl';
 
 type AIAdviceCardProps = {
   advice: string[] | null;
@@ -167,11 +167,7 @@ export default function AIAdviceCard({
               {sources.slice(0, 2).map((url, idx) => (
                 <TouchableOpacity
                   key={idx}
-                  onPress={() => WebBrowser.openBrowserAsync(url, {
-                    readerMode: false,
-                    enableBarCollapsing: true,
-                    dismissButtonStyle: 'close',
-                  })}
+                  onPress={() => openExternalUrl(url)}
                   style={styles.sourceLink}
                 >
                   <Ionicons name="link" size={14} color={isDark ? '#ffd700' : '#6366f1'} />

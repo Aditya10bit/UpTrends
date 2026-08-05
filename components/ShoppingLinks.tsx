@@ -2,8 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useRef } from 'react';
-import { Alert, Animated, Linking, ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import * as WebBrowser from 'expo-web-browser';
+import { Animated, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { openExternalUrl } from '../utils/openExternalUrl';
 
 interface ShoppingLinksProps {
   result: {
@@ -125,25 +125,10 @@ const ShoppingItemCard: React.FC<{
   }, [delay]);
 
   const handlePress = async () => {
-    try {
-      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      await WebBrowser.openBrowserAsync(item.url, {
-        readerMode: false,
-        enableBarCollapsing: true,
-        dismissButtonStyle: 'close',
-      });
-    } catch (error) {
-      console.error('Error opening link:', error);
-      // Fallback to standard Linking if WebBrowser fails — same pattern as
-      // outfit-detail.tsx. Some URL formats are rejected by openBrowserAsync
-      // on Android release builds; Linking.openURL still opens them.
-      try {
-        await Linking.openURL(item.url);
-      } catch (linkError) {
-        console.error('Linking error:', linkError);
-        Alert.alert('Error', 'Unable to open this link');
-      }
-    }
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    // Open in the real browser (Chrome) so the user's saved login/cookies are
+    // reused — the in-app browser forces re-login on every open.
+    await openExternalUrl(item.url);
   };
 
   return (

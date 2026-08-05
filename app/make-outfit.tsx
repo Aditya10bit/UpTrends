@@ -18,7 +18,6 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
-import * as WebBrowser from 'expo-web-browser';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
 import PremiumBackground from '../components/PremiumBackground';
@@ -31,6 +30,7 @@ import {
 import { getLocationTopography } from '../services/topographyService';
 import { getUserProfile } from '../services/userService';
 import { checkUserGender, promptForGender } from '../utils/genderUtils';
+import { openExternalUrl } from '../utils/openExternalUrl';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const getResponsiveSize = (size: number) => (screenWidth / 375) * size;
@@ -257,16 +257,7 @@ export default function MakeOutfit() {
 
   const openShoppingLink = async (url: string) => {
     if (url) {
-      try {
-        await WebBrowser.openBrowserAsync(url, {
-          readerMode: false,
-          enableBarCollapsing: true,
-          dismissButtonStyle: 'close',
-        });
-      } catch (error) {
-        console.error('Error opening shopping link:', error);
-        Alert.alert('Error', 'Unable to open shopping link');
-      }
+      await openExternalUrl(url);
     }
   };
 

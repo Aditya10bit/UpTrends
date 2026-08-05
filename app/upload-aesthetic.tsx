@@ -3,6 +3,7 @@ import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
+import { openExternalUrl } from '../utils/openExternalUrl';
 import React, { useEffect, useRef, useState } from 'react';
 import {
     Alert,
@@ -27,6 +28,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { analyzeImageAndGenerateOutfits, generateOutfitLinks, generateOutfitsFromPrompt, getActiveKeySource, OutfitSuggestion, StyleAnalysisResult } from '../services/geminiService';
 import { getUserProfile } from '../services/userService';
+import { colorToHex, resolveColorLabel } from '../utils/colorExtraction';
 import { checkUserGender, promptForGender } from '../utils/genderUtils';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -232,42 +234,28 @@ export default function UploadAesthetic() {
   const handleSeeLinks = async (outfit: OutfitSuggestion) => {
     try {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      
-      Alert.alert(
-        'Generating Links',
-        'Finding shopping links for this outfit...',
-        [{ text: 'OK' }]
-      );
 
       const links = await generateOutfitLinks(outfit.outfit, prompt);
 
-      if (links.length > 0) {
-        router.push({
-          pathname: '/outfit-links',
-          params: {
-            links: JSON.stringify(links),
-            outfitName: outfit.style,
-            url: links[0].url
-          }
-        });
+      const allLinks = links.length > 0 ? links : (outfit.shoppingLinks || []);
+
+      if (allLinks.length > 0) {
+        // Show an action sheet so user picks which platform to open in Chrome
+        const platformButtons = allLinks.map((link: any) => ({
+          text: link.platform || link.item || 'Open Link',
+          onPress: () => openExternalUrl(link.url),
+        }));
+        Alert.alert(
+          'Open Shopping Link',
+          `Choose a platform for "${outfit.style}"`,
+          [...platformButtons, { text: 'Cancel', style: 'cancel' as const }],
+        );
       } else {
-        const fallbackLinks = outfit.shoppingLinks || [];
-        if (fallbackLinks.length > 0) {
-          router.push({
-            pathname: '/outfit-links',
-            params: {
-              links: JSON.stringify(fallbackLinks),
-              outfitName: outfit.style,
-              url: fallbackLinks[0].url
-            }
-          });
-        } else {
-          Alert.alert(
-            'No Links Found',
-            'Unable to generate shopping links for this outfit. Please try searching manually.',
-            [{ text: 'OK' }]
-          );
-        }
+        Alert.alert(
+          'No Links Found',
+          'Unable to generate shopping links for this outfit. Please try searching manually.',
+          [{ text: 'OK' }]
+        );
       }
     } catch (error) {
       console.error('Error generating outfit links:', error);
@@ -538,7 +526,7 @@ export default function UploadAesthetic() {
                 <Text style={[styles.venueAmbiance, { color: theme.textSecondary }]}>{suggestions.ambiance}</Text>
               </View>
 
-              {/* Dominant Colors Section */}
+              {/* Dominant Colors Section — actual color swatches, not hex codes */}
               {suggestions.dominantColors && suggestions.dominantColors.length > 0 && (
                 <View style={styles.colorsSection}>
                   <Text style={[styles.colorsTitle, { color: theme.text }]}>Venue Colors:</Text>
@@ -548,7 +536,15 @@ export default function UploadAesthetic() {
                         key={index}
                         style={[styles.colorTag, { backgroundColor: theme.background }]}
                       >
-                        <Text style={[styles.colorText, { color: theme.text }]}>{color}</Text>
+                        <View
+                          style={[
+                            styles.colorSwatchDot,
+                            { backgroundColor: colorToHex(color) || '#9ca3af' }
+                          ]}
+                        />
+                        <Text style={[styles.colorText, { color: theme.text }]}>
+                          {resolveColorLabel(color)}
+                        </Text>
                       </View>
                     ))}
                   </View>
@@ -903,12 +899,22 @@ const styles = StyleSheet.create({
     gap: getResponsiveSize(8),
   },
   colorTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: getResponsiveSize(8),
     paddingHorizontal: getResponsiveSize(12),
     paddingVertical: getResponsiveSize(8),
     borderRadius: getResponsiveSize(16),
     borderWidth: 1,
     borderColor: 'rgba(102, 126, 234, 0.3)',
     marginBottom: getResponsiveSize(8),
+  },
+  colorSwatchDot: {
+    width: getResponsiveSize(18),
+    height: getResponsiveSize(18),
+    borderRadius: getResponsiveSize(9),
+    borderWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.15)',
   },
   colorText: {
     fontSize: getResponsiveFontSize(12),

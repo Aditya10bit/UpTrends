@@ -5,6 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { geminiRateLimiter, getSecureApiKey } from '../config/security';
 import { trackAIRequest } from './analyticsService';
 import { TopographyData } from './topographyService';
+import { isModelExhaustedToday, markModelExhausted } from '../utils/aiQuotaTracker';
 
 /**
  * Robust JSON extractor. Finds the first '{' or '[' and the last '}' or ']'
@@ -145,6 +146,25 @@ export const testApiKey = async (apiKey: string): Promise<{ success: boolean; er
 };
 
 // --- Dynamic genAI wrapper ---
+// Fallback model chain — when a model hits its daily free-tier quota, retry the
+// same request with its lighter counterpart (same API key, still multimodal).
+// Add entries here as Google rolls out new flash/lite pairs. Verify the lite
+// model ID in AI Studio before relying on it.
+const FALLBACK_MODEL_MAP: Record<string, string> = {
+  'gemini-3.5-flash': 'gemini-3.5-flash-lite',
+  'gemini-2.5-flash': 'gemini-2.5-flash-lite',
+  'gemini-flash-latest': 'gemini-flash-lite-latest',
+};
+
+// Tracks the last model that actually served a request, so a screen/log can show
+// "running on flash-lite" when the free-tier fallback kicked in.
+let lastServedModel: string | null = null;
+let lastServedAt: number | null = null;
+export const getLastServedModel = (): { model: string | null; at: number | null } => ({
+  model: lastServedModel,
+  at: lastServedAt,
+});
+
 // Resolves the correct GoogleGenerativeAI instance (custom or default)
 // at call-time, not at import-time.
 export const genAI = {
@@ -153,28 +173,74 @@ export const genAI = {
     return {
       generateContent: async (request: any, options?: any) => {
         const instance = await getGenAIInstance();
-        const model = instance.getGenerativeModel(params);
+        const primaryModel = instance.getGenerativeModel(params);
+        const primaryName = params?.model || '';
 
-        // Exponential backoff retry logic
-        let delay = 1000;
-        const maxRetries = 3;
-        for (let attempt = 1; attempt <= maxRetries; attempt++) {
-          try {
-            return await model.generateContent(request, options);
-          } catch (error: any) {
-            const isQuota = error.message?.includes('429') || error.message?.includes('Quota') || error.message?.includes('Too Many Requests');
-            const isOverloaded = error.message?.includes('503') || error.message?.includes('overloaded');
+        // Ordered fallback chain for this request: [primary, lite]
+        const fallbackName = FALLBACK_MODEL_MAP[primaryName];
+        const chainNames = fallbackName ? [primaryName, fallbackName] : [primaryName];
+        const attempted: string[] = [];
 
-            if ((isQuota || isOverloaded) && attempt < maxRetries) {
-              console.warn(`[Gemini] API error (Attempt ${attempt}/${maxRetries}). Retrying in ${delay}ms...`, error.message);
-              await new Promise(resolve => setTimeout(resolve, delay));
-              delay *= 2;
-            } else {
+        for (const modelName of chainNames) {
+          // Skip models whose daily quota is already exhausted (efficiency: no wasted retries)
+          if (await isModelExhaustedToday(modelName)) {
+            console.warn(`[AI] Skipping ${modelName} — daily quota already exhausted`);
+            attempted.push(modelName);
+            continue;
+          }
+
+          const model = modelName === primaryName
+            ? primaryModel
+            : instance.getGenerativeModel({ ...params, model: modelName });
+
+          // Exponential backoff retry logic (per model)
+          // On 503/overloaded: ONE quick retry (1s), then immediately skip to next model.
+          // The user experiences6-7 min waits when we retry overloaded servers multiple times.
+          let delay = 1000;
+          const maxRetries = 2;
+          for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+              const result = await model.generateContent(request, options);
+              lastServedModel = modelName;
+              lastServedAt = Date.now();
+              if (modelName !== primaryName) {
+                console.warn(`[AI] ⚠️ FLASH QUOTA HIT — served by fallback model: ${modelName} (500 RPD, use is free)`);
+              } else {
+                console.log(`[AI] ✅ Served by model: ${modelName}`);
+              }
+              return result;
+            } catch (error: any) {
+              const msg = error.message || String(error);
+              const lower = msg.toLowerCase();
+              const isQuota = msg.includes('429') || lower.includes('quota') || msg.includes('Too Many Requests') || msg.includes('RESOURCE_EXHAUSTED');
+              const isOverloaded = msg.includes('503') || lower.includes('overloaded') || msg.includes('UNAVAILABLE') || msg.includes('500');
+
+              if (isQuota) {
+                // Daily quota hit — don't keep hammering this model; mark it and move on
+                await markModelExhausted(modelName);
+                console.warn(`[AI] ${modelName} daily quota exhausted (${msg}). Marking for today.`);
+                break; // next model in chain
+              }
+
+              if (isOverloaded) {
+                if (attempt < maxRetries) {
+                  console.warn(`[AI] ${modelName} overloaded (Attempt ${attempt}/${maxRetries}). Quick retry in ${delay}ms...`);
+                  await new Promise(resolve => setTimeout(resolve, delay));
+                  delay *= 2;
+                  continue;
+                }
+                // Overloaded after quick retry → skip to next model immediately
+                console.warn(`[AI] ${modelName} still overloaded after ${maxRetries} attempts — switching to next model`);
+                break;
+              }
+
               throw error;
             }
           }
+          attempted.push(modelName);
         }
-        throw new Error("Max retries exceeded");
+
+        throw new Error(`All AI models failed. Tried: ${attempted.join(', ')}`);
       }
     };
   }
@@ -280,6 +346,7 @@ const processQueue = async (): Promise<void> => {
       const cached = getFromCache(cacheKey);
 
       if (cached) {
+        console.log('[AI] 🗄️ Cache hit — served without calling Gemini (saved free-tier quota)');
         request.resolve(cached);
         return;
       }
@@ -2537,7 +2604,7 @@ WEATHER CONDITIONS:
 - Evening Temperature: ${weather.forecast.evening.temp}°C
 
 REQUIREMENTS:
-1. Create ONE perfect outfit specifically for a ${userProfile.gender}
+1. Create ONE perfect outfit specifically for a ${userProfile.gender} — ONLY ${userProfile.gender === 'male' ? 'menswear: shirts, t-shirts, trousers, chinos, jeans, shorts, blazers, jackets, sneakers, loafers, boots' : 'womenswear: dresses, skirts, blouses, tops, jeans, leggings, heels, sandals'}
 2. Consider the weather conditions and temperature changes throughout the day
 3. Ensure the outfit is appropriate for their body type and skin tone
 4. Include practical weather-appropriate items
@@ -2550,11 +2617,11 @@ FORMAT YOUR RESPONSE AS JSON:
   "title": "Weather-appropriate outfit name",
   "description": "Brief description of why this outfit is perfect for today",
   "items": [
-    "Specific clothing item 1 (e.g., 'Light cotton t-shirt')",
-    "Specific clothing item 2 (e.g., 'Comfortable jeans')",
-    "Specific clothing item 3 (e.g., 'Lightweight jacket')",
-    "Footwear recommendation",
-    "Accessories if needed"
+    "Specific ${userProfile.gender === 'male' ? 'menswear' : 'womenswear'} item 1 (e.g., ${userProfile.gender === 'male' ? "'Navy polo shirt', 'White button-down shirt', 'Light blue linen shirt'" : "'Floral summer dress', 'Silk blouse', 'Cotton midi skirt'"})",
+    "Specific clothing item 2 (e.g., ${userProfile.gender === 'male' ? "'Khaki chinos', 'Dark slim-fit jeans', 'Beige linen trousers'" : "'High-waist jeans', 'Pleated trousers', 'Denim skirt'"})",
+    "Specific clothing item 3 (e.g., ${userProfile.gender === 'male' ? "'Lightweight bomber jacket', 'Cotton blazer', 'Denim jacket'" : "'Cardigan', 'Cropped jacket', 'Trench coat'"})",
+    "Footwear recommendation (e.g., ${userProfile.gender === 'male' ? "'White leather sneakers', 'Suede loafers', 'Desert boots'" : "'Block heel sandals', 'White sneakers', 'Ankle boots'"})",
+    "Accessories if needed (e.g., ${userProfile.gender === 'male' ? "'Leather watch', 'Sunglasses', 'Belt'" : "'Tote bag', 'Gold earrings', 'Scarf'"})"
   ],
   "colors": [
     "Primary color that suits ${userProfile.skinTone} skin tone",
@@ -2602,7 +2669,7 @@ FORMAT YOUR RESPONSE AS JSON:
 }
 
 IMPORTANT GUIDELINES:
-- Make the outfit gender-specific (${userProfile.gender} clothing only)
+- ABSOLUTELY CRITICAL: This outfit is for a ${userProfile.gender}. Every clothing item MUST be ${userProfile.gender === 'male' ? 'a menswear item (no dresses, skirts, heels, women\'s blouses, women\'s accessories)' : 'a womenswear item'}. For a MALE user, think: polo shirts, button-downs, chinos, jeans, blazers, sneakers, loafers. NEVER generate feminine clothing for a male user.
 - Consider temperature fluctuations throughout the day
 - Include layering options if temperature varies significantly
 - Ensure colors complement ${userProfile.skinTone} skin tone
@@ -3024,14 +3091,21 @@ Make sure the response is valid JSON only, no additional text.
       console.error(`Gemini API Error (attempt ${attempt}):`, error);
       lastError = error;
 
-      // Check if it's a 503 (overloaded) or rate limit error
-      if (error.message?.includes('overloaded') || error.message?.includes('503') || error.message?.includes('429')) {
-        console.log(`Model overloaded/rate limited, waiting before retry...`);
-        await new Promise(resolve => setTimeout(resolve, 2000 * attempt)); // Exponential backoff
+      // 503/overloaded — the genAI wrapper already retries & switches models.
+      // No point retrying here; jump to fallback immediately.
+      if (error.message?.includes('overloaded') || error.message?.includes('503')) {
+        console.warn('[AI] Overloaded — using fallback response immediately');
+        return generateTopographyAwareFallbackResponse(prompt, topography, userProfile);
+      }
+
+      // Rate limit (429) — retry once with short delay, then fallback
+      if (error.message?.includes('429')) {
+        console.warn('[AI] Rate limited — retrying once...');
+        await new Promise(resolve => setTimeout(resolve, 2000));
         continue;
       }
 
-      // If it's not a retryable error, break the loop
+      // Non-retryable error — break and use fallback
       break;
     }
   }
@@ -3181,14 +3255,21 @@ Make sure the response is valid JSON only, no additional text.
       console.error(`Gemini API Error (attempt ${attempt}):`, error);
       lastError = error;
 
-      // Check if it's a 503 (overloaded) or rate limit error
-      if (error.message?.includes('overloaded') || error.message?.includes('503') || error.message?.includes('429')) {
-        console.log(`Model overloaded/rate limited, waiting before retry...`);
-        await new Promise(resolve => setTimeout(resolve, 2000 * attempt)); // Exponential backoff
+      // 503/overloaded — the genAI wrapper already retries & switches models.
+      // No point retrying here; jump to fallback immediately.
+      if (error.message?.includes('overloaded') || error.message?.includes('503')) {
+        console.warn('[AI] Overloaded — using fallback response immediately');
+        return generateWeatherAwareFallbackResponse(prompt, weather, userProfile);
+      }
+
+      // Rate limit (429) — retry once with short delay, then fallback
+      if (error.message?.includes('429')) {
+        console.warn('[AI] Rate limited — retrying once...');
+        await new Promise(resolve => setTimeout(resolve, 2000));
         continue;
       }
 
-      // If it's not a retryable error, break the loop
+      // Non-retryable error — break and use fallback
       break;
     }
   }

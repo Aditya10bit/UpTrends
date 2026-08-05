@@ -3,13 +3,22 @@
 // Stores clothing items with AI-powered metadata, generates outfits from real wardrobe
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { addDoc, collection, deleteDoc, doc, getDocs, orderBy, query, updateDoc, where } from 'firebase/firestore';
+import { addDoc, collection, deleteDoc, doc, getDocs, query, updateDoc, where } from 'firebase/firestore';
 import { auth, db, isFirebaseInitialized, storage } from '../firebaseConfig';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import * as FileSystem from 'expo-file-system';
 import * as ImageManipulator from 'expo-image-manipulator';
-import { genAI, validateImageContext } from './geminiService';
+import { extractJSON, genAI, validateImageContext } from './geminiService';
 import { geminiRateLimiter } from '../config/security';
+
+// Some wardrobe items (older ones, or ones saved without full AI analysis) can
+// have undefined colors/seasons. Guard every join so a missing field never
+// crashes a prompt builder with "…colors.join is not a function".
+const fmtList = (value: any, joiner = ', '): string => {
+  if (!Array.isArray(value)) return 'n/a';
+  const strings = value.map(String).filter(Boolean);
+  return strings.length > 0 ? strings.join(joiner) : 'n/a';
+};
 
 // ─── FileSystem Helpers ───────────────────────────────────────────────────────
 const WARDROBE_DIR = `${FileSystem.documentDirectory}wardrobes/`;
@@ -365,10 +374,13 @@ export const getWardrobe = async (): Promise<WardrobeItem[]> => {
   // Try Firestore first
   if (isFirebaseInitialized && db) {
     try {
+      // NOTE: Deliberately no orderBy('dateAdded') here — combined with the userId
+      // filter it needs a composite Firestore index, which fails on fresh installs
+      // with "The query requires an index". Single-field equality queries use
+      // Firestore's automatic indexes, so we sort newest-first client-side instead.
       const q = query(
         collection(db, WARDROBE_COLLECTION),
-        where('userId', '==', user.uid),
-        orderBy('dateAdded', 'desc')
+        where('userId', '==', user.uid)
       );
       const snapshot = await getDocs(q);
       const items = snapshot.docs.map(doc => ({
@@ -377,7 +389,15 @@ export const getWardrobe = async (): Promise<WardrobeItem[]> => {
         dateAdded: doc.data().dateAdded?.toDate?.() || new Date(doc.data().dateAdded),
         lastWorn: doc.data().lastWorn?.toDate?.() || undefined,
       })) as WardrobeItem[];
-      
+
+      // Sort newest-first client-side (avoids the composite index requirement)
+      const toTime = (d: any): number => {
+        if (d instanceof Date && !isNaN(d.getTime())) return d.getTime();
+        const t = new Date(d).getTime();
+        return isNaN(t) ? 0 : t;
+      };
+      items.sort((a, b) => toTime(b.dateAdded) - toTime(a.dateAdded));
+
       if (items.length > 0) {
         // Sync to local storage
         await AsyncStorage.setItem(
@@ -572,7 +592,7 @@ export const generateOutfitsFromWardrobe = async (
 
     // Build wardrobe summary for the prompt
     const wardrobeSummary = items.map((item, i) => 
-      `[${i + 1}] ${item.name} — Type: ${item.type}/${item.subType}, Colors: ${item.colors.join(', ')}, Pattern: ${item.pattern}, Fabric: ${item.fabric}, Formality: ${item.formality}, Seasons: ${item.seasons.join(', ')}`
+      `[${i + 1}] ${item.name} — Type: ${item.type}/${item.subType}, Colors: ${fmtList(item.colors)}, Pattern: ${item.pattern}, Fabric: ${item.fabric}, Formality: ${item.formality}, Seasons: ${fmtList(item.seasons)}`
     ).join('\n');
 
     const gender = userProfile?.gender || 'male';
@@ -664,12 +684,12 @@ export const getItemPairings = async (
     const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
 
     const othersSummary = otherItems.map((i, idx) =>
-      `[${idx + 1}] ${i.name} — ${i.type}/${i.subType}, Colors: ${i.colors.join(', ')}, Pattern: ${i.pattern}, Formality: ${i.formality}`
+      `[${idx + 1}] ${i.name} — ${i.type}/${i.subType}, Colors: ${fmtList(i.colors)}, Pattern: ${i.pattern}, Formality: ${i.formality}`
     ).join('\n');
 
     const prompt = `You are a fashion stylist. A user wants to know what items from their wardrobe pair well with:
 
-SELECTED ITEM: ${item.name} — ${item.type}/${item.subType}, Colors: ${item.colors.join(', ')}, Pattern: ${item.pattern}, Fabric: ${item.fabric}, Formality: ${item.formality}
+SELECTED ITEM: ${item.name} — ${item.type}/${item.subType}, Colors: ${fmtList(item.colors)}, Pattern: ${item.pattern}, Fabric: ${item.fabric}, Formality: ${item.formality}
 
 OTHER WARDROBE ITEMS:
 ${othersSummary}
@@ -769,9 +789,17 @@ export const getWardrobeStats = (items: WardrobeItem[]): WardrobeStats => {
   // Season readiness
   const allSeasons: Season[] = ['summer', 'monsoon', 'winter', 'spring', 'autumn'];
   const seasonReadiness = allSeasons.map(season => {
-    const seasonItems = items.filter(i => 
-      i.seasons?.includes(season) || i.seasons?.includes('all_season')
-    );
+    const seasonItems = items.filter(i => {
+      // seasons can be missing / a non-array on legacy items — never call
+      // .includes directly (it crashes on booleans/numbers).
+      const rawSeasons: any = i.seasons;
+      const seasons = Array.isArray(rawSeasons)
+        ? rawSeasons.map((s: any) => String(s).toLowerCase())
+        : typeof rawSeasons === 'string'
+          ? rawSeasons.split(',').map((s: string) => s.trim().toLowerCase()).filter(Boolean)
+          : [];
+      return seasons.includes(season) || seasons.includes('all_season');
+    });
     const hasTops = seasonItems.some(i => i.type === 'top' || i.type === 'dress' || i.type === 'ethnic');
     const hasBottoms = seasonItems.some(i => i.type === 'bottom' || i.type === 'dress' || i.type === 'ethnic');
     const hasOuterwear = season === 'winter' || season === 'monsoon' 
@@ -928,7 +956,7 @@ export const checkShoppingItemMatch = async (
     // Build wardrobe inventory summary for prompt
     const wardrobeSummary = wardrobeItems.length > 0
       ? wardrobeItems.map((item, i) =>
-          `[${i + 1}] ${item.name} — Type: ${item.type}/${item.subType}, Colors: ${item.colors.join(', ')}, Pattern: ${item.pattern}, Formality: ${item.formality}, Style: ${item.stylePersonality}`
+          `[${i + 1}] ${item.name} — Type: ${item.type}/${item.subType}, Colors: ${fmtList(item.colors)}, Pattern: ${item.pattern}, Formality: ${item.formality}, Style: ${item.stylePersonality}`
         ).join('\n')
       : 'User wardrobe is currently empty.';
 
@@ -1039,11 +1067,13 @@ export interface ChatMessage {
   timestamp: Date;
   attachedItem?: WardrobeItem;
   packingData?: PackingData;
+  closetItemNames?: string[];
 }
 
 export interface StylistResponse {
   text: string;
   packingData?: PackingData;
+  closetItemNames?: string[];
 }
 
 // Helper to fetch coordinates for a city name via Open-Meteo geocoding
@@ -1063,6 +1093,19 @@ const fetchCityCoordinates = async (city: string): Promise<{ lat: number; lon: n
   }
 };
 
+// Build a compact one-line-per-item closet inventory for the AI.
+// ~20 tokens per item → ~600 tokens for 30 items. Deliberately excludes
+// id/imageUri/imageBase64 — the AI doesn't need internal DB IDs and previously
+// echoed them back into chat responses.
+const buildWardrobeSnapshot = (items: WardrobeItem[], limit = 30): string => {
+  if (!items || items.length === 0) return 'Your closet is currently empty.';
+  return items.slice(0, limit).map((item, i) =>
+    `#${i + 1} ${item.name} — ${item.type}/${item.subType}, ${fmtList(item.colors, '/')}, ` +
+    `${item.pattern}, ${item.fabric}, ${item.formality}, seasons:${fmtList(item.seasons, '/')}` +
+    (item.favorite ? ', FAVORITE' : '')
+  ).join('\n');
+};
+
 export const sendMessageToStylist = async (
   message: string,
   history: ChatMessage[],
@@ -1075,10 +1118,19 @@ export const sendMessageToStylist = async (
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
+    // Cap output tokens so long replies don't blow through the free tier
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-3.5-flash',
+      generationConfig: {
+        temperature: 0.7,
+        maxOutputTokens: 2048,
+      },
+    });
 
+    // Keep only the last 10 messages so the prompt doesn't grow unbounded
+    const recentHistory = history.slice(-10);
     // Format chat history for Gemini
-    const historyPrompt = history.map(msg =>
+    const historyPrompt = recentHistory.map(msg =>
       `${msg.isUser ? 'User' : 'Stylist'}: ${msg.text}${msg.attachedItem ? ` (Attached Item: ${msg.attachedItem.name} — ${msg.attachedItem.type}/${msg.attachedItem.subType})` : ''}`
     ).join('\n');
 
@@ -1094,8 +1146,12 @@ export const sendMessageToStylist = async (
 
     let itemContext = '';
     if (attachedItem) {
-      itemContext = `The user has attached their wardrobe item: "${attachedItem.name}". Details: Type: ${attachedItem.type}/${attachedItem.subType}, Colors: ${attachedItem.colors.join(', ')}, Pattern: ${attachedItem.pattern}, Fabric: ${attachedItem.fabric}, Formality: ${attachedItem.formality}, Seasons: ${attachedItem.seasons.join(', ')}.`;
+      itemContext = `The user has attached their wardrobe item: "${attachedItem.name}". Details: Type: ${attachedItem.type}/${attachedItem.subType}, Colors: ${fmtList(attachedItem.colors)}, Pattern: ${attachedItem.pattern}, Fabric: ${attachedItem.fabric}, Formality: ${attachedItem.formality}, Seasons: ${fmtList(attachedItem.seasons)}.`;
     }
+
+    // Compact closet inventory — always sent so Aria can answer any
+    // closet-based question, not just travel/packing requests.
+    const wardrobeSnapshot = buildWardrobeSnapshot(wardrobeItems || []);
 
     // ── STEP 1: Detect if message is a travel/packing intent ──────────────────
     // Broad pre-filter list including common travel questions, weather actions, and destinations
@@ -1167,19 +1223,6 @@ Reply in this exact JSON format, nothing else:
         }
       }
 
-      // Build wardrobe snapshot for AI (limit to 30 items to stay within context)
-      // NOTE: Deliberately exclude id/imageUri/imageBase64 — AI doesn't need internal DB IDs
-      //       and was accidentally echoing them back in chat responses.
-      const wardrobeSnapshot = wardrobeItems.slice(0, 30).map(item => ({
-        name: item.name,
-        type: item.type,
-        subType: item.subType,
-        colors: item.colors,
-        fabric: item.fabric,
-        seasons: item.seasons,
-        formality: item.formality,
-      }));
-
       const packingPrompt = `You are Aria, a world-class personal fashion stylist and travel packing expert.
 
 USER PROFILE:
@@ -1189,7 +1232,7 @@ DESTINATION & WEATHER:
 ${weatherContext}
 
 USER'S AVAILABLE WARDROBE (scan carefully for suitable items):
-${JSON.stringify(wardrobeSnapshot, null, 2)}
+${wardrobeSnapshot}
 
 USER'S REQUEST: "${message}"
 
@@ -1237,7 +1280,7 @@ Return your response as valid JSON ONLY in this exact format:
     }
 
     // ── STEP 3: Regular conversation (non-travel) ─────────────────────────────
-    const systemPrompt = `You are a world-class friendly personal fashion stylist and image consultant named "Aria". 
+    const systemPrompt = `You are Aria, a world-class friendly personal fashion stylist and image consultant.
 You help users with styling advice, choosing colors, packing lists, wardrobe coordination, and figuring out what suits their body shape.
 
 USER STYLE DNA PROFILE:
@@ -1251,6 +1294,9 @@ USER STYLE DNA PROFILE:
 - Lifestyle/Vibe: ${lifestyle}
 - City/Location: ${city}
 
+USER'S CLOSET INVENTORY (use these items whenever relevant):
+${wardrobeSnapshot}
+
 ${itemContext}
 
 CHAT HISTORY:
@@ -1258,17 +1304,47 @@ ${historyPrompt}
 
 User's new message: "${message}"
 
-Write a highly personalized, warm, and professional response advising the user as their personal stylist. Keep the tone helpful, encouraging, and stylish.
+HOW TO RESPOND:
+1. If the user references a closet item — by name, description, or color ("this black dress", "the kurta", "my white sneakers") — locate it in the closet inventory and build outfits around it. Reference items by their exact inventory names.
+2. Honor every constraint the user mentions: colors to avoid, occasion (e.g. a rudraabhishek/pooja calls for modest clothing — non-ethnic casual is fine), formality, seasons, and ethnic vs non-ethnic preference.
+3. Build outfits using ONLY items from the closet inventory (2-4 items per outfit). If nothing in the closet fits the request, say which items are missing or closest, and briefly suggest what to add.
+4. Keep the reply concise and warm. Plain text only: no markdown headings, no bold/italics, use "- " for bullet lists, separate paragraphs with a blank line.
+5. When the user wants to buy something or an item is missing from the closet, append direct shopping search links at the end of your reply, one per line, as PLAIN URLs only — never wrapped in markdown brackets/parentheses like [text](url), never in quotes. Use ONLY these exact formats with a short, product-specific query (URL-encoded, spaces as %20):
+- Amazon: https://www.amazon.com/s?k=<url-encoded query>
+- Myntra: https://www.myntra.com/<url-encoded query>
+- Google Shopping: https://www.google.com/search?tbm=shop&q=<url-encoded query>
+Example line: "Shop similar: https://www.amazon.com/s?k=black%20dress"
 
-FORMATTING RULES:
-1. Do NOT use markdown heading tags (e.g., #, ##, ###, etc.).
-2. Do NOT use bold markdown tags (**text**) or italics (*text*). Use standard capitalization and plain text for emphasis.
-3. For lists, use simple bullet points starting with a hyphen (e.g., "- First item") followed by a space.
-4. Separate sections or paragraphs with double line breaks for beautiful, spacious readability.
-This is critical for mobile text display. Output clean, conversational plain text following these rules.`;
+Return your response as valid JSON ONLY in this exact format (no markdown code fences, no extra text):
+{
+  "text": "Your full conversational reply to the user",
+  "closetItemNames": ["Exact Inventory Item Name 1", "Exact Inventory Item Name 2"]
+}
+
+RULES:
+- "text" is your complete reply.
+- "closetItemNames" lists ONLY items that exist verbatim in the closet inventory and that you referenced; use [] if none.`;
 
     const result = await model.generateContent(systemPrompt);
-    return { text: result.response.text().trim() };
+    const rawText = result.response.text().trim();
+
+    // Parse the JSON envelope; on any failure, fall back to the raw text.
+    // Mirrors the packing flow's robust try/catch pattern.
+    try {
+      const parsed = JSON.parse(extractJSON(rawText));
+      const text = (parsed && typeof parsed.text === 'string' && parsed.text.trim())
+        ? parsed.text.trim()
+        : rawText;
+      const closetItemNames = Array.isArray(parsed?.closetItemNames)
+        ? parsed.closetItemNames.filter(
+            (n: string) => typeof n === 'string' && wardrobeItems?.some(w => w.name === n)
+          )
+        : undefined;
+      return { text, closetItemNames };
+    } catch (parseErr) {
+      console.warn('Stylist JSON envelope parse failed, returning raw text:', parseErr);
+      return { text: rawText };
+    }
   } catch (error) {
     console.error('Stylist chat error:', error);
     throw error;
@@ -1307,11 +1383,11 @@ export const analyzeArTryon = async (
 OVERLAID CLOTHING ITEM DETAILS:
 - Name: ${attachedItem.name}
 - Type: ${attachedItem.type}/${attachedItem.subType}
-- Colors: ${attachedItem.colors.join(', ')}
+- Colors: ${fmtList(attachedItem.colors)}
 - Pattern: ${attachedItem.pattern}
 - Fabric: ${attachedItem.fabric}
 - Formality: ${attachedItem.formality}
-- Seasons: ${attachedItem.seasons.join(', ')}
+- Seasons: ${fmtList(attachedItem.seasons)}
 
 USER STYLE PROFILE:
 - Gender: ${gender}

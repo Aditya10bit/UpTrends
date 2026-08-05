@@ -270,3 +270,141 @@ export const generateOutfitColors = (venueColors: ColorInfo[]): string[] => {
     const uniqueColors = [...new Set(outfitColors)];
     return uniqueColors.slice(0, 6);
 };
+
+// --- Color string helpers (hex codes AND plain color names) ---
+// Gemini's dominantColors output sometimes returns hex codes ("#FF5733") and
+// sometimes color names ("Navy Blue"). These helpers resolve either form into a
+// swatch-able hex + a human-readable label, so UI can render the actual color.
+
+// Normalize a color name for lookups (lowercase, spaces removed).
+const normName = (name: string): string => name.toLowerCase().replace(/\s+/g, '');
+
+// Invert the hex→name map so names can be resolved back to a swatch color.
+const nameToHexMap: Record<string, string> = {};
+Object.entries(colorMap).forEach(([hex, name]) => {
+    const key = normName(name);
+    if (!nameToHexMap[key]) nameToHexMap[key] = hex;
+});
+
+// Extra common fashion/venue color names not covered by colorMap.
+const extraColorNames: Record<string, string> = {
+    beige: '#F5F5DC',
+    cream: '#FFFDD0',
+    ivory: '#FFFFF0',
+    maroon: '#800000',
+    burgundy: '#800020',
+    charcoal: '#36454F',
+    teal: '#008080',
+    emerald: '#50C878',
+    mustard: '#FFDB58',
+    terracotta: '#E2725B',
+    rose: '#FF007F',
+    lavender: '#E6E6FA',
+    peach: '#FFDAB9',
+    mint: '#98FF98',
+    'off white': '#F8F8F8',
+    'navy blue': '#000080',
+    grey: '#808080',
+    nude: '#E3BC9A',
+    'dark navy': '#000080',
+    'light beige': '#F5F5DC',
+    // Compound colors Gemini commonly returns for venue/outfit analysis
+    'burnt orange': '#CC5500',
+    'charcoal black': '#36454F',
+    'olive green': '#808000',
+    'forest green': '#228B22',
+    'dark green': '#006400',
+    'light green': '#90EE90',
+    'dark blue': '#00008B',
+    'light blue': '#ADD8E6',
+    'sky blue': '#87CEEB',
+    'dark red': '#8B0000',
+    'light pink': '#FFB6C1',
+    'hot pink': '#FF69B4',
+    'baby blue': '#89CFF0',
+    'baby pink': '#F4C2C2',
+    'dusty pink': '#DCAE96',
+    'wine red': '#722F37',
+    'wine': '#722F37',
+    'sand': '#C2B280',
+    'khaki': '#C3B091',
+    'tan': '#D2B48C',
+    'taupe': '#483C32',
+    'stone': '#928E85',
+    'rust': '#B7410E',
+    'coral': '#FF7F50',
+    'mauve': '#E0B0FF',
+    'plum': '#8E4585',
+    'sage': '#B2AC88',
+    'camel': '#C19A6B',
+    'caramel': '#FFD59A',
+    'chocolate': '#7B3F00',
+    'bronze': '#CD7F32',
+    'copper': '#B87333',
+    'gold': '#FFD700',
+    'silver': '#C0C0C0',
+    'slate': '#708090',
+    'periwinkle': '#CCCCFF',
+    'mint green': '#98FF98',
+    'olive': '#808000',
+    'burgundy red': '#800020',
+    'dark grey': '#A9A9A9',
+    'light grey': '#D3D3D3',
+    'blush': '#DE5D83',
+    'champagne': '#F7E7CE',
+};
+Object.entries(extraColorNames).forEach(([name, hex]) => {
+    nameToHexMap[normName(name)] = hex;
+});
+
+// Normalize any hex-ish string to #RRGGBB (accepts #RGB, RRGGBB, 0x…), else null.
+export const normalizeHex = (value: string): string | null => {
+    let hex = (value || '').trim().replace(/^0x/i, '#');
+    if (!/^#/.test(hex)) hex = '#' + hex;
+    if (/^#[a-f\d]{3}$/i.test(hex)) {
+        hex = '#' + hex[1] + hex[1] + hex[2] + hex[2] + hex[3] + hex[3];
+    }
+    return /^#[a-f\d]{6}$/i.test(hex) ? hex.toLowerCase() : null;
+};
+
+// Resolve any color string (hex or name) to a valid #RRGGBB hex for a swatch.
+// Tries exact name match first, then falls back to substring matching so that
+// compound Gemini names like "burnt orange" → "orange", "charcoal black" → "charcoal".
+export const colorToHex = (value: string): string | null => {
+    if (!value) return null;
+    const normalized = normalizeHex(value);
+    if (normalized) return normalized;
+    const key = normName(value.trim());
+    // 1. Exact match
+    if (nameToHexMap[key]) return nameToHexMap[key];
+    // 2. Substring match — pick the longest known name that is contained in the input
+    let bestHex = '';
+    let bestLen = 0;
+    Object.entries(nameToHexMap).forEach(([name, hex]) => {
+        if (name.length >= 3 && key.length > name.length && key.includes(name) && name.length > bestLen) {
+            bestLen = name.length;
+            bestHex = hex;
+        }
+    });
+    if (bestHex) return bestHex;
+    // 3. Reverse substring — input is contained in a known name (e.g. "red" in "darkred")
+    Object.entries(nameToHexMap).forEach(([name, hex]) => {
+        if (name.length >= 3 && name.includes(key) && name.length > bestLen) {
+            bestLen = name.length;
+            bestHex = hex;
+        }
+    });
+    return bestHex || null;
+};
+
+// Human-readable label for a color string — never a raw hex code. Hex input is
+// converted to its nearest color name; named input passes through as-is.
+export const resolveColorLabel = (value: string): string => {
+    if (!value) return 'n/a';
+    const normalized = normalizeHex(value);
+    if (normalized) {
+        const name = getColorName(normalized);
+        return name && name !== 'Unknown' ? name : normalized;
+    }
+    return value.trim();
+};

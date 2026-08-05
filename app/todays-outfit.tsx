@@ -14,7 +14,6 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
-import * as WebBrowser from 'expo-web-browser';
 import Animated, {
     useAnimatedStyle,
     useSharedValue,
@@ -32,6 +31,7 @@ import { getUserProfile } from '../services/userService';
 import { getColorCode } from '../utils/colorResolver';
 import { clearWeatherCache, getCurrentWeather, getWeatherBasedTheme, WeatherData } from '../services/weatherService';
 import { checkUserGender, promptForGender } from '../utils/genderUtils';
+import { openExternalUrl } from '../utils/openExternalUrl';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -499,11 +499,7 @@ export default function TodaysOutfitScreen() {
                       <TouchableOpacity
                         key={index}
                         style={[styles.shoppingLink, { backgroundColor: theme.background, borderColor: theme.borderLight }]}
-                        onPress={() => WebBrowser.openBrowserAsync(link.url, {
-                          readerMode: false,
-                          enableBarCollapsing: true,
-                          dismissButtonStyle: 'close',
-                        })}
+                        onPress={() => openExternalUrl(link.url)}
                       >
                         <View style={[styles.shoppingIconContainer, { backgroundColor: weatherTheme?.primary || theme.primary }]}>
                           <Ionicons name={link.icon as any} size={20} color="#fff" />
@@ -533,11 +529,7 @@ export default function TodaysOutfitScreen() {
                         borderWidth: 1.5,
                         marginTop: 12,
                       }]}
-                      onPress={() => WebBrowser.openBrowserAsync(link.url, {
-                        readerMode: false,
-                        enableBarCollapsing: true,
-                        dismissButtonStyle: 'close',
-                      })}
+                      onPress={() => openExternalUrl(link.url)}
                     >
                       <View style={[styles.shoppingIconContainer, { backgroundColor: '#E60023' }]}>
                         <Ionicons name="logo-pinterest" size={20} color="#fff" />

@@ -23,8 +23,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
 import { OutfitSuggestion } from '../services/outfitService';
 import { getColorCode, hexToHSL, detectHarmony } from '../utils/colorResolver';
+import { openExternalUrl } from '../utils/openExternalUrl';
 import Svg, { Circle, Line } from 'react-native-svg';
-import * as WebBrowser from 'expo-web-browser';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -494,20 +494,8 @@ export default function OutfitDetailScreen() {
                         key={index}
                         style={[styles.linkCard, { backgroundColor: theme.background, borderColor: theme.borderLight }]}
                         onPress={async () => {
-                          try {
-                            await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                            await WebBrowser.openBrowserAsync(link.url, {
-                              readerMode: false,
-                              enableBarCollapsing: true,
-                              dismissButtonStyle: 'close',
-                            });
-                          } catch (error) {
-                            console.error('Error opening browser:', error);
-                            // Fallback to standard Linking if WebBrowser fails
-                            import('react-native').then(({ Linking }) => {
-                              Linking.openURL(link.url).catch(e => console.error('Linking error:', e));
-                            });
-                          }
+                          await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                          await openExternalUrl(link.url);
                         }}
                       >
                         <View style={[styles.linkIconContainer, { backgroundColor: theme.primary }]}>
@@ -539,19 +527,8 @@ export default function OutfitDetailScreen() {
                         key={index}
                         style={[styles.linkCard, { backgroundColor: theme.background, borderColor: theme.borderLight }]}
                         onPress={async () => {
-                          try {
-                            await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                            await WebBrowser.openBrowserAsync(link.url, {
-                              readerMode: false,
-                              enableBarCollapsing: true,
-                              dismissButtonStyle: 'close',
-                            });
-                          } catch (error) {
-                            console.error('Error opening browser:', error);
-                            import('react-native').then(({ Linking }) => {
-                              Linking.openURL(link.url).catch(e => console.error('Linking error:', e));
-                            });
-                          }
+                          await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                          await openExternalUrl(link.url);
                         }}
                       >
                         <View style={[styles.linkIconContainer, { backgroundColor: theme.primary }]}>
