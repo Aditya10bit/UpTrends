@@ -26,6 +26,7 @@ import {
   addWardrobeItem,
   WardrobeItem,
   ShoppingMatchResult,
+  ClothingType,
 } from '../services/digitalWardrobeService';
 import { getUserProfile } from '../services/userService';
 import { getColorCode } from '../utils/colorResolver';
@@ -156,9 +157,18 @@ export default function ShoppingScannerScreen() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
       const gender = userProfile?.gender || 'male';
-      
-      // Directly add using current image and metadata to bypass re-analysis
-      await addWardrobeItem(imageUri, gender);
+
+      // Add using the metadata the scanner ALREADY detected — no second AI call.
+      // (Previously this re-ran full AI analysis, doubling cost and failing when
+      // quota was low after the first call.)
+      await addWardrobeItem(imageUri, gender, {
+        name: result.detectedItem.name,
+        type: result.detectedItem.type as ClothingType,
+        subType: result.detectedItem.subType,
+        primaryColor: result.detectedItem.primaryColor,
+        colors: [result.detectedItem.primaryColor],
+        stylePersonality: result.detectedItem.stylePersonality,
+      });
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Alert.alert(

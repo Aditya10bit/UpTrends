@@ -117,6 +117,8 @@ export interface WardrobeStats {
   gapAnalysis: string[];     // "You're missing a versatile navy blazer"
   duplicates: string[];      // "You have 4 similar white t-shirts"
   costPerWear: { itemName: string; cost: number; wears: number; cpw: number }[];
+  outfitCount: number;      // total distinct looks the wardrobe can produce
+  outfitFormula: string;    // "9 tops × 5 bottoms × 3 shoes = 135 looks"
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -266,15 +268,47 @@ const getDefaultClothingMetadata = () => ({
 
 // ─── CRUD Operations ──────────────────────────────────────────────────────────
 
+export type ClothingMetadata = Omit<
+  WardrobeItem,
+  'id' | 'userId' | 'imageUri' | 'imageBase64' | 'favorite' | 'timesWorn' | 'dateAdded' | 'lastWorn' | 'notes' | 'purchasePrice'
+>;
+
+// Fill sensible defaults for a partially-detected item (e.g. from the shopping
+// scanner) so it can be persisted WITHOUT a second Gemini analysis call.
+const buildMetadataFromPartial = (meta: Partial<ClothingMetadata>, gender: string): ClothingMetadata => {
+  const primaryColor = meta.primaryColor || meta.colors?.[0] || 'Unknown';
+  return {
+    type: meta.type || 'top',
+    subType: meta.subType || 'Unknown Item',
+    colors: meta.colors && meta.colors.length > 0 ? meta.colors : [primaryColor],
+    primaryColor,
+    pattern: meta.pattern || 'solid',
+    fabric: meta.fabric || 'cotton',
+    brand: meta.brand,
+    formality: meta.formality || 'casual',
+    seasons: meta.seasons || ['all_season'],
+    occasions: meta.occasions || ['casual'],
+    condition: meta.condition || 'good',
+    name: meta.name || 'Clothing Item',
+    pairsWellWith: meta.pairsWellWith || [],
+    avoidWith: meta.avoidWith || [],
+    stylePersonality: meta.stylePersonality || (gender === 'male' ? 'classic' : 'trendy'),
+  };
+};
+
 export const addWardrobeItem = async (
   imageUri: string,
-  gender: string = 'male'
+  gender: string = 'male',
+  preAnalyzedMetadata?: Partial<ClothingMetadata>
 ): Promise<WardrobeItem> => {
   const user = auth?.currentUser;
   if (!user) throw new Error('Not authenticated');
 
-  // Step 1: AI analyze the clothing item
-  const metadata = await analyzeClothingItem(imageUri, gender);
+  // Step 1: AI analyze the clothing item — skipped when the caller already has
+  // metadata (e.g. from the "Will It Match?" scanner), avoiding a second call.
+  const metadata: ClothingMetadata = preAnalyzedMetadata
+    ? buildMetadataFromPartial(preAnalyzedMetadata, gender)
+    : await analyzeClothingItem(imageUri, gender);
 
   // Generate ID beforehand to use for naming local files
   let itemId = `local_${Date.now()}`;
@@ -756,6 +790,8 @@ export const getWardrobeStats = (items: WardrobeItem[]): WardrobeStats => {
       gapAnalysis: ['Start building your wardrobe by adding your first item!'],
       duplicates: [],
       costPerWear: [],
+      outfitCount: 0,
+      outfitFormula: 'Add items to see your outfit potential',
     };
   }
 
@@ -878,6 +914,31 @@ export const getWardrobeStats = (items: WardrobeItem[]): WardrobeStats => {
     }))
     .sort((a, b) => a.cpw - b.cpw);
 
+  // ─── Outfit Potential Engine ────────────────────────────────────────────────
+  // Counts how many distinct looks the wardrobe can actually produce.
+  //   two-piece looks = tops × bottoms × shoe choices
+  //   full-piece looks = dresses/ethnic/formal sets (each is a complete outfit)
+  const tops = items.filter(i => i.type === 'top' || i.type === 'outerwear');
+  const bottoms = items.filter(i => i.type === 'bottom');
+  const fullPieces = items.filter(i => i.type === 'dress' || i.type === 'ethnic' || i.type === 'formal_set');
+  const footwear = items.filter(i => i.type === 'footwear');
+  const shoeFactor = Math.max(footwear.length, 1); // no shoes? don't zero everything out
+
+  const twoPieceOutfits = tops.length * bottoms.length * shoeFactor;
+  const fullPieceOutfits = fullPieces.length * shoeFactor;
+  const outfitCount = twoPieceOutfits + fullPieceOutfits;
+
+  const formulaParts: string[] = [];
+  if (tops.length > 0 && bottoms.length > 0) {
+    formulaParts.push(`${tops.length} tops × ${bottoms.length} bottoms × ${shoeFactor} shoe${shoeFactor === 1 ? '' : 's'}`);
+  }
+  if (fullPieces.length > 0) {
+    formulaParts.push(`${fullPieces.length} full look${fullPieces.length === 1 ? '' : 's'}`);
+  }
+  const outfitFormula = formulaParts.length > 0
+    ? `${formulaParts.join(' + ')} = ${outfitCount} look${outfitCount === 1 ? '' : 's'}`
+    : 'Add tops + bottoms to unlock outfit combos';
+
   return {
     totalItems: items.length,
     byType,
@@ -889,7 +950,146 @@ export const getWardrobeStats = (items: WardrobeItem[]): WardrobeStats => {
     gapAnalysis,
     duplicates,
     costPerWear,
+    outfitCount,
+    outfitFormula,
   };
+};
+
+// ─── AI Closet Intelligence ───────────────────────────────────────────────────
+
+export interface ClosetInsight {
+  archetype: string;         // "Classic Minimalist"
+  archetypeEmoji: string;    // "🕶️"
+  colorMood: string;         // "Earthy neutrals with a pop of indigo"
+  strengths: string[];       // 3 concrete strengths
+  opportunities: string[];   // 3 actionable ways to level up
+  signatureLook: string;     // one full outfit built from items they own
+  shoppingPriority: { item: string; reason: string; priority: 'high' | 'medium' | 'low' }[];
+}
+
+// Compact, AI-safe inventory line per item.
+const summarizeItem = (item: WardrobeItem): string =>
+  `${item.name} | ${item.type}/${item.subType} | ${fmtList(item.colors)} | ${item.formality} | ${fmtList(item.seasons)} | ${item.stylePersonality || 'classic'}`;
+
+const buildInventory = (items: WardrobeItem[]): string => {
+  if (items.length === 0) return '(empty wardrobe)';
+  return items.slice(0, 80).map((item, i) => `${i + 1}. ${summarizeItem(item)}`).join('\n');
+};
+
+// Deterministic fallback — derives honest insights from the existing stats so the
+// AI audit never blocks the UI, even when Gemini is down.
+export const getFallbackClosetInsight = (items: WardrobeItem[]): ClosetInsight => {
+  const stats = getWardrobeStats(items);
+
+  if (stats.totalItems === 0) {
+    return {
+      archetype: 'Fresh Start',
+      archetypeEmoji: '🌱',
+      colorMood: 'A blank canvas',
+      strengths: ['Your closet is a blank canvas — full creative freedom'],
+      opportunities: ['Add one versatile top + one bottom to unlock your first looks'],
+      signatureLook: 'Start with a crisp white tee and your favorite jeans',
+      shoppingPriority: [],
+    };
+  }
+
+  const topType = Object.entries(stats.byType).sort((a, b) => b[1] - a[1])[0];
+  const archetype = topType ? `${topType[0].charAt(0).toUpperCase()}${topType[0].slice(1)} enthusiast` : 'Explorer';
+
+  const strengths: string[] = [];
+  if (stats.outfitCount > 0) strengths.push(`${stats.totalItems} pieces give you ${stats.outfitCount} possible looks`);
+  if (stats.colorDistribution.length >= 3) strengths.push(`A ${stats.colorDistribution.length}-color palette that mixes easily`);
+  if (stats.seasonReadiness.filter(s => s.score >= 70).length >= 3) strengths.push('Year-round coverage across 3+ seasons');
+  if (stats.formalitySpread['formal'] || stats.formalitySpread['semi_formal']) strengths.push('Dressy occasions are covered');
+
+  const opportunities: string[] = [];
+  if (stats.outfitCount === 0) opportunities.push('Add a bottom (jeans, chinos) to start creating full outfits');
+  if (!stats.byType['outerwear']) opportunities.push('One neutral jacket or blazer triples your layering options');
+  if ((stats.byType['footwear'] || 0) < 2) opportunities.push('A second pair of shoes unlocks many more looks');
+  if (stats.colorDistribution.length < 4) opportunities.push('Add a pop of color to break out of neutral territory');
+  if (opportunities.length === 0) opportunities.push('Keep collecting versatile neutrals — they do the heavy lifting');
+
+  return {
+    archetype,
+    archetypeEmoji: '👗',
+    colorMood: stats.colorDistribution.slice(0, 3).map(c => c.color).join(', ') || 'Undefined yet',
+    strengths: strengths.slice(0, 3),
+    opportunities: opportunities.slice(0, 3),
+    signatureLook: 'Try pairing your most-loved pieces in a fresh combination today',
+    shoppingPriority: [],
+  };
+};
+
+// One consolidated Gemini call that audits the whole closet and returns a rich,
+// structured style report. Never throws — returns the deterministic fallback.
+export const analyzeWardrobeIntelligence = async (
+  items: WardrobeItem[],
+  gender: string = 'male'
+): Promise<ClosetInsight> => {
+  const fallback = getFallbackClosetInsight(items);
+  if (items.length === 0) return fallback;
+
+  if (!geminiRateLimiter.canMakeCall()) return fallback;
+
+  try {
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
+
+    const prompt = `You are a world-class fashion director auditing a user's full clothing inventory (AI-detected metadata). Return ONLY valid JSON with these EXACT fields:
+
+{
+  "archetype": "a 2-3 word fashion archetype, e.g. 'Classic Minimalist'",
+  "archetypeEmoji": "one emoji that captures the style",
+  "colorMood": "a short poetic phrase about their color story, e.g. 'Earthy neutrals with a pop of indigo'",
+  "strengths": ["3 concrete strengths of this wardrobe"],
+  "opportunities": ["3 actionable, specific opportunities to level up (name the exact item type and color)"],
+  "signatureLook": "ONE full outfit they can wear RIGHT NOW using only items from the inventory — name the actual pieces",
+  "shoppingPriority": [
+    {"item": "specific item to add (e.g. 'navy unstructured blazer')", "reason": "why it unlocks the most looks", "priority": "high|medium|low"}
+  ]
+}
+
+RULES:
+- Base everything ONLY on the inventory given — never invent items you don't see.
+- strengths must reflect what is actually there (volume, colors, formality range, season coverage).
+- opportunities must be specific and actionable, never generic.
+- shoppingPriority: max 3 items, ordered by impact.
+- The signature look MUST reuse actual item names from the inventory.
+
+USER GENDER: ${gender}
+
+INVENTORY:
+${buildInventory(items)}`;
+
+    const result = await model.generateContent(prompt);
+    let parsed: any = {};
+    try {
+      parsed = JSON.parse(extractJSON(result.response.text()));
+    } catch (parseError) {
+      console.warn('Failed to parse closet insight JSON:', parseError);
+    }
+
+    const normalizePriority = (p: any) => (['high', 'medium', 'low'].includes(p?.priority) ? p.priority : 'medium');
+
+    return {
+      archetype: String(parsed.archetype || fallback.archetype).slice(0, 40),
+      archetypeEmoji: String(parsed.archetypeEmoji || fallback.archetypeEmoji).slice(0, 4),
+      colorMood: String(parsed.colorMood || fallback.colorMood).slice(0, 80),
+      strengths: (Array.isArray(parsed.strengths) ? parsed.strengths.map(String) : fallback.strengths).slice(0, 3),
+      opportunities: (Array.isArray(parsed.opportunities) ? parsed.opportunities.map(String) : fallback.opportunities).slice(0, 3),
+      signatureLook: String(parsed.signatureLook || fallback.signatureLook).slice(0, 160),
+      shoppingPriority: (Array.isArray(parsed.shoppingPriority) ? parsed.shoppingPriority : [])
+        .map((p: any) => ({
+          item: String(p?.item || '').slice(0, 60),
+          reason: String(p?.reason || '').slice(0, 100),
+          priority: normalizePriority(p) as 'high' | 'medium' | 'low',
+        }))
+        .filter(p => p.item)
+        .slice(0, 3),
+    };
+  } catch (error) {
+    console.error('Wardrobe intelligence analysis error:', error);
+    return fallback;
+  }
 };
 
 // ─── Fallbacks ────────────────────────────────────────────────────────────────

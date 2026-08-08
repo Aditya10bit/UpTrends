@@ -5,7 +5,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as WebBrowser from 'expo-web-browser';
 import { router } from 'expo-router';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -26,6 +26,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import PremiumBackground from '../components/PremiumBackground';
 import { isFirebaseInitialized, storage } from '../firebaseConfig';
 import { testApiKey, invalidateApiKeyCache, getActiveKeySource } from '../services/geminiService';
+import KeyUpgradeModal from '../components/KeyUpgradeModal';
 
 import Animated, {
   useAnimatedStyle,
@@ -93,6 +94,9 @@ export default function ProfileScreen() {
   const [apiKeyError, setApiKeyError] = useState('');
   const [activeKeySource, setActiveKeySource] = useState<'custom' | 'default'>('default');
   const [showApiKey, setShowApiKey] = useState(false);
+  const [showKeyInfoModal, setShowKeyInfoModal] = useState(false);
+  // Auto-show the "why your own key?" modal only once per app session to avoid nagging.
+  const hasAutoShownKeyInfo = useRef(false);
 
   // Animation values
   const scale = useSharedValue(1);
@@ -793,7 +797,16 @@ export default function ProfileScreen() {
         ]}>
           {/* Header Row */}
           <TouchableOpacity
-            onPress={() => setApiKeyExpanded(!apiKeyExpanded)}
+            onPress={() => {
+              const next = !apiKeyExpanded;
+              setApiKeyExpanded(next);
+              // On the shared default key, surface the "why your own key?" info
+              // the first time the user opens the settings (once per session).
+              if (next && activeKeySource === 'default' && !hasAutoShownKeyInfo.current) {
+                hasAutoShownKeyInfo.current = true;
+                setShowKeyInfoModal(true);
+              }
+            }}
             style={{
               flexDirection: 'row',
               alignItems: 'center',
@@ -819,6 +832,15 @@ export default function ProfileScreen() {
                 </Text>
               </View>
             </View>
+            {activeKeySource === 'default' && (
+              <TouchableOpacity
+                onPress={() => setShowKeyInfoModal(true)}
+                style={{ padding: 6, marginRight: 2 }}
+                hitSlop={8}
+              >
+                <Ionicons name="information-circle" size={21} color={theme.primary} />
+              </TouchableOpacity>
+            )}
             <Ionicons
               name={apiKeyExpanded ? 'chevron-up' : 'chevron-down'}
               size={20}
@@ -1028,6 +1050,11 @@ export default function ProfileScreen() {
         </Animated.View>
       </ScrollView>
 
+      <KeyUpgradeModal
+        visible={showKeyInfoModal}
+        onClose={() => setShowKeyInfoModal(false)}
+        theme={theme}
+      />
     </Animated.View>
     </PremiumBackground>
   );

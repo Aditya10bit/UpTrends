@@ -5,6 +5,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from '../contexts/AuthContext';
 import { ThemeProvider, useTheme } from '../contexts/ThemeContext';
 import AnimatedSplash from '../components/AnimatedSplash';
+import DefaultKeyPrompt from '../components/DefaultKeyPrompt';
+import { rearmReminders } from '../services/notificationService';
 
 // Minimal error boundary for startup crashes
 import React, { useCallback, useEffect, useState } from 'react';
@@ -63,6 +65,13 @@ function RootLayoutContent() {
   // (plain logo) stays on top and covers the custom animation entirely.
   useEffect(() => {
     SplashScreen.hideAsync();
+  }, []);
+
+  // Re-arm any scheduled local notifications on launch (non-blocking).
+  // Android can drop them when the app is force-closed; this snapshot approach
+  // re-schedules anything still in the future so reminders stay reliable.
+  useEffect(() => {
+    rearmReminders().catch(() => {});
   }, []);
 
   const handleSplashFinish = useCallback(() => {
@@ -134,6 +143,13 @@ function RootLayoutContent() {
           }}
         />
         <Stack.Screen
+          name="plan-event"
+          options={{
+            title: 'Event Planner',
+            presentation: 'card'
+          }}
+        />
+        <Stack.Screen
           name="make-outfit"
           options={{
             title: 'Make Outfit',
@@ -198,6 +214,9 @@ function RootLayoutContent() {
         />
 
       </Stack>
+
+      {/* Auto-dismissing "add your own AI key" nudge — only when on the default key */}
+      {!showSplash && <DefaultKeyPrompt />}
     </AuthProvider>
   );
 }

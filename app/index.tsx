@@ -82,6 +82,7 @@ export default function MainScreen() {
   const cardAnim6 = useRef(new Animated.Value(0)).current;
   const cardAnim7 = useRef(new Animated.Value(0)).current;
   const cardAnim8 = useRef(new Animated.Value(0)).current;
+  const cardAnim9 = useRef(new Animated.Value(0)).current;
 
   const floatingAnim1 = useRef(new Animated.Value(0)).current;
   const floatingAnim2 = useRef(new Animated.Value(0)).current;
@@ -135,6 +136,7 @@ export default function MainScreen() {
     cardAnim6.setValue(0);
     cardAnim7.setValue(0);
     cardAnim8.setValue(0);
+    cardAnim9.setValue(0);
 
     glowAnim.setValue(0);
     morphAnim.setValue(0);
@@ -245,6 +247,12 @@ export default function MainScreen() {
           useNativeDriver: true,
         }),
         Animated.spring(cardAnim8, {
+          toValue: 1,
+          tension: 100,
+          friction: 8,
+          useNativeDriver: true,
+        }),
+        Animated.spring(cardAnim9, {
           toValue: 1,
           tension: 100,
           friction: 8,
@@ -688,6 +696,32 @@ export default function MainScreen() {
     ]).start(() => {
       startExitAnimation(() => {
         router.push('/stylist-chat');
+        setTimeout(() => setIsNavigating(false), 500);
+      });
+    });
+  };
+
+  const navigateToEventPlanner = async () => {
+    if (isNavigating || isExiting) return;
+    setIsNavigating(true);
+
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    Animated.sequence([
+      Animated.spring(cardAnim9, {
+        toValue: 0.92,
+        tension: 300,
+        friction: 10,
+        useNativeDriver: true,
+      }),
+      Animated.spring(cardAnim9, {
+        toValue: 1,
+        tension: 300,
+        friction: 10,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      startExitAnimation(() => {
+        router.push('/plan-event');
         setTimeout(() => setIsNavigating(false), 500);
       });
     });
@@ -1358,6 +1392,51 @@ export default function MainScreen() {
                       </Animated.View>
                       <Text style={styles.cardTitle}>Stylist Chat</Text>
                       <Text style={styles.cardDescription}>Consult your AI stylist</Text>
+                      <View style={styles.cardGlow} />
+                    </LinearGradient>
+                  </GlassCard>
+                </TouchableOpacity>
+              </Animated.View>
+
+              {/* Event Planner Card */}
+              <Animated.View style={[
+                styles.cardContainer,
+                {
+                  transform: [
+                    { scale: cardAnim9 },
+                    {
+                      rotateX: morphAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ['0deg', '-2deg']
+                      })
+                    }
+                  ]
+                }
+              ]}>
+                <TouchableOpacity
+                  onPress={navigateToEventPlanner}
+                  activeOpacity={0.9}
+                  style={styles.cardTouchable}
+                >
+                  <GlassCard style={styles.navCard} intensity={60} tint="light">
+                    <LinearGradient
+                      colors={['rgba(250, 204, 21, 0.85)', 'rgba(217, 70, 239, 0.8)']}
+                      style={styles.cardGradient}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                    >
+                      <Animated.View style={[
+                        styles.cardIconContainer,
+                        {
+                          transform: [{
+                            scale: pulseAnim
+                          }]
+                        }
+                      ]}>
+                        <Ionicons name="calendar-outline" size={32} color="#fff" />
+                      </Animated.View>
+                      <Text style={styles.cardTitle}>Event Planner</Text>
+                      <Text style={styles.cardDescription}>Plan a look, get reminders</Text>
                       <View style={styles.cardGlow} />
                     </LinearGradient>
                   </GlassCard>

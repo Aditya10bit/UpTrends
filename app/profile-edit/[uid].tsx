@@ -100,6 +100,71 @@ const genderList = [
   { label: 'Female 👩', value: 'Female' },
   { label: 'Other 🏳️‍⚧️', value: 'Other' },
 ];
+
+// ─── AI detection matching helpers ────────────────────────────────────────────
+// Gemini echoes the LONG descriptive labels from its prompt (e.g. "Slim/Ectomorph",
+// "Inverted Triangle/V-Shape", "Tall & Lanky") while the app stores only the SHORT
+// value ("Slim", "Inverted Triangle", "Tall Lanky"). An exact string compare never
+// matches, so detected values are fuzzy-matched against each option's label + value.
+
+// Normalize for comparison: lowercase, drop emoji, collapse separators to spaces.
+const normalizeMatchStr = (s: string): string =>
+  (s || '')
+    .toLowerCase()
+    .replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}\u{200D}]/gu, ' ')
+    .replace(/[^a-z0-9]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+// Find the best-matching option VALUE for an AI-detected string.
+// Returns '' when nothing is close enough (caller then asks the user to pick).
+const findMatchingOption = (
+  detected: string,
+  options: { label: string; value: string }[]
+): string => {
+  const target = normalizeMatchStr(detected);
+  if (!target) return '';
+  const targetWords = target.split(' ').filter(Boolean);
+
+  let best = '';
+  let bestScore = 0;
+
+  options.forEach((opt) => {
+    const valueNorm = normalizeMatchStr(opt.value);
+    const labelNorm = normalizeMatchStr(opt.label);
+
+    let score = 0;
+    // 1. Exact (normalized) match on value or label → slam dunk
+    if (valueNorm === target || labelNorm === target) {
+      score = 1000;
+    } else {
+      // 2. Token overlap — the detected phrase shares words with the label/value
+      const optTokens = new Set([...labelNorm.split(' '), ...valueNorm.split(' ')].filter(Boolean));
+      targetWords.forEach((w) => {
+        if (optTokens.has(w)) {
+          score += 3;
+        } else {
+          for (const t of optTokens) {
+            if (t.length >= 4 && (t.includes(w) || w.includes(t))) {
+              score += 1;
+              break;
+            }
+          }
+        }
+      });
+      // 3. Whole-phrase containment (e.g. detected "Slim" inside label "slim ectomorph")
+      if (labelNorm.includes(target) || valueNorm.includes(target)) score += 5;
+      if (target.includes(valueNorm) && valueNorm.length >= 3) score += 5;
+    }
+
+    if (score > bestScore) {
+      bestScore = score;
+      best = opt.value;
+    }
+  });
+
+  return bestScore >= 2 ? best : '';
+};
 const cityList = [
   "Mumbai", "Delhi", "Bangalore", "Hyderabad", "Ahmedabad", "Chennai", "Kolkata", "Pune", "Jaipur", "Lucknow",
   "Kanpur", "Nagpur", "Indore", "Bhopal", "Patna", "Ludhiana", "Agra", "Nashik", "Vadodara", "Other"
@@ -329,32 +394,37 @@ export default function ProfileEditScreen() {
         try {
           const analysisText = await analyzePersonComprehensively(result.assets[0].uri, 'User');
 
-          // Parse the analysis response
-          const bodyTypeMatch = analysisText.match(/Body Type:\s*([^\n]+)/i);
-          const skinToneMatch = analysisText.match(/Skin Tone:\s*([^\n]+)/i);
-          const confidenceMatch = analysisText.match(/Confidence:\s*(\d+)/i);
+          // Parse the analysis response (tolerant of markdown bold like **Body Type:**)
+          const bodyTypeMatch = analysisText.match(/Body\s*Type\s*[:=]\s*\*{0,2}([^*\n]+)/i);
+          const skinToneMatch = analysisText.match(/Skin\s*Tone\s*[:=]\s*\*{0,2}([^*\n]+)/i);
+          const confidenceMatch = analysisText.match(/Confidence\s*[:=]\s*(\d+)/i);
 
           const detectedBodyType = bodyTypeMatch ? bodyTypeMatch[1].trim() : '';
           const detectedSkinTone = skinToneMatch ? skinToneMatch[1].trim() : '';
           const confidence = confidenceMatch ? parseInt(confidenceMatch[1]) : 85;
 
-          // Auto-fill the detected values (excluding gender)
-          if (detectedSkinTone) setSkinTone(detectedSkinTone);
-          
-          // Validate and set body type based on current gender selection
-          if (detectedBodyType && gender) {
-            const validBodyTypes = getBodyTypesForGender(gender);
-            const isValidBodyType = validBodyTypes.some(bt => bt.value === detectedBodyType);
-            
-            if (isValidBodyType) {
-              setBodyType(detectedBodyType);
+          // Gemini may append notes like "(thin frame)" — keep only the type itself
+          const cleanDetected = (s: string) => (s || '').split(/[([{]/)[0].trim();
+
+          const rawBody = cleanDetected(detectedBodyType);
+          const rawSkin = cleanDetected(detectedSkinTone);
+
+          // Auto-fill skin tone — fuzzy-matched so "Fair skin" → "Fair"
+          const appliedSkinTone = findMatchingOption(rawSkin, skinTones) || rawSkin;
+          if (appliedSkinTone) setSkinTone(appliedSkinTone);
+
+          // Auto-fill body type — fuzzy-matched against the current gender's list
+          let appliedBodyType = '';
+          if (rawBody) {
+            if (gender) {
+              // Match only within this gender's list (never apply the wrong gender's shape)
+              appliedBodyType = findMatchingOption(rawBody, getBodyTypesForGender(gender));
             } else {
-              // If detected body type is not valid for current gender, suggest it but don't auto-set
-              console.log(`Detected body type "${detectedBodyType}" is not valid for gender "${gender}"`);
+              // No gender selected yet — match against every list so we still store a clean value
+              const allBodyTypes = [...maleBodyTypes, ...femaleBodyTypes, ...otherBodyTypes];
+              appliedBodyType = findMatchingOption(rawBody, allBodyTypes) || rawBody;
             }
-          } else if (detectedBodyType && !gender) {
-            // If no gender is selected, set the body type anyway
-            setBodyType(detectedBodyType);
+            if (appliedBodyType) setBodyType(appliedBodyType);
           }
 
           await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -375,15 +445,19 @@ export default function ProfileEditScreen() {
             }),
           ]).start();
 
-          const bodyTypeMessage = gender ? 
-            (getBodyTypesForGender(gender).some(bt => bt.value === detectedBodyType) ? 
-              `• Body Type: ${detectedBodyType} ✓` : 
-              `• Body Type: ${detectedBodyType} (not applied - please select manually for ${gender})`) :
-            `• Body Type: ${detectedBodyType} (please select gender first)`;
+          const bodyTypeStatus = !rawBody
+            ? '• Body Type: not detected'
+            : appliedBodyType
+              ? `• Body Type: ${appliedBodyType} ✓`
+              : `• Body Type: ${rawBody} (not applied - please select manually for ${gender || 'your gender'})`;
+
+          const skinToneStatus = rawSkin
+            ? `• Skin Tone: ${appliedSkinTone} ✓`
+            : '• Skin Tone: not detected';
 
           Alert.alert(
             '🎉 Analysis Complete!',
-            `Detected:\n${bodyTypeMessage}\n• Skin Tone: ${detectedSkinTone} ✓\n• Confidence: ${confidence}%\n\n${!gender ? 'Please select your gender first, then ' : ''}You can adjust any detected values if needed.`,
+            `Detected:\n${bodyTypeStatus}\n${skinToneStatus}\n• Confidence: ${confidence}%\n\nYou can adjust any detected values if needed.`,
             [{ text: 'Got it!' }]
           );
         } catch (error) {

@@ -28,8 +28,11 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import {
   addWardrobeItem,
+  analyzeWardrobeIntelligence,
+  ClosetInsight,
   deleteWardrobeItem,
   generateOutfitsFromWardrobe,
+  getFallbackClosetInsight,
   getItemPairings,
   getWardrobe,
   getWardrobeStats,
@@ -40,6 +43,7 @@ import {
 } from '../services/digitalWardrobeService';
 import { getUserProfile } from '../services/userService';
 import { getCurrentWeather, WeatherData } from '../services/weatherService';
+import { safeApiCall } from '../utils/apiSafeguards';
 import { getColorCode } from '../utils/colorResolver';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -88,6 +92,8 @@ export default function WardrobeScreen() {
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [stats, setStats] = useState<WardrobeStats | null>(null);
+  const [closetInsight, setClosetInsight] = useState<ClosetInsight | null>(null);
+  const [analyzingInsight, setAnalyzingInsight] = useState(false);
   const [outfitCombos, setOutfitCombos] = useState<WardrobeOutfitCombo[]>([]);
   const [generatingOutfits, setGeneratingOutfits] = useState(false);
   const [selectedItem, setSelectedItem] = useState<WardrobeItem | null>(null);
@@ -188,6 +194,26 @@ export default function WardrobeScreen() {
       console.error('Failed to load wardrobe:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Runs the one-call AI closet audit. safeApiCall guarantees a fallback (never a crash).
+  const runClosetAudit = async () => {
+    if (analyzingInsight || wardrobeItems.length === 0) return;
+    setAnalyzingInsight(true);
+    try {
+      const gender = userProfile?.gender || 'male';
+      const insight = await safeApiCall(
+        () => analyzeWardrobeIntelligence(wardrobeItems, gender),
+        getFallbackClosetInsight(wardrobeItems),
+        { timeout: 20000, showErrorAlert: false }
+      );
+      setClosetInsight(insight);
+    } catch (error) {
+      console.error('Closet audit failed:', error);
+      setClosetInsight(getFallbackClosetInsight(wardrobeItems));
+    } finally {
+      setAnalyzingInsight(false);
     }
   };
 
@@ -501,6 +527,128 @@ export default function WardrobeScreen() {
 
     return (
       <ScrollView style={styles.statsContainer} showsVerticalScrollIndicator={false}>
+        {/* AI Closet Intelligence */}
+        <View style={[styles.statsCard, { backgroundColor: theme.card }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Text style={[styles.statsTitle, { color: theme.text }]}>🔮 Closet Intelligence</Text>
+            {closetInsight && (
+              <TouchableOpacity onPress={runClosetAudit} hitSlop={8} disabled={analyzingInsight}>
+                <Ionicons name="refresh" size={18} color={theme.primary} />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {analyzingInsight ? (
+            <View style={{ alignItems: 'center', paddingVertical: 24 }}>
+              <ActivityIndicator size="large" color={theme.primary} />
+              <Text style={[styles.insightText, { color: theme.textSecondary, marginTop: 12 }]}>
+                AI is auditing your closet...
+              </Text>
+            </View>
+          ) : closetInsight ? (
+            <View>
+              {/* Archetype badge */}
+              <View style={[styles.archetypeBadge, { backgroundColor: theme.primary + '15', borderColor: theme.primary + '30' }]}>
+                <Text style={{ fontSize: 28 }}>{closetInsight.archetypeEmoji}</Text>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={[styles.insightArchetype, { color: theme.text }]}>
+                    {closetInsight.archetype}
+                  </Text>
+                  <Text style={[styles.insightMood, { color: theme.textSecondary }]}>
+                    {closetInsight.colorMood}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Strengths */}
+              <Text style={[styles.insightSectionLabel, { color: theme.text }]}>💪 Strengths</Text>
+              {closetInsight.strengths.map((s, i) => (
+                <View key={`str-${i}`} style={styles.insightRow}>
+                  <Ionicons name="checkmark-circle" size={16} color={theme.success} style={{ marginTop: 2 }} />
+                  <Text style={[styles.insightText, { color: theme.textSecondary }]}>{s}</Text>
+                </View>
+              ))}
+
+              {/* Opportunities */}
+              <Text style={[styles.insightSectionLabel, { color: theme.text }]}>💡 Level-Up Tips</Text>
+              {closetInsight.opportunities.map((o, i) => (
+                <View key={`opp-${i}`} style={styles.insightRow}>
+                  <Ionicons name="bulb" size={16} color={theme.warning} style={{ marginTop: 2 }} />
+                  <Text style={[styles.insightText, { color: theme.textSecondary }]}>{o}</Text>
+                </View>
+              ))}
+
+              {/* Signature Look */}
+              {closetInsight.signatureLook ? (
+                <View style={[styles.signatureBox, { backgroundColor: '#8b5cf6' + '12', borderColor: '#8b5cf6' + '30' }]}>
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: '#8b5cf6' }}>✨ Signature Look</Text>
+                  <Text style={[styles.insightText, { color: theme.text, marginTop: 5, lineHeight: 20 }]}>
+                    {closetInsight.signatureLook}
+                  </Text>
+                </View>
+              ) : null}
+
+              {/* Shopping priority */}
+              {closetInsight.shoppingPriority.length > 0 && (
+                <View style={{ marginTop: 4 }}>
+                  <Text style={[styles.insightSectionLabel, { color: theme.text }]}>🛍️ Smart Shopping List</Text>
+                  {closetInsight.shoppingPriority.map((p, i) => (
+                    <View key={`shop-${i}`} style={[styles.priorityRow, { backgroundColor: theme.borderLight + '40' }]}>
+                      <Text style={[
+                        styles.priorityChip,
+                        {
+                          backgroundColor: p.priority === 'high' ? theme.error + '20' : p.priority === 'medium' ? theme.warning + '20' : theme.success + '20',
+                          color: p.priority === 'high' ? theme.error : p.priority === 'medium' ? theme.warning : theme.success,
+                        },
+                      ]}>
+                        {p.priority.toUpperCase()}
+                      </Text>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.priorityItem, { color: theme.text }]}>{p.item}</Text>
+                        {p.reason ? (
+                          <Text style={[styles.priorityReason, { color: theme.textSecondary }]}>{p.reason}</Text>
+                        ) : null}
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
+          ) : (
+            <View>
+              <Text style={[styles.insightText, { color: theme.textSecondary, lineHeight: 20 }]}>
+                One-tap style report: your fashion archetype, strengths, hidden gaps and a smart
+                shopping list — built from your actual pieces.
+              </Text>
+              <TouchableOpacity
+                onPress={runClosetAudit}
+                disabled={wardrobeItems.length === 0}
+                style={[styles.auditBtn, { backgroundColor: theme.primary, opacity: wardrobeItems.length === 0 ? 0.5 : 1 }]}
+              >
+                <Ionicons name="sparkles" size={18} color="#fff" />
+                <Text style={styles.auditBtnText}>Analyze My Closet</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+
+        {/* Outfit Potential */}
+        <View style={[styles.statsCard, { backgroundColor: theme.card }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Text style={[styles.statsTitle, { color: theme.text }]}>🧩 Outfit Potential</Text>
+            <Text style={[styles.insightMood, { color: theme.textTertiary }]}>distinct looks</Text>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end' }}>
+            <Text style={[styles.outfitCount, { color: theme.primary }]}>{stats.outfitCount}</Text>
+            <Text style={[styles.outfitCountLabel, { color: theme.textSecondary, marginBottom: 8, marginLeft: 8 }]}>
+              {stats.outfitCount === 1 ? 'outfit you can create today' : 'outfits you can create today'}
+            </Text>
+          </View>
+          <Text style={[styles.insightMood, { color: theme.textSecondary, marginTop: 6 }]}>
+            {stats.outfitFormula}
+          </Text>
+        </View>
+
         {/* Wardrobe Score */}
         <View style={[styles.scoreCard, { backgroundColor: theme.card }]}>
           <LinearGradient
@@ -591,6 +739,21 @@ export default function WardrobeScreen() {
             </View>
           ))}
         </View>
+
+        {/* Best Value (cost per wear) */}
+        {stats.costPerWear.length > 0 && (
+          <View style={[styles.statsCard, { backgroundColor: theme.card }]}>
+            <Text style={[styles.statsTitle, { color: theme.text }]}>💎 Best Value Picks</Text>
+            {stats.costPerWear.slice(0, 3).map((cpw, i) => (
+              <View key={i} style={styles.gapItem}>
+                <Ionicons name="pricetag" size={16} color={theme.success} />
+                <Text style={[styles.gapText, { color: theme.textSecondary }]}>
+                  {cpw.itemName} — spent {cpw.cost} across {cpw.wears} wears ({cpw.cpw}/wear)
+                </Text>
+              </View>
+            ))}
+          </View>
+        )}
 
         {/* Gap Analysis */}
         {stats.gapAnalysis.length > 0 && (
@@ -1188,6 +1351,46 @@ const styles = StyleSheet.create({
   seasonPercent: { fontSize: 12, fontWeight: '600', width: 30, textAlign: 'right' },
   gapItem: { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 12, marginBottom: 8, gap: 10 },
   gapText: { fontSize: 13, flex: 1, lineHeight: 18 },
+
+  // Closet Intelligence
+  archetypeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 14,
+    marginBottom: 12,
+  },
+  insightArchetype: { fontSize: 17, fontWeight: '800', letterSpacing: -0.2 },
+  insightMood: { fontSize: 12.5, fontWeight: '500', marginTop: 2 },
+  insightSectionLabel: { fontSize: 13, fontWeight: '800', marginTop: 8, marginBottom: 7, letterSpacing: -0.2 },
+  insightRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 7, gap: 9 },
+  insightText: { fontSize: 13, flex: 1, lineHeight: 18 },
+  signatureBox: {
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 13,
+    marginTop: 12,
+  },
+  priorityRow: { flexDirection: 'row', alignItems: 'flex-start', borderRadius: 12, padding: 11, marginBottom: 8, gap: 10 },
+  priorityChip: { fontSize: 10, fontWeight: '800', borderRadius: 7, paddingHorizontal: 8, paddingVertical: 3, overflow: 'hidden', marginTop: 2 },
+  priorityItem: { fontSize: 13.5, fontWeight: '700' },
+  priorityReason: { fontSize: 12, lineHeight: 16, marginTop: 2 },
+  auditBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 14,
+    paddingVertical: 14,
+    marginTop: 14,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  auditBtnText: { color: '#fff', fontWeight: '800', fontSize: 15, marginLeft: 8 },
+  outfitCount: { fontSize: 52, fontWeight: '900', letterSpacing: -2 },
+  outfitCountLabel: { fontSize: 13, fontWeight: '600', flex: 1 },
 
   // Item Modal
   modalContainer: { flex: 1 },

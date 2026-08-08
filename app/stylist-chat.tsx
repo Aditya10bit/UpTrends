@@ -1,42 +1,48 @@
-import React, { useState, useEffect, useRef } from 'react';
-import {
-  StyleSheet,
-  View,
-  Text,
-  TouchableOpacity,
-  Image,
-  TextInput,
-  FlatList,
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  StatusBar,
-  Modal,
-  Dimensions,
-  ScrollView,
-  Alert,
-} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Stack, useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useTheme } from '../contexts/ThemeContext';
-import { useAuth } from '../contexts/AuthContext';
-import { openExternalUrl } from '../utils/openExternalUrl';
+import React, { useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
+  Dimensions,
+  FlatList,
+  Image,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import SavedChatsSidebar from '../components/SavedChatsSidebar';
+import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
+import {
+  deleteChat,
+  getSavedChats,
+  loadChat,
+  saveChat,
+  SavedChatMeta,
+} from '../services/chatHistoryService';
+import {
+  ChatMessage,
   getWardrobe,
+  PackingData,
   sendMessageToStylist,
   WardrobeItem,
-  ChatMessage,
-  PackingData,
 } from '../services/digitalWardrobeService';
 import { getUserProfile } from '../services/userService';
+import { openExternalUrl } from '../utils/openExternalUrl';
 
 const { width: screenWidth } = Dimensions.get('window');
 
 const PRESET_PROMPTS = [
-  'What matches my black dress from my closet?',
   'Make a non-ethnic casual outfit for a pooja — no red',
   'Packing list for a 3-day Paris trip',
   'Style advice for athletic bodies',
@@ -54,24 +60,52 @@ export default function StylistChatScreen() {
   const [loading, setLoading] = useState(false);
   const [wardrobeItems, setWardrobeItems] = useState<WardrobeItem[]>([]);
   const [userProfile, setUserProfile] = useState<any>(null);
-  
+
   // Closet Attachment modal & selection
   const [showClosetModal, setShowClosetModal] = useState(false);
   const [attachedItem, setAttachedItem] = useState<WardrobeItem | null>(null);
 
+  // Saved-chat sidebar state
+  const [showSidebar, setShowSidebar] = useState(false);
+  const [savedChats, setSavedChats] = useState<SavedChatMeta[]>([]);
+  const [loadingChats, setLoadingChats] = useState(false);
+  const [currentChatId, setCurrentChatId] = useState<string | null>(null);
+
   const flatListRef = useRef<FlatList>(null);
+
+  // Refs so the unmount-time auto-save sees the freshest state without stale closures.
+  const messagesRef = useRef<ChatMessage[]>([]);
+  const currentChatIdRef = useRef<string | null>(null);
+  const dirtyRef = useRef(false);
+
+  const createWelcomeMessage = (): ChatMessage[] => [
+    {
+      id: 'welcome',
+      text: "Hello! I'm Aria, your personal AI fashion stylist. I can see everything in your closet — ask what matches a specific item , build an outfit for any occasion with the colors you want, or pack for a trip. Ask away! ✨",
+      isUser: false,
+      timestamp: new Date(),
+    },
+  ];
+
+  // Auto-save the conversation when the screen unmounts (navigating away).
+  useEffect(() => {
+    return () => {
+      if (!dirtyRef.current) return;
+      const msgs = messagesRef.current;
+      if (msgs.length <= 1) return;
+      saveChat(msgs, currentChatIdRef.current).catch(() => { });
+    };
+  }, []);
+
+  // Keep the latest messages mirrored into a ref for the cleanup above.
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   useEffect(() => {
     loadData();
     // Initial welcome message
-    setMessages([
-      {
-        id: 'welcome',
-        text: "Hello! I'm Aria, your personal AI fashion stylist. I can see everything in your closet — ask what matches a specific item (like your black dress or kurta), build an outfit for any occasion with the colors you want, or pack for a trip. Ask away! ✨",
-        isUser: false,
-        timestamp: new Date(),
-      },
-    ]);
+    setMessages(createWelcomeMessage());
   }, []);
 
   const loadData = async () => {
@@ -87,10 +121,46 @@ export default function StylistChatScreen() {
     }
   };
 
+  // ----- Saved chat sidebar handlers -----
+
+  const handleOpenSidebar = async () => {
+    setShowSidebar(true);
+    setLoadingChats(true);
+    setSavedChats(await getSavedChats());
+    setLoadingChats(false);
+  };
+
+  const handleOpenChat = async (id: string) => {
+    const history = await loadChat(id);
+    if (history.length === 0) return;
+    setMessages(history);
+    setCurrentChatId(id);
+    currentChatIdRef.current = id;
+    dirtyRef.current = false; // loaded state is already persisted
+    setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 60);
+  };
+
+  const handleNewChat = () => {
+    // Preserve the current conversation before starting fresh (best-effort).
+    if (dirtyRef.current && messagesRef.current.length > 1) {
+      saveChat(messagesRef.current, currentChatIdRef.current).catch(() => { });
+    }
+    setMessages(createWelcomeMessage());
+    setCurrentChatId(null);
+    currentChatIdRef.current = null;
+    dirtyRef.current = true; // so a fresh conversation gets saved on exit
+  };
+
+  const handleDeleteChat = async (id: string) => {
+    const removed = await deleteChat(id);
+    if (removed) setSavedChats(prev => prev.filter(c => c.id !== id));
+  };
+
   const handleSend = async (textToSend: string) => {
     const trimmed = textToSend.trim();
     if (!trimmed && !attachedItem) return;
 
+    dirtyRef.current = true; // conversation is now worth persisting
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     const userMsg: ChatMessage = {
@@ -356,6 +426,15 @@ export default function StylistChatScreen() {
             <Text style={styles.headerTitle}>Aria Stylist Chat</Text>
             <Text style={styles.headerSubtitle}>Personal Styling Consultation</Text>
           </View>
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              handleOpenSidebar();
+            }}
+          >
+            <Ionicons name="menu" size={22} color="#fff" />
+          </TouchableOpacity>
         </View>
       </LinearGradient>
 
@@ -499,6 +578,18 @@ export default function StylistChatScreen() {
           )}
         </View>
       </Modal>
+
+      {/* Saved Chats Sidebar */}
+      <SavedChatsSidebar
+        visible={showSidebar}
+        onClose={() => setShowSidebar(false)}
+        chats={savedChats}
+        loading={loadingChats}
+        theme={theme}
+        onOpenChat={handleOpenChat}
+        onNewChat={handleNewChat}
+        onDeleteChat={handleDeleteChat}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -515,7 +606,7 @@ const styles = StyleSheet.create({
   messageRow: { flexDirection: 'row', marginBottom: 16, gap: 10, maxWidth: '85%' },
   userRow: { alignSelf: 'flex-end', justifyContent: 'flex-end' },
   stylistRow: { alignSelf: 'flex-start', justifyContent: 'flex-start' },
-  
+
   avatarCircle: { width: 30, height: 30, borderRadius: 15, justifyContent: 'center', alignItems: 'center', marginTop: 2 },
   chatBubble: { borderRadius: 18, paddingHorizontal: 16, paddingVertical: 10, maxWidth: '100%' },
   messageText: { fontSize: 14, lineHeight: 20 },

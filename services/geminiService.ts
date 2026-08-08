@@ -876,14 +876,28 @@ export const generateOutfitLinks = async (outfitDescription: string, userPrompt?
 // "Navy blazer with white shirt and dark jeans" into a concise search string
 const normalizeOutfitToSearch = (outfitDescription: string): string => {
   const lower = (outfitDescription || '').toLowerCase();
-  const replaced = lower
-    .replace(/[+/,]/g, ' ')
+  let replaced = lower
+    .replace(/[+/,:()]/g, ' ')
     .replace(/\bwith\b/g, ' ')
     .replace(/\band\b/g, ' ')
     .replace(/\bpaired with\b/g, ' ')
     .replace(/\bcombo\b/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+
+  // Strip closet-context / meta words that leak from AI prompts (e.g. "you already
+  // own the navy blazer from your closet"). Without this, closet/venue words pollute
+  // the Pinterest + store searches and wreck the results. Word-boundary only, so
+  // "own" never matches inside "button-down" or "t-shirt".
+  const CLOSET_META_WORDS = [
+    'closet', 'wardrobe', 'your', 'my', 'you', 'already', 'own', 'have', 'has',
+    'from', 'using', 'use', 'used', 'item', 'items', 'piece', 'pieces', 'user',
+    'profile', 'based', 'available', 'empty', 'currently', 'the', 'a', 'an', 'this',
+    'these', 'those', 'that', 'also', 'please', 'here', 'there', 'not', 'no',
+    'instead', 'only', 'also', 'goes', 'match', 'matches', 'perfect', 'ideal',
+  ];
+  const stopwordPattern = new RegExp(`\\b(${CLOSET_META_WORDS.join('|')})\\b`, 'g');
+  replaced = replaced.replace(stopwordPattern, ' ').replace(/\s+/g, ' ').trim();
 
   // Remove trailing/leading words like 'outfit' that add noise
   const cleaned = replaced.replace(/\boutfit\b/g, '').replace(/\s+/g, ' ').trim();

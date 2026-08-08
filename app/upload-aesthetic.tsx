@@ -28,6 +28,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { analyzeImageAndGenerateOutfits, generateOutfitLinks, generateOutfitsFromPrompt, getActiveKeySource, OutfitSuggestion, StyleAnalysisResult } from '../services/geminiService';
 import { getUserProfile } from '../services/userService';
+import { getWardrobe, WardrobeItem } from '../services/digitalWardrobeService';
 import { colorToHex, resolveColorLabel } from '../utils/colorExtraction';
 import { checkUserGender, promptForGender } from '../utils/genderUtils';
 
@@ -49,6 +50,7 @@ export default function UploadAesthetic() {
   const [suggestions, setSuggestions] = useState<StyleAnalysisResult | null>(null);
   const [isNavigating, setIsNavigating] = useState(false);
   const [userProfile, setUserProfile] = useState<any>(null);
+  const [wardrobeItems, setWardrobeItems] = useState<WardrobeItem[]>([]);
 
   // Animations
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -60,6 +62,7 @@ export default function UploadAesthetic() {
   useEffect(() => {
     startEntranceAnimations();
     loadUserProfile();
+    loadWardrobe();
   }, []);
 
   const loadUserProfile = async () => {
@@ -69,6 +72,30 @@ export default function UploadAesthetic() {
     } catch (error) {
       console.error('Error loading user profile:', error);
     }
+  };
+
+  const loadWardrobe = async () => {
+    try {
+      const items = await getWardrobe();
+      setWardrobeItems(items);
+      console.log(`👗 Upload Aesthetic loaded ${items.length} closet items for context`);
+    } catch (error) {
+      console.error('Error loading wardrobe for closet-aware suggestions:', error);
+    }
+  };
+
+  // Summarize the user's actual closet so Gemini can reuse items they already own.
+  // Legacy items can store colors/seasons as a string — always guard with Array.isArray.
+  const buildWardrobeContext = () => {
+    if (wardrobeItems.length === 0) {
+      return 'User wardrobe is currently empty (no items logged yet).';
+    }
+    const lines = wardrobeItems.slice(0, 50).map((item, i) => {
+      const colors = Array.isArray(item.colors) ? item.colors.join(', ') : 'n/a';
+      const seasons = Array.isArray(item.seasons) ? item.seasons.join(', ') : 'n/a';
+      return `${i + 1}. ${item.name} — ${item.type}/${item.subType}, ${colors}, ${item.formality}, ${seasons}, ${item.stylePersonality || 'classic'}`;
+    });
+    return `User's current wardrobe (${wardrobeItems.length} items):\n${lines.join('\n')}`;
   };
 
   const startEntranceAnimations = () => {
@@ -167,7 +194,8 @@ export default function UploadAesthetic() {
       let result: StyleAnalysisResult;
       
       const userContext = buildUserContext();
-      const enhancedPrompt = `${prompt}\n\nUser Profile: ${userContext}`;
+      const wardrobeContext = buildWardrobeContext();
+      const enhancedPrompt = `${prompt}\n\nUser Profile: ${userContext}\n\nMY CLOSET:\n${wardrobeContext}\n\nUse items from MY CLOSET where they fit the venue, and only suggest shopping links for what the user does NOT already own.`;
 
       if (selectedImages.length > 0) {
         result = await analyzeImageAndGenerateOutfits(selectedImages[0], enhancedPrompt, userProfile);
