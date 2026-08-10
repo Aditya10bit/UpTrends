@@ -75,9 +75,17 @@ export const ensureNotificationSetup = async (): Promise<boolean> => {
 
 // ---------- helpers ----------
 
-/** Date at the given hour of a day offset from now (used for staggered reminders). */
+/** Date at the given hour of a day offset from now (used for weather-prep nudges). */
 const atDayOffset = (dayOffset: number, hour: number, minute = 0): Date => {
   const d = new Date();
+  d.setDate(d.getDate() + dayOffset);
+  d.setHours(hour, minute, 0, 0);
+  return d;
+};
+
+/** Date at the given hour of a day offset from an anchor date (used for event reminders). */
+const atDateOffset = (anchor: Date, dayOffset: number, hour: number, minute = 0): Date => {
+  const d = new Date(anchor);
   d.setDate(d.getDate() + dayOffset);
   d.setHours(hour, minute, 0, 0);
   return d;
@@ -156,20 +164,11 @@ export const scheduleEventReminders = async (
   const eventTime = plan.eventDate.getTime();
   const scheduled: StoredReminder[] = [];
 
-  const snap = (dayOffset: number, hour: number, minute: number): Date => {
-    // For relative offsets always count back from today, not from event day —
-    // this keeps e.g. "T-1" landing one day before the event even if the user
-    // plans the event a week out but schedules reminders late.
-    const d = atDayOffset(dayOffset, hour, minute);
-    if (d.getTime() > eventTime) {
-      // Clamp to morning-of (never schedule after the event).
-      const morning = new Date(plan.eventDate);
-      morning.setHours(7, 0, 0, 0);
-      return morning;
-    }
-    return d;
-  };
-
+  // All offsets are anchored to the EVENT date, not today. This is what makes
+  // the stagger correct: an event tomorrow (planned today) still gets
+  // "lay out tonight" (T-1 = today 20:00) and "morning-of" (event day 07:00)
+  // instead of both being skipped or shifted. Offsets before the event are
+  // naturally clamped by the `fire <= now` check.
   const push = async (
     kind: ReminderKind,
     dayOffset: number,
@@ -178,7 +177,13 @@ export const scheduleEventReminders = async (
     title: string,
     body: string
   ) => {
-    const fire = snap(dayOffset, hour, minute);
+    const fire = atDateOffset(plan.eventDate, dayOffset, hour, minute);
+    if (fire.getTime() > eventTime) {
+      // Clamp to morning-of (never schedule after the event).
+      const morning = new Date(plan.eventDate);
+      morning.setHours(7, 0, 0, 0);
+      return; // skip — event has effectively already started
+    }
     if (fire.getTime() <= now) return; // already passed
     const r = await schedule(title, body, fire, plan.eventId, kind);
     if (r) scheduled.push(r);

@@ -352,6 +352,39 @@ const extraColorNames: Record<string, string> = {
     'light grey': '#D3D3D3',
     'blush': '#DE5D83',
     'champagne': '#F7E7CE',
+    // Modifier + base color phrases Gemini commonly returns for venue/outfit
+    // analysis. Exact matches beat the substring fallback, so "Rose Gold"
+    // renders as rose-gold, not plain gold. (The old code fell back to
+    // substring matching which collapsed these to their base hue.)
+    'rose gold': '#B76E79',
+    'dusty rose': '#C08081',
+    'ivory white': '#FFFFF0',
+    'off-white': '#F8F8F8',
+    'deep red': '#8B0000',
+    'deep green': '#006400',
+    'sage green': '#B2AC88',
+    'dark brown': '#5C4033',
+    'light brown': '#C4A484',
+    'golden yellow': '#FFD700',
+    'pale gold': '#F0D9B5',
+    'metallic gold': '#D4AF37',
+    'dark burgundy': '#800020',
+    'smoke grey': '#8B8B8B',
+    'smoke gray': '#8B8B8B',
+    'dark teal': '#006060',
+    'midnight blue': '#191970',
+    'emerald green': '#50C878',
+    'royal blue': '#4169E1',
+    'navy green': '#2F4F4F',
+    'charcoal grey': '#36454F',
+    'charcoal gray': '#36454F',
+    'warm grey': '#8C8C8C',
+    'warm gray': '#8C8C8C',
+    'cream white': '#FFFDD0',
+    'off black': '#1A1A1A',
+    'white gold': '#E8E6E0',
+    'champagne gold': '#F7E7CE',
+    'rust orange': '#C4551C',
 };
 Object.entries(extraColorNames).forEach(([name, hex]) => {
     nameToHexMap[normName(name)] = hex;
@@ -370,6 +403,7 @@ export const normalizeHex = (value: string): string | null => {
 // Resolve any color string (hex or name) to a valid #RRGGBB hex for a swatch.
 // Tries exact name match first, then falls back to substring matching so that
 // compound Gemini names like "burnt orange" → "orange", "charcoal black" → "charcoal".
+// Handles multi-color strings ("Burgundy & Gold") by resolving the first segment.
 export const colorToHex = (value: string): string | null => {
     if (!value) return null;
     const normalized = normalizeHex(value);
@@ -377,6 +411,20 @@ export const colorToHex = (value: string): string | null => {
     const key = normName(value.trim());
     // 1. Exact match
     if (nameToHexMap[key]) return nameToHexMap[key];
+    // 1b. Multi-color strings ("Burgundy & Gold", "black / white", "red+gold") —
+    //     resolve the first segment that is a known color so a combined venue
+    //     palette still renders a sensible swatch instead of a fallback gray.
+    if (/[&+/|,]/.test(value) || /\band\b/i.test(value)) {
+        const segments = value.split(/&|\+|\/|\||,|\band\b/i).map(s => s.trim()).filter(Boolean);
+        for (const seg of segments) {
+            const segKey = normName(seg);
+            if (nameToHexMap[segKey]) return nameToHexMap[segKey];
+        }
+        for (const seg of segments) {
+            const sub = colorToHex(seg);
+            if (sub) return sub;
+        }
+    }
     // 2. Substring match — pick the longest known name that is contained in the input
     let bestHex = '';
     let bestLen = 0;
@@ -387,14 +435,18 @@ export const colorToHex = (value: string): string | null => {
         }
     });
     if (bestHex) return bestHex;
-    // 3. Reverse substring — input is contained in a known name (e.g. "red" in "darkred")
+    // 3. Reverse substring — input is contained in a known name (e.g. "red" in "darkred").
+    //    Only used when nothing above matched; pick the SHORTEST containing name so a
+    //    bare token like "golden" resolves to "goldenrod", not the longest "pale goldenrod".
+    let revHex = '';
+    let revLen = Infinity;
     Object.entries(nameToHexMap).forEach(([name, hex]) => {
-        if (name.length >= 3 && name.includes(key) && name.length > bestLen) {
-            bestLen = name.length;
-            bestHex = hex;
+        if (name.length >= 3 && name.includes(key) && name.length < revLen) {
+            revLen = name.length;
+            revHex = hex;
         }
     });
-    return bestHex || null;
+    return revHex || null;
 };
 
 // Human-readable label for a color string — never a raw hex code. Hex input is

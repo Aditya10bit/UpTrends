@@ -26,7 +26,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
-import { analyzeImageAndGenerateOutfits, generateOutfitLinks, generateOutfitsFromPrompt, getActiveKeySource, OutfitSuggestion, StyleAnalysisResult } from '../services/geminiService';
+import { analyzeImageAndGenerateOutfits, generateOutfitItemLinks, generateOutfitsFromPrompt, getActiveKeySource, StyleAnalysisResult } from '../services/geminiService';
 import { getUserProfile } from '../services/userService';
 import { getWardrobe, WardrobeItem } from '../services/digitalWardrobeService';
 import { colorToHex, resolveColorLabel } from '../utils/colorExtraction';
@@ -203,6 +203,14 @@ export default function UploadAesthetic() {
         result = await generateOutfitsFromPrompt(enhancedPrompt, userProfile);
       }
 
+      // Attach per-item shopping links so each NOT-owned piece gets its OWN
+      // store searches instead of one combined query (e.g. "sweater shirt").
+      await Promise.all(
+        (result.recommendations || []).map(async (rec) => {
+          rec.itemLinks = await generateOutfitItemLinks(rec.outfit, prompt);
+        })
+      );
+
       setSuggestions(result);
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (error: any) {
@@ -258,42 +266,6 @@ export default function UploadAesthetic() {
     inputRange: [0, 1],
     outputRange: ['0deg', '360deg'],
   });
-
-  const handleSeeLinks = async (outfit: OutfitSuggestion) => {
-    try {
-      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
-      const links = await generateOutfitLinks(outfit.outfit, prompt);
-
-      const allLinks = links.length > 0 ? links : (outfit.shoppingLinks || []);
-
-      if (allLinks.length > 0) {
-        // Show an action sheet so user picks which platform to open in Chrome
-        const platformButtons = allLinks.map((link: any) => ({
-          text: link.platform || link.item || 'Open Link',
-          onPress: () => openExternalUrl(link.url),
-        }));
-        Alert.alert(
-          'Open Shopping Link',
-          `Choose a platform for "${outfit.style}"`,
-          [...platformButtons, { text: 'Cancel', style: 'cancel' as const }],
-        );
-      } else {
-        Alert.alert(
-          'No Links Found',
-          'Unable to generate shopping links for this outfit. Please try searching manually.',
-          [{ text: 'OK' }]
-        );
-      }
-    } catch (error) {
-      console.error('Error generating outfit links:', error);
-      Alert.alert(
-        'Error',
-        'Unable to generate shopping links. Please try again.',
-        [{ text: 'OK' }]
-      );
-    }
-  };
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background, paddingTop: insets.top }]}>
@@ -614,17 +586,47 @@ export default function UploadAesthetic() {
                       </Text>
                     )}
 
-                    {/* See Links Button */}
-                    <TouchableOpacity
-                      style={[styles.linksButton, { backgroundColor: theme.primary }]}
-                      onPress={() => handleSeeLinks(rec)}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons name="link" size={16} color="#fff" style={styles.linksButtonIcon} />
-                      <Text style={styles.linksButtonText}>
-                        See Shopping Links
-                      </Text>
-                    </TouchableOpacity>
+                    {/* Shopping links — each missing piece gets its own link set */}
+                    {rec.itemLinks && rec.itemLinks.length > 0 && (
+                      <View style={styles.itemLinksSection}>
+                        {rec.itemLinks.map((group, gi) => (
+                          <View key={gi} style={[styles.itemLinkGroup, { backgroundColor: theme.backgroundSecondary }]}>
+                            <View style={styles.itemLinkHeader}>
+                              <Ionicons
+                                name={group.owned ? 'checkmark-circle-outline' : 'cart-outline'}
+                                size={14}
+                                color={group.owned ? theme.success : theme.primary}
+                              />
+                              <Text
+                                style={[styles.itemLinkName, { color: group.owned ? theme.textSecondary : theme.text }]}
+                                numberOfLines={1}
+                              >
+                                {group.item}
+                              </Text>
+                              <Text
+                                style={[styles.itemLinkStatus, { color: group.owned ? theme.success : theme.primary }]}
+                              >
+                                {group.owned ? 'In closet' : 'Shop'}
+                              </Text>
+                            </View>
+                            {!group.owned && group.links.length > 0 && (
+                              <View style={styles.itemLinkRow}>
+                                {group.links.map((link, li) => (
+                                  <TouchableOpacity
+                                    key={li}
+                                    style={[styles.itemLinkPill, { borderColor: theme.borderLight, backgroundColor: theme.card }]}
+                                    onPress={() => { Haptics.selectionAsync(); openExternalUrl(link.url); }}
+                                    activeOpacity={0.7}
+                                  >
+                                    <Text style={[styles.itemLinkLabel, { color: theme.primary }]}>{link.platform}</Text>
+                                  </TouchableOpacity>
+                                ))}
+                              </View>
+                            )}
+                          </View>
+                        ))}
+                      </View>
+                    )}
                   </View>
                 ))}
               </View>
@@ -1021,27 +1023,44 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     flexWrap: 'wrap',
   },
-  linksButton: {
+  itemLinksSection: {
     marginTop: getResponsiveSize(12),
-    paddingHorizontal: getResponsiveSize(16),
+    gap: getResponsiveSize(8),
+  },
+  itemLinkGroup: {
+    borderRadius: getResponsiveSize(10),
+    paddingHorizontal: getResponsiveSize(10),
     paddingVertical: getResponsiveSize(8),
-    borderRadius: getResponsiveSize(20),
+  },
+  itemLinkHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#667eea',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
+    gap: getResponsiveSize(6),
   },
-  linksButtonIcon: {
-    marginRight: getResponsiveSize(6),
-  },
-  linksButtonText: {
-    color: '#fff',
+  itemLinkName: {
+    flex: 1,
     fontSize: getResponsiveFontSize(12),
-    fontWeight: '600',
+    fontWeight: '700',
+  },
+  itemLinkStatus: {
+    fontSize: getResponsiveFontSize(10),
+    fontWeight: '800',
+  },
+  itemLinkRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: getResponsiveSize(6),
+    marginTop: getResponsiveSize(6),
+  },
+  itemLinkPill: {
+    paddingHorizontal: getResponsiveSize(10),
+    paddingVertical: getResponsiveSize(5),
+    borderRadius: getResponsiveSize(14),
+    borderWidth: 1,
+  },
+  itemLinkLabel: {
+    fontSize: getResponsiveFontSize(11),
+    fontWeight: '700',
   },
   tipsSection: {
     marginTop: getResponsiveSize(16),

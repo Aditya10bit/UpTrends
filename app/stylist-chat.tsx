@@ -43,9 +43,10 @@ import { openExternalUrl } from '../utils/openExternalUrl';
 const { width: screenWidth } = Dimensions.get('window');
 
 const PRESET_PROMPTS = [
-  'Make a non-ethnic casual outfit for a pooja — no red',
+  'Make a non-ethnic casual outfit for a pooja',
   'Packing list for a 3-day Paris trip',
-  'Style advice for athletic bodies',
+  'Create a date outfit from my closet as per todays weather',
+  'What should I wear to a concert today',
 ];
 
 export default function StylistChatScreen() {

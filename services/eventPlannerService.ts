@@ -16,6 +16,7 @@ import { genAI, extractJSON, generateOutfitLinks, OutfitLink } from './geminiSer
 import { getWardrobe, WardrobeItem } from './digitalWardrobeService';
 import { getUserProfile } from './userService';
 import { safeApiCall } from '../utils/apiSafeguards';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface EventPlanInput {
   occasion: string; // e.g. "Diwali dinner", "Office party", "Friend's wedding"
@@ -43,11 +44,74 @@ export interface EventPlanResult {
   missingItems: string[];
   reasoning: string;
   styleTips: string[];
-  shoppingLinks: OutfitLink[];
+  /** Per-item shopping links — each missing item gets its OWN Pinterest/Amazon/Google set. */
+  gapLinks: GapShopGroup[];
   daysUntil: number;
 }
 
+export interface GapShopGroup {
+  item: string;
+  links: OutfitLink[];
+}
+
+// ---------- plan persistence ----------
+// Plans are held in screen state only, so a tap on a reminder notification (which
+// carries just `eventId`) had nothing to open after the app restarted. We save
+// every generated plan locally (small JSON, capped) so a notification tap can
+// reopen the exact event look. Best-effort — never blocks or breaks planning.
+
+const PLANS_KEY = 'uptrends_event_plans_v1';
+const MAX_SAVED_PLANS = 10;
+
+export const saveEventPlan = async (plan: EventPlanResult): Promise<void> => {
+  try {
+    const raw = await AsyncStorage.getItem(PLANS_KEY);
+    const plans: EventPlanResult[] = raw ? JSON.parse(raw) : [];
+    const without = plans.filter((p) => p.eventId !== plan.eventId);
+    await AsyncStorage.setItem(
+      PLANS_KEY,
+      JSON.stringify([...without, plan].slice(-MAX_SAVED_PLANS))
+    );
+  } catch (e) {
+    // Persistence is a nice-to-have — planning still works without it.
+  }
+};
+
+export const loadEventPlan = async (eventId: string): Promise<EventPlanResult | null> => {
+  try {
+    const raw = await AsyncStorage.getItem(PLANS_KEY);
+    if (!raw) return null;
+    const plans: EventPlanResult[] = JSON.parse(raw);
+    return plans.find((p) => p.eventId === eventId) || null;
+  } catch (e) {
+    return null;
+  }
+};
+
 const escapePrompt = (s: string) => (s || '').replace(/["\n]/g, ' ').trim();
+
+/**
+ * Builds a separate shopping-link group for EVERY missing item. The user asked
+ * for this explicitly — a combined search like "beige trousers, off-white Nehru
+ * jacket, tan loafers" produces one generic Pinterest/Amazon query that matches
+ * none of them well. Instead each gap ("beige tailored trousers") gets its own
+ * Pinterest/Amazon/Google set, so the store searches stay specific.
+ * generateOutfitLinks is pure URL building (no AI), so this is cheap to run.
+ */
+const buildGapLinks = async (missing: string[], occasion: string): Promise<GapShopGroup[]> => {
+  const groups: GapShopGroup[] = [];
+  for (const item of missing) {
+    const trimmed = (item || '').trim();
+    if (!trimmed) continue;
+    try {
+      const links = await generateOutfitLinks(trimmed, occasion);
+      if (links.length) groups.push({ item: trimmed, links });
+    } catch (e) {
+      // A bad item shouldn't sink the whole plan — skip it.
+    }
+  }
+  return groups;
+};
 
 /** Compact, readable closet summary for the prompt (metadata only). */
 const buildWardrobeContext = (items: WardrobeItem[]): string => {
@@ -123,9 +187,7 @@ Rules: 3-6 items. "owned": true must ONLY be for items that genuinely exist in M
     ? parsed.missingItems.map((m: any) => String(m)).filter((m) => m.trim().length > 0)
     : itemsArr.filter((it) => !it.owned).map((it) => `${it.name}${it.color && it.color !== 'unknown' ? ` ${it.color}` : ''}`);
 
-  const shoppingLinks = missing.length
-    ? await generateOutfitLinks(missing.join(', '), input.occasion)
-    : [];
+  const gapLinks = await buildGapLinks(missing, input.occasion);
 
   const daysUntil = Math.max(0, Math.ceil((new Date(input.date + 'T12:00:00').getTime() - Date.now()) / 86400000));
 
@@ -138,7 +200,7 @@ Rules: 3-6 items. "owned": true must ONLY be for items that genuinely exist in M
     missingItems: missing,
     reasoning: parsed.reasoning || 'A tailored look built from your closet for this occasion.',
     styleTips: Array.isArray(parsed.styleTips) ? parsed.styleTips.slice(0, 3) : ['Fit first: get the proportions right.', 'Keep accessories minimal.', 'Check the forecast the night before.'],
-    shoppingLinks,
+    gapLinks,
     daysUntil,
   };
 };
@@ -189,15 +251,8 @@ const getFallbackEventPlan = async (
   const daysUntil = Math.max(0, Math.ceil((new Date(input.date + 'T12:00:00').getTime() - Date.now()) / 86400000));
 
   // generateOutfitLinks is pure URL building (no AI) — safe to run in fallback so
-  // the degraded path still hands the user shop links for their gaps.
-  let shoppingLinks: OutfitLink[] = [];
-  if (missing.length > 0) {
-    try {
-      shoppingLinks = await generateOutfitLinks(missing.join(', '), eventName);
-    } catch (e) {
-      shoppingLinks = [];
-    }
-  }
+  // the degraded path still hands the user per-item shop links for their gaps.
+  const gapLinks = await buildGapLinks(missing, eventName);
 
   return {
     eventId: `evt_${Date.now().toString(36)}_${Math.floor(Math.random() * 1e4).toString(36)}`,
@@ -208,7 +263,7 @@ const getFallbackEventPlan = async (
     missingItems: missing,
     reasoning: `Pulled together from your closet so you show up ready for ${eventName}.${missing.length ? ` You're missing ${missing.join(', ')} — grab those to complete the look.` : ' You already own everything needed.'}`,
     styleTips: ['Keep it comfortable — you should enjoy the event, not fuss over your clothes.', 'Neutral base, one statement piece.', 'Confirm the dress code with the host if unsure.'],
-    shoppingLinks,
+    gapLinks,
     daysUntil,
   };
 };

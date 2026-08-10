@@ -395,6 +395,10 @@ export interface OutfitSuggestion {
   mood: string;
   reasoning: string;
   shoppingLinks?: OutfitLink[];
+  /** Per-item link groups (one per outfit piece). Populated by
+   *  generateOutfitItemLinks so each NOT-owned piece gets its own shop searches
+   *  instead of one combined query that matches nothing. */
+  itemLinks?: OutfitItemLinkGroup[];
 }
 
 export interface OutfitLink {
@@ -832,13 +836,20 @@ const blobToBase64 = (blob: Blob): Promise<string> => {
   });
 };
 
-export const generateOutfitLinks = async (outfitDescription: string, userPrompt?: string): Promise<OutfitLink[]> => {
+export const generateOutfitLinks = async (
+  outfitDescription: string,
+  userPrompt?: string,
+  options?: { exactItem?: boolean }
+): Promise<OutfitLink[]> => {
   // Build deterministic, specific search links based on the outfit items and the user's prompt
   const core = normalizeOutfitToSearch(outfitDescription);
   const promptPart = sanitizeForPrompt(userPrompt || '');
 
-  // Extract 1-2 key item phrases from the outfit for product-oriented search (avoid searching full outfit)
-  const keyItems = extractKeyItems(core, 2);
+  // For a single already-specific item (per-item links), the whole description IS
+  // the key item — extractKeyItems would collapse "Light Blue Oxford Cotton
+  // Button-Down Shirt" down to just "shirt". Only extract key phrases from a
+  // full multi-piece outfit string.
+  const keyItems = options?.exactItem ? [core] : extractKeyItems(core, 2);
 
   // For product searches (Amazon/Myntra), use only the key items
   const productQuery = keyItems.join(' ').trim();
@@ -870,6 +881,64 @@ export const generateOutfitLinks = async (outfitDescription: string, userPrompt?
   ];
 
   return links;
+};
+
+// ---------------------------------------------------------------------------
+// Per-item outfit links — mirrors the event-planner's gap-links pattern.
+// ---------------------------------------------------------------------------
+
+export interface OutfitItemLinkGroup {
+  item: string;   // readable piece, e.g. "Slim Navy Trousers"
+  owned: boolean; // true = already in the user's closet (no links needed)
+  links: OutfitLink[];
+}
+
+// Owned-item markers Gemini appends when it reuses a closet piece, e.g.
+// "Cricket Sweater (from closet)". Any item carrying one is already owned.
+const OWNED_MARKER_RE =
+  /\s*\(?\s*(from\s+(your\s+|my\s+)?(closet|wardrobe)|you\s+already\s+own|already\s+(owned|have)|you\s+(own|have)|owned|have\s+it)\s*\)?\s*$/i;
+
+// Split a Gemini outfit string — e.g. "Cricket Sweater (from closet) + Light
+// Blue Oxford Cotton Button-Down Shirt + Slim Navy Trousers" — into individual
+// pieces, flagging which ones the user already owns. Gemini separates items
+// with " + " (per the prompt's own format example), so that's the primary
+// separator; commas are accepted as a fallback.
+export const splitOutfitItems = (outfit: string): OutfitItemLinkGroup[] => {
+  const parts = (outfit || '')
+    .split(/\s*\+\s*|\s*,\s*/)
+    .map((part) => part.replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
+
+  return parts.map((part) => {
+    const owned = OWNED_MARKER_RE.test(part);
+    // Drop the owned marker itself so the label stays clean.
+    const item = owned ? part.replace(OWNED_MARKER_RE, '').trim() : part;
+    return { item, owned, links: [] };
+  });
+};
+
+// Build a per-item link set for every NOT-owned piece in an outfit. A single
+// call across the whole outfit collapses into a nonsense query like
+// "sweater shirt" — giving each missing piece its own generateOutfitLinks call
+// keeps the store searches specific (same fix as the event planner's gaps).
+export const generateOutfitItemLinks = async (
+  outfit: string,
+  userPrompt?: string
+): Promise<OutfitItemLinkGroup[]> => {
+  const groups = splitOutfitItems(outfit);
+  await Promise.all(
+    groups.map(async (group) => {
+      if (group.owned || !group.item.trim()) return;
+      try {
+        // exactItem: the piece is already a single specific item, so don't let
+        // extractKeyItems collapse it to a bare token like "shirt".
+        group.links = await generateOutfitLinks(group.item, userPrompt, { exactItem: true });
+      } catch (e) {
+        group.links = [];
+      }
+    })
+  );
+  return groups;
 };
 
 // Convert an outfit description like "Black shirt + shorts" or

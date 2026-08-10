@@ -12,13 +12,14 @@ import {
   Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Location from 'expo-location';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../contexts/ThemeContext';
-import { planEvent, EventPlanResult } from '../services/eventPlannerService';
-import { scheduleEventReminders, cancelEventReminders } from '../services/notificationService';
+import { planEvent, EventPlanResult, saveEventPlan, loadEventPlan } from '../services/eventPlannerService';
+import { scheduleEventReminders, cancelEventReminders, getScheduledReminders } from '../services/notificationService';
 import { getCurrentWeather } from '../services/weatherService';
 import { openExternalUrl } from '../utils/openExternalUrl';
 
@@ -44,6 +45,7 @@ export default function PlanEventScreen() {
   const { theme } = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { eventId: eventIdParam } = useLocalSearchParams<{ eventId?: string }>();
 
   const [occasion, setOccasion] = useState('');
   const [customOccasion, setCustomOccasion] = useState('');
@@ -55,6 +57,21 @@ export default function PlanEventScreen() {
   const [weather, setWeather] = useState<{ temp?: number; condition?: string; location?: string }>({});
 
   const resultFade = useRef(new Animated.Value(0)).current;
+
+  // Opened from a reminder notification tap (carries ?eventId=...). Restore the
+  // saved plan so the user lands on their event look instead of a blank form.
+  useEffect(() => {
+    if (!eventIdParam) return;
+    loadEventPlan(eventIdParam).then((saved) => {
+      if (saved) {
+        setPlan(saved);
+        resultFade.setValue(1); // show immediately, skip the entry animation
+      }
+    });
+    getScheduledReminders().then((reminders) => {
+      if (reminders.some((r) => r.eventId === eventIdParam)) setRemindersScheduled(true);
+    });
+  }, [eventIdParam, resultFade]);
 
   // Next 14 days for the date strip.
   const dateOptions = useRef(
@@ -70,7 +87,31 @@ export default function PlanEventScreen() {
 
   const loadWeather = async () => {
     try {
-      const w = await getCurrentWeather();
+      // Use the user's real location (Kolkata etc.), not the Delhi default.
+      let lat: number | undefined;
+      let lon: number | undefined;
+      try {
+        const { status } = await Location.getForegroundPermissionsAsync();
+        if (status === 'granted') {
+          const loc = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+          });
+          lat = loc.coords.latitude;
+          lon = loc.coords.longitude;
+        } else {
+          const asked = await Location.requestForegroundPermissionsAsync();
+          if (asked.granted) {
+            const loc = await Location.getCurrentPositionAsync({
+              accuracy: Location.Accuracy.Balanced,
+            });
+            lat = loc.coords.latitude;
+            lon = loc.coords.longitude;
+          }
+        }
+      } catch (locErr) {
+        // Location unavailable — fall back to default (Delhi) rather than crash.
+      }
+      const w = await getCurrentWeather(lat, lon);
       setWeather({ temp: w.temperature, condition: w.condition, location: w.location });
     } catch (e) {
       // Weather is a nice-to-have — planner works without it.
@@ -102,6 +143,8 @@ export default function PlanEventScreen() {
         location: weather.location,
       });
       setPlan(result);
+      // Persist so a reminder notification tap can reopen this exact plan later.
+      saveEventPlan(result);
       Animated.timing(resultFade, { toValue: 1, duration: 600, useNativeDriver: true }).start();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (e: any) {
@@ -127,9 +170,17 @@ export default function PlanEventScreen() {
       }
       setRemindersScheduled(true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      const summary = scheduled
+        .map((r) => {
+          if (r.kind === 'event-prep-3d') return 'prep 3 days out';
+          if (r.kind === 'event-buy-gap') return 'shop the gap';
+          if (r.kind === 'event-layout-1d') return 'lay out the night before';
+          return 'morning-of wake-up';
+        })
+        .join(', ');
       Alert.alert(
         '🔔 Reminders set!',
-        `${scheduled.length} reminder${scheduled.length > 1 ? 's' : ''} scheduled. We will nudge you to prep, shop any gaps, and get dressed.`,
+        `${scheduled.length} reminder${scheduled.length > 1 ? 's' : ''} scheduled: ${summary}.`,
         [{ text: 'Nice!' }]
       );
     } catch (e: any) {
@@ -312,27 +363,32 @@ export default function PlanEventScreen() {
               </View>
             </View>
 
-            {/* Shopping links for gaps */}
-            {plan.missingItems.length > 0 && (
+            {/* Shopping links for gaps — one set of links per missing item */}
+            {plan.gapLinks.length > 0 && (
               <View style={[styles.resultCard, { backgroundColor: theme.card }]}>
                 <Text style={[styles.sectionTitle, { color: theme.text }]}>🛍️ Complete the look</Text>
                 <Text style={[styles.missingLine, { color: theme.textSecondary }]}>
-                  Not in your closet: <Text style={{ fontWeight: '700', color: theme.text }}>{plan.missingItems.join(', ')}</Text>
+                  Each missing piece has its own shop links:
                 </Text>
-                <View style={styles.linkRow}>
-                  {plan.shoppingLinks.map((link, i) => (
-                    <TouchableOpacity
-                      key={i}
-                      style={[styles.linkBtn, { borderColor: theme.borderLight, backgroundColor: theme.background }]}
-                      onPress={() => { Haptics.selectionAsync(); openExternalUrl(link.url); }}
-                    >
-                      <Text style={[styles.linkLabel, { color: theme.primary }]}>{link.platform}</Text>
-                      <Text style={[styles.linkDesc, { color: theme.textTertiary }]} numberOfLines={1}>
-                        {link.searchQuery}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
+                {plan.gapLinks.map((group, gi) => (
+                  <View key={gi} style={styles.gapGroup}>
+                    <Text style={[styles.gapItem, { color: theme.text }]}>{group.item}</Text>
+                    <View style={styles.linkRow}>
+                      {group.links.map((link, i) => (
+                        <TouchableOpacity
+                          key={i}
+                          style={[styles.linkBtn, { borderColor: theme.borderLight, backgroundColor: theme.background }]}
+                          onPress={() => { Haptics.selectionAsync(); openExternalUrl(link.url); }}
+                        >
+                          <Text style={[styles.linkLabel, { color: theme.primary }]}>{link.platform}</Text>
+                          <Text style={[styles.linkDesc, { color: theme.textTertiary }]} numberOfLines={1}>
+                            {link.searchQuery}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                ))}
               </View>
             )}
 
@@ -429,7 +485,9 @@ const styles = StyleSheet.create({
   tipText: { fontSize: 12, fontWeight: '500' },
 
   missingLine: { fontSize: 13, lineHeight: 19 },
-  linkRow: { gap: 8, marginTop: 12 },
+  gapGroup: { marginTop: 12 },
+  gapItem: { fontSize: 13, fontWeight: '800', marginBottom: 6 },
+  linkRow: { gap: 8 },
   linkBtn: { borderRadius: 12, borderWidth: 1.5, paddingHorizontal: 14, paddingVertical: 10 },
   linkLabel: { fontSize: 13, fontWeight: '800' },
   linkDesc: { fontSize: 11, marginTop: 2 },

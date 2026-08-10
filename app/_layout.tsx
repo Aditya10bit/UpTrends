@@ -6,6 +6,7 @@ import { AuthProvider } from '../contexts/AuthContext';
 import { ThemeProvider, useTheme } from '../contexts/ThemeContext';
 import AnimatedSplash from '../components/AnimatedSplash';
 import DefaultKeyPrompt from '../components/DefaultKeyPrompt';
+import NotificationTapHandler from '../components/NotificationTapHandler';
 import { rearmReminders } from '../services/notificationService';
 
 // Minimal error boundary for startup crashes
@@ -217,6 +218,9 @@ function RootLayoutContent() {
 
       {/* Auto-dismissing "add your own AI key" nudge — only when on the default key */}
       {!showSplash && <DefaultKeyPrompt />}
+
+      {/* Renders null — routes notification taps to the matching event plan */}
+      <NotificationTapHandler />
     </AuthProvider>
   );
 }
