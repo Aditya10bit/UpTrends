@@ -53,3 +53,6 @@ config/config.json
 # Google Services
 google-services.json
 GoogleService-Info.plist
+
+# Local configurations / IDE files
+CLAUDE.md
