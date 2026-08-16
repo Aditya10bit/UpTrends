@@ -1,7 +1,7 @@
 // Security configuration and validation
 export const validateEnvironment = () => {
   const requiredEnvVars = [
-    'EXPO_PUBLIC_GEMINI_API_KEY'
+    // EXPO_PUBLIC_GEMINI_API_KEY is now optional; if missing, we default to the AI Proxy
   ];
 
   const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
@@ -12,11 +12,11 @@ export const validateEnvironment = () => {
 };
 
 // API key validation
-export const getSecureApiKey = (): string => {
+export const getSecureApiKey = (): string | null => {
   const apiKey = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
   
   if (!apiKey) {
-    throw new Error('Gemini API key is not configured');
+    return null;
   }
   
   if (!apiKey.startsWith('AIza')) {

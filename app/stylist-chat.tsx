@@ -237,7 +237,7 @@ export default function StylistChatScreen() {
     if (lower.includes('myntra')) return { name: 'Myntra', icon: 'diamond', color: '#FF3F6C' };
     if (lower.includes('google.com')) return { name: 'Google', icon: 'search', color: '#4285F4' };
     if (lower.includes('pinterest')) return { name: 'Pinterest', icon: 'camera', color: '#E60023' };
-    return { name: 'Shop', icon: 'storefront', color: '#6366f1' };
+    return { name: 'Shop', icon: 'storefront', color: theme.primary };
   };
 
   // Render message text with shopping URLs converted to platform icon buttons
@@ -414,9 +414,9 @@ export default function StylistChatScreen() {
       <Stack.Screen options={{ headerShown: false }} />
       <StatusBar barStyle="light-content" />
 
-      {/* Header */}
+      {/* Header — obsidian/ivory editorial gradient (dark enough for white text in both modes) */}
       <LinearGradient
-        colors={[theme.primary, theme.secondary]}
+        colors={theme.gradientHome as [string, string, string]}
         style={[styles.header, { paddingTop: insets.top + 8 }]}
       >
         <View style={styles.headerRow}>
@@ -600,8 +600,8 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: 16, paddingBottom: 16 },
   headerRow: { flexDirection: 'row', alignItems: 'center' },
   backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
-  headerTitle: { color: '#fff', fontSize: 24, fontWeight: '800', letterSpacing: -0.5 },
-  headerSubtitle: { color: 'rgba(255,255,255,0.7)', fontSize: 13, fontWeight: '500', marginTop: 2 },
+  headerTitle: { color: '#fff', fontFamily: 'PlayfairDisplay_700Bold', fontSize: 22, letterSpacing: -0.4 },
+  headerSubtitle: { color: 'rgba(255,255,255,0.75)', fontFamily: 'Inter_600SemiBold', fontSize: 10, letterSpacing: 1.6, textTransform: 'uppercase', marginTop: 3 },
 
   chatList: { padding: 16 },
   messageRow: { flexDirection: 'row', marginBottom: 16, gap: 10, maxWidth: '85%' },

@@ -273,7 +273,7 @@ const StyleRatingCard: React.FC<StyleRatingCardProps> = ({ result, theme }) => {
           padding: 24,
           overflow: 'hidden',
           shadowColor: theme.shadow,
-          shadowOpacity: theme.background === '#0f172a' ? 0.45 : 0.6,
+          shadowOpacity: theme.background === '#0e0e0e' ? 0.45 : 0.6,
           shadowRadius: 16,
           shadowOffset: { width: 0, height: 8 },
           elevation: 4,

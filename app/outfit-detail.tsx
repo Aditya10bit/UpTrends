@@ -134,7 +134,7 @@ export default function OutfitDetailScreen() {
       <Stack.Screen options={{ headerShown: false }} />
       <Animated.View style={[styles.container, { backgroundColor: theme.background }, screenAnimatedStyle]}>
         <StatusBar
-          barStyle={theme.background === '#18181b' ? 'light-content' : 'dark-content'}
+          barStyle={theme.background === '#0e0e0e' ? 'light-content' : 'dark-content'}
           backgroundColor={theme.background}
         />
         

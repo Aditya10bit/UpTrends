@@ -339,13 +339,13 @@ export default function ProfileScreen() {
       }
       const result = source === 'camera'
         ? await ImagePicker.launchCameraAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          mediaTypes: ['images'],
           allowsEditing: true,
           aspect: [1, 1],
           quality: 0.7,
         })
         : await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          mediaTypes: ['images'],
           allowsEditing: true,
           aspect: [1, 1],
           quality: 0.7,
@@ -380,7 +380,7 @@ export default function ProfileScreen() {
       const timestamp = Date.now();
       const imageRef = ref(storage, `profile-images/${user.uid}_${timestamp}`);
 
-      await uploadBytes(imageRef, blob);
+      await uploadBytes(imageRef, blob as any);
       const downloadURL = await getDownloadURL(imageRef);
       await updateUserProfile(user.uid, { photoURL: downloadURL });
       await loadUserData();
@@ -449,7 +449,7 @@ export default function ProfileScreen() {
     return (
       <PremiumBackground variant="profile">
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <StatusBar barStyle={theme.background === '#18181b' ? "light-content" : "dark-content"} backgroundColor={theme.primary} />
+          <StatusBar barStyle={theme.background === '#0e0e0e' ? "light-content" : "dark-content"} backgroundColor={theme.primary} />
           <Ionicons name="sparkles" size={48} color={theme.primary} />
           <Text style={{ color: theme.text, fontSize: 18, fontWeight: '600', marginTop: 16 }}>
             Loading your profile...
@@ -462,7 +462,7 @@ export default function ProfileScreen() {
   return (
     <PremiumBackground variant="profile">
     <Animated.View style={[{ flex: 1 }, screenAnimatedStyle]}>
-      <StatusBar barStyle={theme.background === '#18181b' ? "light-content" : "dark-content"} backgroundColor={theme.primary} />
+      <StatusBar barStyle={theme.background === '#0e0e0e' ? "light-content" : "dark-content"} backgroundColor={theme.primary} />
       {/* Back Button */}
       <Animated.View style={[
         {

@@ -129,7 +129,7 @@ const MAX_IMAGE_SIZE = 200 * 1024; // 200KB compressed
 
 // ─── Image Helpers ────────────────────────────────────────────────────────────
 
-const blobToBase64 = (blob: Blob): Promise<string> => {
+const blobToBase64 = (blob: any): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onloadend = () => resolve(reader.result as string);
@@ -349,7 +349,7 @@ export const addWardrobeItem = async (
       const blob = await response.blob();
       const imagePath = `wardrobes/${user.uid}/${itemId}.jpg`;
       const imageRef = ref(storage, imagePath);
-      await uploadBytes(imageRef, blob);
+      await uploadBytes(imageRef, blob as any);
       storedImageUri = await getDownloadURL(imageRef);
     } catch (uploadError) {
       console.warn('Firebase upload failed, using local filesystem fallback:', uploadError);

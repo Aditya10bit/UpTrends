@@ -606,7 +606,7 @@ export default function ProfileEditScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
-      <StatusBar barStyle={theme.background === '#18181b' ? "light-content" : "dark-content"} backgroundColor={theme.background} />
+      <StatusBar barStyle={theme.background === '#0e0e0e' ? "light-content" : "dark-content"} backgroundColor={theme.background} />
 
       <ScrollView
         style={{ flex: 1 }}

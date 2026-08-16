@@ -1,13 +1,14 @@
 import { Stack } from "expo-router";
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
+import { useFonts } from 'expo-font';
+import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
+import { PlayfairDisplay_600SemiBold, PlayfairDisplay_700Bold } from '@expo-google-fonts/playfair-display';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from '../contexts/AuthContext';
 import { ThemeProvider, useTheme } from '../contexts/ThemeContext';
 import AnimatedSplash from '../components/AnimatedSplash';
 import DefaultKeyPrompt from '../components/DefaultKeyPrompt';
-import NotificationTapHandler from '../components/NotificationTapHandler';
-import { rearmReminders } from '../services/notificationService';
 
 // Minimal error boundary for startup crashes
 import React, { useCallback, useEffect, useState } from 'react';
@@ -58,26 +59,35 @@ try {
 // Inner layout that has access to useTheme (must be inside ThemeProvider).
 function RootLayoutContent() {
   const { theme } = useTheme();
-  const isDark = theme.background === '#0f172a';
+  const isDark = theme.background === '#0e0e0e';
   const [showSplash, setShowSplash] = useState(true);
 
-  // Hide the native splash as soon as the custom splash has mounted & painted.
-  // If hideAsync() is deferred until the animation ends, the native splash
-  // (plain logo) stays on top and covers the custom animation entirely.
-  useEffect(() => {
-    SplashScreen.hideAsync();
-  }, []);
+  // Load Playfair Display (display) + Inter (body) before showing the app.
+  // Keep the native splash up until the fonts are ready so text doesn't flash
+  // in with the wrong typeface.
+  const [fontsLoaded] = useFonts({
+    PlayfairDisplay_600SemiBold,
+    PlayfairDisplay_700Bold,
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
+  });
 
-  // Re-arm any scheduled local notifications on launch (non-blocking).
-  // Android can drop them when the app is force-closed; this snapshot approach
-  // re-schedules anything still in the future so reminders stay reliable.
+  // Hide the native splash as soon as fonts are loaded AND the custom splash
+  // has mounted. If hideAsync() is deferred until the animation ends, the
+  // native splash (plain logo) stays on top and covers the custom animation.
   useEffect(() => {
-    rearmReminders().catch(() => {});
-  }, []);
+    if (fontsLoaded) SplashScreen.hideAsync();
+  }, [fontsLoaded]);
 
   const handleSplashFinish = useCallback(() => {
     setShowSplash(false);
   }, []);
+
+  // Keep the native splash up until the fonts are ready. Placed AFTER every
+  // hook so the rules-of-hooks stay satisfied while fonts load.
+  if (!fontsLoaded) return null;
 
   return (
     <AuthProvider>
@@ -140,13 +150,6 @@ function RootLayoutContent() {
           name="upload-aesthetic"
           options={{
             title: 'Upload Aesthetic',
-            presentation: 'card'
-          }}
-        />
-        <Stack.Screen
-          name="plan-event"
-          options={{
-            title: 'Event Planner',
             presentation: 'card'
           }}
         />
@@ -218,9 +221,6 @@ function RootLayoutContent() {
 
       {/* Auto-dismissing "add your own AI key" nudge — only when on the default key */}
       {!showSplash && <DefaultKeyPrompt />}
-
-      {/* Renders null — routes notification taps to the matching event plan */}
-      <NotificationTapHandler />
     </AuthProvider>
   );
 }

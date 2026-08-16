@@ -86,7 +86,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       await signOut(auth);
       setHasNavigated(false);
-      // Let auth state change handle navigation
+      // Explicitly navigate to auth screen — the auth-state effect has a
+      // 100ms timeout with a stale-closure race that often misses this.
+      router.replace('/auth');
     } catch (error) {
       console.error('Error signing out:', error);
     }

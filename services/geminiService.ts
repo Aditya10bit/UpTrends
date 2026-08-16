@@ -2,10 +2,12 @@
 // import { checkMemoryPressure } from '../utils/apiSafeguards';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as FileSystem from 'expo-file-system';
 import { geminiRateLimiter, getSecureApiKey } from '../config/security';
+import { isModelExhaustedToday, markModelExhausted } from '../utils/aiQuotaTracker';
 import { trackAIRequest } from './analyticsService';
 import { TopographyData } from './topographyService';
-import { isModelExhaustedToday, markModelExhausted } from '../utils/aiQuotaTracker';
+import { callAIProxy, isProxyConfigured } from './aiProxyService';
 
 /**
  * Robust JSON extractor. Finds the first '{' or '[' and the last '}' or ']'
@@ -56,7 +58,7 @@ let cachedCustomKey: string | null | undefined = undefined; // undefined = not y
 let cachedGenAIInstance: GoogleGenerativeAI | null = null;
 let lastKeySource: 'custom' | 'default' = 'default';
 
-const getGenAIInstance = async (): Promise<GoogleGenerativeAI> => {
+const getGenAIInstance = async (): Promise<GoogleGenerativeAI | null> => {
   try {
     // Check AsyncStorage for a user-provided key (cache after first read)
     if (cachedCustomKey === undefined) {
@@ -80,11 +82,17 @@ const getGenAIInstance = async (): Promise<GoogleGenerativeAI> => {
   // Fallback to developer's bundled key
   if (lastKeySource !== 'default' || !cachedGenAIInstance) {
     const defaultKey = getSecureApiKey();
+    if (!defaultKey) {
+      console.log('[Gemini] No developer API key configured in .env');
+      cachedGenAIInstance = null;
+      lastKeySource = 'default';
+      return null;
+    }
     cachedGenAIInstance = new GoogleGenerativeAI(defaultKey);
     lastKeySource = 'default';
     console.log('[Gemini] Using default developer API key');
   }
-  return cachedGenAIInstance!;
+  return cachedGenAIInstance;
 };
 
 /**
@@ -146,14 +154,21 @@ export const testApiKey = async (apiKey: string): Promise<{ success: boolean; er
 };
 
 // --- Dynamic genAI wrapper ---
-// Fallback model chain — when a model hits its daily free-tier quota, retry the
-// same request with its lighter counterpart (same API key, still multimodal).
-// Add entries here as Google rolls out new flash/lite pairs. Verify the lite
-// model ID in AI Studio before relying on it.
-const FALLBACK_MODEL_MAP: Record<string, string> = {
-  'gemini-3.5-flash': 'gemini-3.5-flash-lite',
-  'gemini-2.5-flash': 'gemini-2.5-flash-lite',
-  'gemini-flash-latest': 'gemini-flash-lite-latest',
+// Fallback model chain — when a model hits its daily free-tier quota or 503s,
+// retry the same request with the next lighter model in the chain. This is an
+// ORDERED chain: each model falls through to the one after it.
+//
+// ⚠️  VERIFIED LIVE MODELS (Aug 2026):
+//   gemini-3.5-flash, gemini-3.5-flash-lite  → primary free-tier models
+//   gemini-1.5-flash, gemini-1.5-flash-8b    → stable fallbacks (still live)
+// ❌  DEAD MODELS (404): gemini-2.0-flash, gemini-2.0-flash-lite — DO NOT USE
+const MODEL_FALLBACK_CHAINS: Record<string, string[]> = {
+  'gemini-3.5-flash': ['gemini-3.5-flash-lite', 'gemini-1.5-flash', 'gemini-1.5-flash-8b'],
+  'gemini-3.5-flash-lite': ['gemini-1.5-flash', 'gemini-1.5-flash-8b'],
+  'gemini-2.5-flash': ['gemini-2.5-flash-lite', 'gemini-1.5-flash', 'gemini-1.5-flash-8b'],
+  'gemini-2.5-flash-lite': ['gemini-1.5-flash', 'gemini-1.5-flash-8b'],
+  'gemini-1.5-flash': ['gemini-1.5-flash-8b'],
+  'gemini-flash-latest': ['gemini-1.5-flash', 'gemini-1.5-flash-8b'],
 };
 
 // Tracks the last model that actually served a request, so a screen/log can show
@@ -173,13 +188,67 @@ export const genAI = {
     return {
       generateContent: async (request: any, options?: any) => {
         const instance = await getGenAIInstance();
-        const primaryModel = instance.getGenerativeModel(params);
         const primaryName = params?.model || '';
 
-        // Ordered fallback chain for this request: [primary, lite]
-        const fallbackName = FALLBACK_MODEL_MAP[primaryName];
-        const chainNames = fallbackName ? [primaryName, fallbackName] : [primaryName];
+        if (!instance) {
+          if (isProxyConfigured()) {
+            console.log(`[AI] No local key configured. Routing image/generative content directly to AI Proxy.`);
+            // Extract text prompt and optional image from potentially complex request structure
+            let prompt = '';
+            let imagePayload: { data: string; mimeType: string } | undefined = undefined;
+
+            if (typeof request === 'string') {
+              prompt = request;
+            } else if (Array.isArray(request)) {
+              for (const part of request) {
+                if (typeof part === 'string') {
+                  prompt += (prompt ? '\n' : '') + part;
+                } else if (part && typeof part === 'object') {
+                  if (part.text) {
+                    prompt += (prompt ? '\n' : '') + part.text;
+                  }
+                  if (part.inlineData) {
+                    imagePayload = {
+                      data: part.inlineData.data,
+                      mimeType: part.inlineData.mimeType,
+                    };
+                  }
+                }
+              }
+            } else if (request && typeof request === 'object') {
+              const contents = request.contents || [];
+              const parts = contents[0]?.parts || request.parts || [];
+              for (const part of parts) {
+                if (part.text) {
+                  prompt += (prompt ? '\n' : '') + part.text;
+                }
+                if (part.inlineData) {
+                  imagePayload = {
+                    data: part.inlineData.data,
+                    mimeType: part.inlineData.mimeType,
+                  };
+                }
+              }
+            }
+
+            const proxyResult = await callAIProxy(prompt, primaryName.includes('fast') ? 'fast' : 'balanced', imagePayload);
+            return {
+              response: {
+                text: () => proxyResult,
+              }
+            } as any;
+          }
+          throw new Error('Gemini API key is not configured and AI Proxy is unavailable.');
+        }
+
+        const primaryModel = instance.getGenerativeModel(params);
+
+        // Ordered fallback chain for this request: [primary, ...fallbacks]
+        const fallbacks = MODEL_FALLBACK_CHAINS[primaryName] || [];
+        const chainNames = [primaryName, ...fallbacks];
         const attempted: string[] = [];
+
+        console.log(`[AI] Starting model chain for ${primaryName}: ${chainNames.join(' → ')}`);
 
         for (const modelName of chainNames) {
           // Skip models whose daily quota is already exhausted (efficiency: no wasted retries)
@@ -285,6 +354,51 @@ const models = {
   }
 };
 
+/**
+ * Unified LLM call with multi-layer fallback.
+ * 1. User's own Gemini key (if set) → direct API with model fallback
+ * 2. Shared keys via Cloudflare proxy (multi-provider fallback: Gemini → Grok → DeepSeek → Groq → Mistral → OpenRouter → Cohere)
+ *
+ * Use this for TEXT-ONLY requests. Image analysis must use direct Gemini (genAI).
+ */
+export const callLLM = async (
+  prompt: string,
+  modelType: 'fast' | 'balanced' | 'quality' = 'balanced'
+): Promise<string> => {
+  // Check if user has their own key
+  const keySource = await getActiveKeySource();
+
+  if (keySource === 'custom') {
+    // User's own key — use existing direct path with model fallback
+    console.log('[callLLM] Using user\'s own API key (direct)');
+    const model = models[modelType];
+    const result = await model.generateContent(prompt);
+    return result.response.text();
+  }
+
+  // Shared key path — try proxy first (multi-provider fallback)
+  if (isProxyConfigured()) {
+    try {
+      console.log('[callLLM] Trying AI proxy (multi-provider fallback)...');
+      return await callAIProxy(prompt, modelType);
+    } catch (error: any) {
+      const msg = error.message || '';
+      console.warn(`[callLLM] Proxy failed: ${msg}`);
+      // If proxy exhausted all providers, don't fall through to direct
+      if (msg.includes('All AI providers exhausted')) {
+        throw new Error('Free AI quota exhausted. Add your own Gemini key for unlimited access.');
+      }
+      // Other proxy errors — try direct as last resort
+    }
+  }
+
+  // Fallback: direct Gemini with model chain (existing behavior)
+  console.log('[callLLM] Falling back to direct Gemini (model chain)');
+  const model = models[modelType];
+  const result = await model.generateContent(prompt);
+  return result.response.text();
+};
+
 // Performance optimization: Cache for frequently used responses
 const responseCache = new Map<string, { data: any; timestamp: number; ttl: number }>();
 const CACHE_TTL = 30 * 60 * 1000; // 30 minutes
@@ -381,7 +495,6 @@ const queueRequest = (prompt: string, modelType: string = 'balanced', priority: 
       model: modelType,
       priority
     };
-
     requestQueue.push(request);
     processQueue();
   });
@@ -395,9 +508,6 @@ export interface OutfitSuggestion {
   mood: string;
   reasoning: string;
   shoppingLinks?: OutfitLink[];
-  /** Per-item link groups (one per outfit piece). Populated by
-   *  generateOutfitItemLinks so each NOT-owned piece gets its own shop searches
-   *  instead of one combined query that matches nothing. */
   itemLinks?: OutfitItemLinkGroup[];
 }
 
@@ -406,6 +516,17 @@ export interface OutfitLink {
   searchQuery: string;
   url: string;
   description: string;
+}
+
+export interface OutfitItemLink {
+  platform: string;
+  url: string;
+}
+
+export interface OutfitItemLinkGroup {
+  item: string;
+  owned: boolean;
+  links: OutfitItemLink[];
 }
 
 export interface StyleAnalysisResult {
@@ -455,14 +576,12 @@ export const analyzeImageAndGenerateOutfits = async (
 
   try {
     // Convert image to base64 (optimized)
-    const response = await fetch(imageUri);
-    const blob = await response.blob();
-    const base64 = await blobToBase64(blob);
+    const { base64, mimeType } = await imageUriToBase64(imageUri);
 
     const imagePart = {
       inlineData: {
-        data: base64.split(',')[1],
-        mimeType: blob.type,
+        data: base64,
+        mimeType,
       },
     };
 
@@ -639,6 +758,109 @@ Provide 3 outfits for ${userProfile?.bodyType || 'average'} body type, ${userPro
   }
 };
 
+/**
+ * Generate per-item shopping links for each piece in an outfit.
+ * Returns an array of { item, owned, links } groups so each clothing piece
+ * gets its own Amazon/Myntra/Google search instead of one combined query.
+ *
+ * @param outfitDescription - The outfit text (e.g., "Navy polo, beige chinos, white sneakers")
+ * @param prompt - The occasion/context
+ * @param wardrobeItems - User's closet items to check for ownership matching
+ */
+export const generateOutfitItemLinks = async (
+  outfitDescription: string,
+  prompt: string,
+  wardrobeItems?: Array<{ name: string; type: string; subType: string; colors?: string[] }>
+): Promise<OutfitItemLinkGroup[]> => {
+  try {
+    // Extract individual items from the outfit description
+    const itemSplitPrompt = `
+You are a fashion assistant. Given an outfit description, extract each DISTINCT clothing item as a separate shopping query.
+
+Outfit: "${outfitDescription}"
+Occasion: "${prompt}"
+
+Return JSON only - an array of items:
+[
+  "Navy blue polo shirt",
+  "Beige chinos",
+  "Brown leather belt",
+  "White sneakers"
+]
+
+Rules:
+- Split compound items (e.g., "white shirt and blue jeans" → ["white shirt", "blue jeans"])
+- Each item should be searchable on its own
+- Maximum 6 items
+- Include accessories if mentioned
+- Keep descriptions concise but specific enough to search`;
+
+    const responseText = await queueRequest(itemSplitPrompt, 'fast', 1);
+    const cleanedResponse = extractJSON(responseText);
+    const items: string[] = JSON.parse(cleanedResponse);
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return [];
+    }
+
+    // Helper: fuzzy match an item name against wardrobe
+    const isOwnedByUser = (itemName: string): boolean => {
+      if (!wardrobeItems || wardrobeItems.length === 0) return false;
+
+      const itemLower = itemName.toLowerCase();
+
+      // Check each wardrobe item for a match
+      return wardrobeItems.some((wItem) => {
+        const wName = (wItem.name || '').toLowerCase();
+        const wSubType = (wItem.subType || '').toLowerCase();
+        const wType = (wItem.type || '').toLowerCase();
+
+        // Direct name match
+        if (wName && itemLower.includes(wName)) return true;
+        if (wName && wName.includes(itemLower)) return true;
+
+        // SubType match (e.g., "polo shirt" matches "polo" or "shirt")
+        if (wSubType) {
+          const subParts = wSubType.split(/[\s_-]+/);
+          const itemParts = itemLower.split(/[\s_-]+/);
+          // At least 2 words match (e.g., "polo shirt" vs "navy polo")
+          const matchCount = subParts.filter(p => itemParts.some(ip => ip.includes(p) || p.includes(ip))).length;
+          if (matchCount >= 2) return true;
+        }
+
+        // Type + color match (e.g., "navy shirt" matches top + navy color)
+        if (wType && itemLower.includes(wType)) {
+          const wColors = wItem.colors || [];
+          const hasColorMatch = wColors.some(c => itemLower.includes(c.toLowerCase()));
+          if (hasColorMatch) return true;
+        }
+
+        return false;
+      });
+    };
+
+    // Build shopping URLs for each item
+    const results: OutfitItemLinkGroup[] = items.map((item) => {
+      const encodedItem = encodeURIComponent(item);
+      const owned = isOwnedByUser(item);
+      return {
+        item,
+        owned,
+        links: owned ? [] : [
+          { platform: 'Amazon', url: `https://www.amazon.com/s?k=${encodedItem}` },
+          { platform: 'Myntra', url: `https://www.myntra.com/${encodedItem.replace(/%20/g, '-')}` },
+          { platform: 'Google', url: `https://www.google.com/search?tbm=shop&q=${encodedItem}` },
+        ],
+      };
+    });
+
+    return results;
+  } catch (error) {
+    console.warn('[generateOutfitItemLinks] Failed, returning empty array:', error);
+    return [];
+  }
+};
+
 // Twinning-specific outfit generation with per-person separation
 export const generateTwinningOutfits = async (
   twinningPrompt: string,
@@ -734,14 +956,12 @@ Respond with ONLY the JSON object, no other text.`;
 // Enhanced body analysis with comprehensive body types
 export const analyzePersonComprehensively = async (imageUri: string, userName: string = 'User'): Promise<string> => {
   try {
-    const response = await fetch(imageUri);
-    const blob = await response.blob();
-    const base64 = await blobToBase64(blob);
+    const { base64, mimeType } = await imageUriToBase64(imageUri);
 
     const imagePart = {
       inlineData: {
-        data: base64.split(',')[1],
-        mimeType: blob.type,
+        data: base64,
+        mimeType,
       },
     };
 
@@ -826,30 +1046,54 @@ const buildUserProfileContext = (userProfile: any): string => {
   return context.join(', ');
 };
 
-// Helper function to convert blob to base64
-const blobToBase64 = (blob: Blob): Promise<string> => {
+/**
+ * React Native-safe image → base64 converter.
+ * Uses expo-file-system for local file:// URIs (no Blob/FileReader needed).
+ * Falls back to XMLHttpRequest for remote https:// URLs.
+ * Returns a data URI: "data:<mimeType>;base64,<data>"
+ */
+const imageUriToBase64 = async (uri: string): Promise<{ base64: string; mimeType: string }> => {
+  // Local file — read directly with FileSystem (fastest, no Blob)
+  if (uri.startsWith('file://') || uri.startsWith('/')) {
+    const base64 = await FileSystem.readAsStringAsync(uri, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+    // Sniff MIME from extension; default to jpeg
+    const ext = uri.split('.').pop()?.toLowerCase() || 'jpg';
+    const mimeMap: Record<string, string> = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif', heic: 'image/heic' };
+    return { base64, mimeType: mimeMap[ext] || 'image/jpeg' };
+  }
+
+  // Remote URL — use XHR which React Native supports natively (no DOM Blob issues)
   return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
+    const xhr = new XMLHttpRequest();
+    xhr.open('GET', uri, true);
+    xhr.responseType = 'arraybuffer';
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        const bytes = new Uint8Array(xhr.response as ArrayBuffer);
+        let binary = '';
+        bytes.forEach(b => { binary += String.fromCharCode(b); });
+        const base64 = btoa(binary);
+        const ct = xhr.getResponseHeader('content-type') || 'image/jpeg';
+        const mimeType = ct.split(';')[0].trim();
+        resolve({ base64, mimeType });
+      } else {
+        reject(new Error(`Failed to fetch image: HTTP ${xhr.status}`));
+      }
+    };
+    xhr.onerror = () => reject(new Error('Network error fetching image'));
+    xhr.send();
   });
 };
 
-export const generateOutfitLinks = async (
-  outfitDescription: string,
-  userPrompt?: string,
-  options?: { exactItem?: boolean }
-): Promise<OutfitLink[]> => {
+export const generateOutfitLinks = async (outfitDescription: string, userPrompt?: string): Promise<OutfitLink[]> => {
   // Build deterministic, specific search links based on the outfit items and the user's prompt
   const core = normalizeOutfitToSearch(outfitDescription);
   const promptPart = sanitizeForPrompt(userPrompt || '');
 
-  // For a single already-specific item (per-item links), the whole description IS
-  // the key item — extractKeyItems would collapse "Light Blue Oxford Cotton
-  // Button-Down Shirt" down to just "shirt". Only extract key phrases from a
-  // full multi-piece outfit string.
-  const keyItems = options?.exactItem ? [core] : extractKeyItems(core, 2);
+  // Extract 1-2 key item phrases from the outfit for product-oriented search (avoid searching full outfit)
+  const keyItems = extractKeyItems(core, 2);
 
   // For product searches (Amazon/Myntra), use only the key items
   const productQuery = keyItems.join(' ').trim();
@@ -883,90 +1127,18 @@ export const generateOutfitLinks = async (
   return links;
 };
 
-// ---------------------------------------------------------------------------
-// Per-item outfit links — mirrors the event-planner's gap-links pattern.
-// ---------------------------------------------------------------------------
-
-export interface OutfitItemLinkGroup {
-  item: string;   // readable piece, e.g. "Slim Navy Trousers"
-  owned: boolean; // true = already in the user's closet (no links needed)
-  links: OutfitLink[];
-}
-
-// Owned-item markers Gemini appends when it reuses a closet piece, e.g.
-// "Cricket Sweater (from closet)". Any item carrying one is already owned.
-const OWNED_MARKER_RE =
-  /\s*\(?\s*(from\s+(your\s+|my\s+)?(closet|wardrobe)|you\s+already\s+own|already\s+(owned|have)|you\s+(own|have)|owned|have\s+it)\s*\)?\s*$/i;
-
-// Split a Gemini outfit string — e.g. "Cricket Sweater (from closet) + Light
-// Blue Oxford Cotton Button-Down Shirt + Slim Navy Trousers" — into individual
-// pieces, flagging which ones the user already owns. Gemini separates items
-// with " + " (per the prompt's own format example), so that's the primary
-// separator; commas are accepted as a fallback.
-export const splitOutfitItems = (outfit: string): OutfitItemLinkGroup[] => {
-  const parts = (outfit || '')
-    .split(/\s*\+\s*|\s*,\s*/)
-    .map((part) => part.replace(/\s+/g, ' ').trim())
-    .filter(Boolean);
-
-  return parts.map((part) => {
-    const owned = OWNED_MARKER_RE.test(part);
-    // Drop the owned marker itself so the label stays clean.
-    const item = owned ? part.replace(OWNED_MARKER_RE, '').trim() : part;
-    return { item, owned, links: [] };
-  });
-};
-
-// Build a per-item link set for every NOT-owned piece in an outfit. A single
-// call across the whole outfit collapses into a nonsense query like
-// "sweater shirt" — giving each missing piece its own generateOutfitLinks call
-// keeps the store searches specific (same fix as the event planner's gaps).
-export const generateOutfitItemLinks = async (
-  outfit: string,
-  userPrompt?: string
-): Promise<OutfitItemLinkGroup[]> => {
-  const groups = splitOutfitItems(outfit);
-  await Promise.all(
-    groups.map(async (group) => {
-      if (group.owned || !group.item.trim()) return;
-      try {
-        // exactItem: the piece is already a single specific item, so don't let
-        // extractKeyItems collapse it to a bare token like "shirt".
-        group.links = await generateOutfitLinks(group.item, userPrompt, { exactItem: true });
-      } catch (e) {
-        group.links = [];
-      }
-    })
-  );
-  return groups;
-};
-
 // Convert an outfit description like "Black shirt + shorts" or
 // "Navy blazer with white shirt and dark jeans" into a concise search string
 const normalizeOutfitToSearch = (outfitDescription: string): string => {
   const lower = (outfitDescription || '').toLowerCase();
-  let replaced = lower
-    .replace(/[+/,:()]/g, ' ')
+  const replaced = lower
+    .replace(/[+/,]/g, ' ')
     .replace(/\bwith\b/g, ' ')
     .replace(/\band\b/g, ' ')
     .replace(/\bpaired with\b/g, ' ')
     .replace(/\bcombo\b/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
-
-  // Strip closet-context / meta words that leak from AI prompts (e.g. "you already
-  // own the navy blazer from your closet"). Without this, closet/venue words pollute
-  // the Pinterest + store searches and wreck the results. Word-boundary only, so
-  // "own" never matches inside "button-down" or "t-shirt".
-  const CLOSET_META_WORDS = [
-    'closet', 'wardrobe', 'your', 'my', 'you', 'already', 'own', 'have', 'has',
-    'from', 'using', 'use', 'used', 'item', 'items', 'piece', 'pieces', 'user',
-    'profile', 'based', 'available', 'empty', 'currently', 'the', 'a', 'an', 'this',
-    'these', 'those', 'that', 'also', 'please', 'here', 'there', 'not', 'no',
-    'instead', 'only', 'also', 'goes', 'match', 'matches', 'perfect', 'ideal',
-  ];
-  const stopwordPattern = new RegExp(`\\b(${CLOSET_META_WORDS.join('|')})\\b`, 'g');
-  replaced = replaced.replace(stopwordPattern, ' ').replace(/\s+/g, ' ').trim();
 
   // Remove trailing/leading words like 'outfit' that add noise
   const cleaned = replaced.replace(/\boutfit\b/g, '').replace(/\s+/g, ' ').trim();
@@ -1545,13 +1717,12 @@ export const analyzeBodyImage = async (imageUri: string, customPrompt?: string):
 
     // Convert image to base64
     const response = await fetch(imageUri);
-    const blob = await response.blob();
-    const base64 = await blobToBase64(blob);
+    const { base64, mimeType } = await imageUriToBase64(imageUri);
 
     const imagePart = {
       inlineData: {
-        data: base64.split(',')[1], // Remove data:image/jpeg;base64, prefix
-        mimeType: blob.type,
+        data: base64,
+        mimeType,
       },
     };
 
@@ -1614,13 +1785,12 @@ export const analyzeVenueComprehensively = async (imageUri: string, category: st
 
     // Convert image to base64
     const response = await fetch(imageUri);
-    const blob = await response.blob();
-    const base64 = await blobToBase64(blob);
+    const { base64, mimeType } = await imageUriToBase64(imageUri);
 
     const imagePart = {
       inlineData: {
-        data: base64.split(',')[1], // Remove data:image/jpeg;base64, prefix
-        mimeType: blob.type,
+        data: base64,
+        mimeType,
       },
     };
 
@@ -1693,14 +1863,12 @@ export const analyzeProfileBodyTypeFromImage = async (imageUri: string, gender?:
     const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
 
     // Convert image to base64
-    const response = await fetch(imageUri);
-    const blob = await response.blob();
-    const base64 = await blobToBase64(blob);
+    const { base64, mimeType } = await imageUriToBase64(imageUri);
 
     const imagePart = {
       inlineData: {
-        data: base64.split(',')[1],
-        mimeType: blob.type,
+        data: base64,
+        mimeType,
       },
     };
 
@@ -1819,14 +1987,12 @@ export const analyzeBodyTypeFromImage = async (imageUri: string, gender?: string
     const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' }); // Use Flash for better reliability
 
     // Convert image to base64
-    const response = await fetch(imageUri);
-    const blob = await response.blob();
-    const base64 = await blobToBase64(blob);
+    const { base64, mimeType } = await imageUriToBase64(imageUri);
 
     const imagePart = {
       inlineData: {
-        data: base64.split(',')[1],
-        mimeType: blob.type,
+        data: base64,
+        mimeType,
       },
     };
 
@@ -3064,13 +3230,12 @@ export const generateTopographyAwareOutfits = async (
 
       // Convert image to base64
       const response = await fetch(imageUri);
-      const blob = await response.blob();
-      const base64 = await blobToBase64(blob);
+      const { base64, mimeType } = await imageUriToBase64(imageUri);
 
       const imagePart = {
         inlineData: {
-          data: base64.split(',')[1], // Remove data:image/jpeg;base64, prefix
-          mimeType: blob.type,
+          data: base64,
+          mimeType,
         },
       };
 
@@ -3230,13 +3395,12 @@ export const generateWeatherAwareOutfits = async (
 
       // Convert image to base64
       const response = await fetch(imageUri);
-      const blob = await response.blob();
-      const base64 = await blobToBase64(blob);
+      const { base64, mimeType } = await imageUriToBase64(imageUri);
 
       const imagePart = {
         inlineData: {
-          data: base64.split(',')[1], // Remove data:image/jpeg;base64, prefix
-          mimeType: blob.type,
+          data: base64,
+          mimeType,
         },
       };
 
@@ -3921,14 +4085,12 @@ export const validateImageContext = async (imageUri: string, expectedContext: st
     const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
 
     // Convert image to base64
-    const response = await fetch(imageUri);
-    const blob = await response.blob();
-    const base64 = await blobToBase64(blob);
+    const { base64, mimeType } = await imageUriToBase64(imageUri);
 
     const imagePart = {
       inlineData: {
-        data: base64.split(',')[1],
-        mimeType: blob.type,
+        data: base64,
+        mimeType,
       },
     };
 
@@ -3980,13 +4142,27 @@ Make sure the response is in the exact format specified above, no additional tex
     };
 
   } catch (error: any) {
-    console.error('Image validation error:', error);
+    const msg = (error?.message || String(error)).toLowerCase();
+    const isAiOverloaded = msg.includes('503') || msg.includes('overloaded') || msg.includes('high demand')
+      || msg.includes('429') || msg.includes('quota') || msg.includes('404') || msg.includes('unavailable');
 
-    // Return a conservative result on error
+    if (isAiOverloaded) {
+      // AI infrastructure is down — don't block the user with a fake "bad image" error.
+      // Pass the image through optimistically; the next AI call will attempt the real task.
+      console.warn('[AI] validateImageContext: all models overloaded/unavailable — optimistically passing image through.');
+      return {
+        isValid: true,
+        confidence: 50,
+        reasoning: 'AI validation temporarily unavailable — proceeding with image as-is.',
+      };
+    }
+
+    console.error('Image validation error:', error);
+    // Only block on genuine processing errors (e.g. bad URI, corrupt file)
     return {
       isValid: false,
       confidence: 0,
-      reasoning: "Unable to validate image due to processing error. Please upload a clear photo matching the required context."
+      reasoning: 'Unable to validate image due to a processing error. Please upload a clear photo.',
     };
   }
 };
@@ -4064,29 +4240,23 @@ export const generateWardrobeBasedOutfits = async (
     completenessScore: number;
   };
 }> => {
-  // Check rate limit
   if (!geminiRateLimiter.canMakeCall()) {
     const waitTime = Math.ceil(geminiRateLimiter.getTimeUntilNextCall() / 1000);
     throw new Error(`Rate limit exceeded. Please wait ${waitTime} seconds before trying again.`);
   }
 
-  // Track AI request at the start
   trackAIRequest();
 
   try {
     const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
 
-    // Convert images to base64
     const imageParts = await Promise.all(
       clothingImages.map(async (imageUri) => {
-        const response = await fetch(imageUri);
-        const blob = await response.blob();
-        const base64 = await blobToBase64(blob);
-
+        const { base64, mimeType } = await imageUriToBase64(imageUri);
         return {
           inlineData: {
-            data: base64.split(',')[1],
-            mimeType: blob.type,
+            data: base64,
+            mimeType,
           },
         };
       })
@@ -4131,41 +4301,14 @@ RESPONSE FORMAT (JSON):
               "searchQuery": "brown leather belt men",
               "url": "https://www.amazon.com/s?k=brown+leather+belt+men",
               "description": "Shop brown leather belts"
-            },
-            {
-              "platform": "Pinterest",
-              "searchQuery": "how to style brown leather belt",
-              "url": "https://www.pinterest.com/search/pins/?q=how+to+style+brown+leather+belt",
-              "description": "Belt styling inspiration"
             }
           ]
         }
       ],
-      "outfitLinks": [
-        {
-          "platform": "Pinterest",
-          "searchQuery": "casual weekend outfit men",
-          "url": "https://www.pinterest.com/search/pins/?q=casual+weekend+outfit+men",
-          "description": "Similar outfit inspiration"
-        }
-      ]
+      "outfitLinks": []
     }
   ],
-  "suggestions": [
-    {
-      "item": "white dress shirt",
-      "reason": "would unlock 3 more formal outfit combinations",
-      "priority": "high",
-      "shoppingLinks": [
-        {
-          "platform": "Amazon",
-          "searchQuery": "white dress shirt men",
-          "url": "https://www.amazon.com/s?k=white+dress+shirt+men",
-          "description": "Shop white dress shirts"
-        }
-      ]
-    }
-  ],
+  "suggestions": [],
   "wardrobeAnalysis": {
     "totalItems": 8,
     "categories": ["shirts", "pants", "shoes"],
@@ -4178,11 +4321,7 @@ IMPORTANT RULES:
 - Create outfits using available items, even if some pieces are missing
 - Always show outfit suggestions with Pinterest inspiration and Amazon shopping links
 - Be specific about colors and styles you observe in the images
-- In missingItems, suggest 1-2 key pieces that would enhance each outfit (not mandatory items)
-- Make missing items helpful suggestions, not strict requirements
-- Consider the user's location and cultural context if provided
 - Generate proper shopping URLs for all suggested items
-- Focus on versatile pieces that unlock multiple outfit combinations
 - Set completeness to 70-90% even for good outfits with minor missing pieces
 
 Return ONLY the JSON object, no additional text.
@@ -4190,8 +4329,6 @@ Return ONLY the JSON object, no additional text.
 
     const result = await model.generateContent([analysisPrompt, ...imageParts]);
     const responseText = result.response.text();
-
-    // Clean the response to ensure it's valid JSON
     const cleanedResponse = responseText.replace(/```json\n?|\n?```/g, '').trim();
 
     try {
@@ -4199,11 +4336,8 @@ Return ONLY the JSON object, no additional text.
       return parsedResult;
     } catch (parseError) {
       console.error('JSON Parse Error for wardrobe analysis:', parseError);
-      console.log('Raw response:', responseText);
-      // Return fallback result
       return generateFallbackWardrobeAnalysis(clothingImages, userProfile);
     }
-
   } catch (error: any) {
     console.error('Wardrobe analysis error:', error);
     return generateFallbackWardrobeAnalysis(clothingImages, userProfile);
@@ -4220,7 +4354,6 @@ export const analyzeOutfitCompatibility = async (
   recommendations: string[];
   compatibilityScore: number;
 }> => {
-  // Check rate limit
   if (!geminiRateLimiter.canMakeCall()) {
     const waitTime = Math.ceil(geminiRateLimiter.getTimeUntilNextCall() / 1000);
     throw new Error(`Rate limit exceeded. Please wait ${waitTime} seconds before trying again.`);
@@ -4229,17 +4362,13 @@ export const analyzeOutfitCompatibility = async (
   try {
     const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
 
-    // Convert images to base64
     const imageParts = await Promise.all(
       clothingImages.map(async (imageUri) => {
-        const response = await fetch(imageUri);
-        const blob = await response.blob();
-        const base64 = await blobToBase64(blob);
-
+        const { base64, mimeType } = await imageUriToBase64(imageUri);
         return {
           inlineData: {
-            data: base64.split(',')[1],
-            mimeType: blob.type,
+            data: base64,
+            mimeType,
           },
         };
       })
@@ -4251,8 +4380,6 @@ Analyze these clothing items to determine if they can form complete, wearable ou
 USER PROFILE:
 - Gender: ${userProfile.gender || 'Male'}
 - Body Type: ${userProfile.bodyType || 'Average'}
-- Height: ${userProfile.height || 170}cm
-- Skin Tone: ${userProfile.skinTone || 'Fair'}
 
 REQUIRED ANALYSIS:
 1. Can these items form complete outfits? (Yes/No)
@@ -4269,12 +4396,8 @@ RECOMMENDATIONS: [Specific recommendations for additional items, separated by se
 COMPATIBILITY_SCORE: [percentage]%
 
 IMPORTANT GUIDELINES:
-- Consider gender-appropriate clothing combinations for ${userProfile.gender || 'Male'}
-- Focus ONLY on major clothing categories: tops, bottoms, dresses, jackets
-- IGNORE accessories like belts, socks, jewelry, bags when determining if outfits can be formed
-- Only mark as "No" if missing essential items like shirts, pants, or dresses
-- If user has basic tops and bottoms, answer "Yes" even if accessories are missing
-- Consider the user's body type and proportions
+- Consider gender-appropriate clothing combinations
+- Focus ONLY on major clothing categories
 - Be lenient - prioritize showing outfits over being restrictive
 
 Make sure the response is in the exact format specified above, no additional text.
@@ -4283,7 +4406,6 @@ Make sure the response is in the exact format specified above, no additional tex
     const result = await model.generateContent([analysisPrompt, ...imageParts]);
     const responseText = result.response.text();
 
-    // Parse the response
     const canFormMatch = responseText.match(/CAN_FORM_OUTFITS:\s*(Yes|No)/i);
     const outfitTypesMatch = responseText.match(/OUTFIT_TYPES:\s*([^\n]+)/i);
     const missingCategoriesMatch = responseText.match(/MISSING_CATEGORIES:\s*([^\n]+)/i);
@@ -4309,8 +4431,6 @@ Make sure the response is in the exact format specified above, no additional tex
     };
   } catch (error: any) {
     console.error('Outfit compatibility analysis error:', error);
-
-    // Return a lenient result on error - assume they can form outfits
     return {
       canFormOutfits: true,
       outfitTypes: ['casual', 'smart casual'],
@@ -4343,7 +4463,6 @@ export const analyzeStyleInspiration = async (
       throw new Error('Rate limit exceeded. Please wait a moment.');
     }
 
-    const genAI = await getGenAIInstance();
     const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
 
     let imagePart;
@@ -4354,22 +4473,9 @@ export const analyzeStyleInspiration = async (
         inlineData: { data: base64Data, mimeType }
       };
     } else {
-      const fileExt = imageUri.split('.').pop()?.toLowerCase();
-      let mimeType = 'image/jpeg';
-      if (fileExt === 'png') mimeType = 'image/png';
-      else if (fileExt === 'webp') mimeType = 'image/webp';
-
-      const response = await fetch(imageUri);
-      const blob = await response.blob();
-      const base64Data = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-      });
-
+      const { base64, mimeType } = await imageUriToBase64(imageUri);
       imagePart = {
-        inlineData: { data: base64Data, mimeType }
+        inlineData: { data: base64, mimeType }
       };
     }
 

@@ -207,7 +207,7 @@ export default function UploadAesthetic() {
       // store searches instead of one combined query (e.g. "sweater shirt").
       await Promise.all(
         (result.recommendations || []).map(async (rec) => {
-          rec.itemLinks = await generateOutfitItemLinks(rec.outfit, prompt);
+          rec.itemLinks = await generateOutfitItemLinks(rec.outfit, prompt, wardrobeItems);
         })
       );
 
@@ -269,7 +269,7 @@ export default function UploadAesthetic() {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background, paddingTop: insets.top }]}>
-      <StatusBar barStyle={theme.background === '#18181b' ? "light-content" : "dark-content"} backgroundColor={theme.background} />
+      <StatusBar barStyle={theme.background === '#0e0e0e' ? "light-content" : "dark-content"} backgroundColor={theme.background} />
 
       {/* Header */}
       <Animated.View style={[styles.headerContainer, { opacity: fadeAnim }]}>

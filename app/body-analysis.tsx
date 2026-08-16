@@ -1,6 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
-import { BlurView } from 'expo-blur';
 
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
@@ -8,14 +7,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-    Alert,
     Animated,
-    Clipboard,
-    Dimensions,
     Easing,
     KeyboardAvoidingView,
     Platform,
-    SafeAreaView,
     ScrollView,
     StatusBar,
     StyleSheet,
@@ -24,50 +19,13 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
-import PremiumBackground from '../components/PremiumBackground';
 import { analyzeBodyImage, analyzeProfileBodyTypeFromImage, generatePersonalizedFashionTips, getChatbotResponse } from '../services/geminiService';
 import { getUserProfile, updateUserProfile } from '../services/userService';
 import { openExternalUrl } from '../utils/openExternalUrl';
-
-const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
-
-// Glassmorphism component
-interface GlassCardProps {
-    children: React.ReactNode;
-    style?: any;
-    intensity?: number;
-    tint?: 'light' | 'dark' | 'default';
-}
-
-const GlassCard = ({ children, style, intensity = 20, tint = 'light' }: GlassCardProps) => {
-    if (Platform.OS === 'web') {
-        return (
-            <View style={[{
-                backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                backdropFilter: 'blur(20px)',
-                borderRadius: 20,
-                borderWidth: 1,
-                borderColor: 'rgba(255, 255, 255, 0.2)',
-            }, style]}>
-                {children}
-            </View>
-        );
-    }
-
-    return (
-        <BlurView intensity={intensity} tint={tint} style={[{
-            borderRadius: 20,
-            overflow: 'hidden',
-            borderWidth: 1,
-            borderColor: 'rgba(255, 255, 255, 0.2)',
-        }, style]}>
-            {children}
-        </BlurView>
-    );
-};
+import { resolveDisplayName } from '../utils/displayName';
 
 interface Message {
     id: string;
@@ -118,7 +76,8 @@ const languages = {
 };
 
 export default function BodyAnalysisScreen() {
-    const { theme } = useTheme();
+    const { theme, mode } = useTheme();
+    const isDark = mode === 'dark';
     const { user } = useAuth();
     const insets = useSafeAreaInsets();
     const [messages, setMessages] = useState<Message[]>([]);
@@ -260,7 +219,7 @@ export default function BodyAnalysisScreen() {
 
             // Initialize chat with greeting
             setTimeout(() => {
-                initializeChat();
+                initializeChat(profile);
                 setIsLoading(false);
             }, 1000);
         } catch (error) {
@@ -270,7 +229,7 @@ export default function BodyAnalysisScreen() {
         }
     };
 
-    const initializeChat = () => {
+    const initializeChat = (profile?: { displayName?: string | null } | null) => {
         const currentTime = new Date();
         const hour = currentTime.getHours();
         let greeting = 'Good day';
@@ -279,7 +238,8 @@ export default function BodyAnalysisScreen() {
         else if (hour < 17) greeting = 'Good afternoon';
         else greeting = 'Good evening';
 
-        const userName = user?.displayName || 'Fashion Lover';
+        // Name they set → email → "Fashion Explorer" (same as the home screen).
+        const userName = resolveDisplayName(user, profile);
         const lang = userData.language || 'english';
         const greetingMessage = languages[lang].greeting(greeting, userName);
 
@@ -690,7 +650,7 @@ export default function BodyAnalysisScreen() {
             }
 
             const result = await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                mediaTypes: ['images'],
                 allowsEditing: true,
                 aspect: [1, 1],
                 quality: 0.7,
@@ -791,7 +751,7 @@ export default function BodyAnalysisScreen() {
             }
 
             const result = await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                mediaTypes: ['images'],
                 allowsEditing: true,
                 aspect: [3, 4], // Better aspect ratio for body analysis
                 quality: 0.8,
@@ -979,139 +939,90 @@ export default function BodyAnalysisScreen() {
         );
     };
 
-    const getGreeting = () => {
-        const hour = new Date().getHours();
-        if (hour < 12) return 'Good Morning';
-        if (hour < 17) return 'Good Afternoon';
-        return 'Good Evening';
-    };
-
-    const handleCopyMessage = async (text: string) => {
-        try {
-            Clipboard.setString(text);
-            await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            Alert.alert('Copied!', 'Message copied to clipboard');
-        } catch (error) {
-            console.error('Error copying to clipboard:', error);
-        }
-    };
-
     const handleLinkPress = async (url: string) => {
         await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         await openExternalUrl(url);
     };
 
-    const renderTextWithLinks = (text: string, textStyle: any) => {
-        // Regex to match URLs
-        const urlRegex = /(https?:\/\/[^\s]+)/g;
-        const parts = text.split(urlRegex);
-
-        return (
-            <Text style={textStyle}>
-                {parts.map((part, index) => {
-                    if (urlRegex.test(part)) {
-                        return (
-                            <Text
-                                key={`link-${index}`}
-                                style={[textStyle, { color: '#4A90E2', textDecorationLine: 'underline' }]}
-                                onPress={() => handleLinkPress(part)}
-                            >
-                                {part}
-                            </Text>
-                        );
-                    }
-                    return <Text key={`text-${index}`} style={textStyle}>{part}</Text>;
-                })}
-            </Text>
-        );
-    };
-
     if (isLoading) {
         return (
-            <PremiumBackground variant="bodyAnalysis">
-            <View style={[styles.container]}>
-                <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+            <View style={[styles.container, { backgroundColor: theme.background }]}>
+                <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={theme.background} />
                 <View style={styles.loadingContainer}>
                     <Animated.View style={{
                         transform: [{ scale: pulseAnim }]
                     }}>
-                        <Ionicons name="chatbubbles-outline" size={60} color={theme.primary} />
+                        <Ionicons name="chatbubbles-outline" size={56} color={theme.primary} />
                     </Animated.View>
-                    <Text style={[styles.loadingText, { color: theme.text }]}>
+                    <Text style={[styles.loadingText, { color: theme.textSecondary }]}>
                         {CHATBOT_NAME} is getting ready...
                     </Text>
                 </View>
             </View>
-            </PremiumBackground>
         );
     }
 
     return (
-        <PremiumBackground variant="bodyAnalysis">
-        <View style={[styles.container]}>
-            <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
+        <View style={[styles.container, { backgroundColor: theme.background }]}>
+            <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={theme.background} />
 
-            {/* Gradient Background */}
-            <LinearGradient
-                colors={[
-                    theme.background === '#18181b' ? '#1a1a2e' : '#667eea',
-                    theme.background === '#18181b' ? '#16213e' : '#764ba2',
-                    theme.background === '#18181b' ? '#0f3460' : '#f093fb'
-                ]}
-                style={styles.backgroundGradient}
-            />
-
-            <SafeAreaView style={[styles.safeArea, { paddingTop: insets.top + 40 }]}>
-                {/* Header */}
+            <SafeAreaView style={[styles.safeArea, { paddingTop: insets.top + 8 }]}>
+                {/* Header — editorial glass panel */}
                 <View style={styles.headerContainer}>
-                    <View style={styles.headerContent}>
+                    <View style={[styles.headerContent, { backgroundColor: theme.card, borderColor: theme.borderLight, borderWidth: 1 }]}>
                         <TouchableOpacity
                             onPress={() => router.back()}
-                            style={styles.backButton}
+                            style={[styles.backButton, { backgroundColor: theme.surfaceElevated, borderColor: theme.borderLight, borderWidth: 1 }]}
                         >
-                            <Ionicons name="arrow-back" size={24} color="#fff" />
+                            <Ionicons name="arrow-back" size={20} color={theme.text} />
                         </TouchableOpacity>
 
                         <View style={styles.headerTitleContainer}>
-                            <Text style={styles.headerTitle}>{CHATBOT_NAME}</Text>
-                            <Text style={styles.headerSubtitle}>Your Fashion Assistant</Text>
+                            <Text style={[styles.headerTitle, { color: theme.text }]}>{CHATBOT_NAME}</Text>
+                            <Text style={[styles.headerSubtitle, { color: theme.textSecondary }]}>Your Fashion Assistant</Text>
                         </View>
 
-                        <View style={styles.languageSelector}>
+                        <View style={[styles.languageSelector, { backgroundColor: theme.background, borderColor: theme.borderLight }]}>
                             <TouchableOpacity
                                 onPress={() => changeLanguage('english')}
                                 style={[
                                     styles.languageButton,
-                                    userData.language === 'english' && styles.languageButtonActive
+                                    userData.language === 'english' && { backgroundColor: theme.primary }
                                 ]}
                             >
                                 <Text style={[
                                     styles.languageText,
-                                    userData.language === 'english' ? styles.languageTextActive : styles.languageTextInactive
+                                    userData.language === 'english'
+                                        ? styles.languageTextActive
+                                        : [styles.languageTextInactive, { color: theme.textSecondary }]
                                 ]}>EN</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
                                 onPress={() => changeLanguage('hindi')}
                                 style={[
                                     styles.languageButton,
-                                    userData.language === 'hindi' && styles.languageButtonActive
+                                    userData.language === 'hindi' && { backgroundColor: theme.primary }
                                 ]}
                             >
                                 <Text style={[
                                     styles.languageText,
-                                    userData.language === 'hindi' ? styles.languageTextActive : styles.languageTextInactive
+                                    userData.language === 'hindi'
+                                        ? styles.languageTextActive
+                                        : [styles.languageTextInactive, { color: theme.textSecondary }]
                                 ]}>हि</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
                                 onPress={() => changeLanguage('hinglish')}
                                 style={[
                                     styles.languageButton,
-                                    userData.language === 'hinglish' && styles.languageButtonActive
+                                    userData.language === 'hinglish' && { backgroundColor: theme.primary }
                                 ]}
                             >
                                 <Text style={[
                                     styles.languageText,
-                                    userData.language === 'hinglish' ? styles.languageTextActive : styles.languageTextInactive
+                                    userData.language === 'hinglish'
+                                        ? styles.languageTextActive
+                                        : [styles.languageTextInactive, { color: theme.textSecondary }]
                                 ]}>HG</Text>
                             </TouchableOpacity>
                         </View>
@@ -1136,7 +1047,7 @@ export default function BodyAnalysisScreen() {
                                 ]}
                             >
                                 {message.isBot && (
-                                    <View style={styles.botAvatar}>
+                                    <View style={[styles.botAvatar, { backgroundColor: theme.primary }]}>
                                         <Ionicons name="sparkles" size={16} color="#fff" />
                                     </View>
                                 )}
@@ -1144,13 +1055,15 @@ export default function BodyAnalysisScreen() {
                                 <View
                                     style={[
                                         styles.messageBubble,
-                                        message.isBot ? styles.botBubble : styles.userBubble,
-                                        message.type === 'video' && styles.videoBubble
+                                        message.isBot
+                                            ? [styles.botBubble, { backgroundColor: theme.card, borderColor: theme.borderLight, borderWidth: 1 }]
+                                            : [styles.userBubble, { backgroundColor: theme.primary }],
+                                        message.type === 'video' && { backgroundColor: theme.error + '18', borderColor: theme.error + '30' },
                                     ]}
                                 >
                                     <Text style={[
                                         styles.messageText,
-                                        { color: '#fff' }
+                                        { color: message.isBot ? theme.text : '#fff' }
                                     ]}>
                                         {message.text}
                                     </Text>
@@ -1161,23 +1074,21 @@ export default function BodyAnalysisScreen() {
                                                 <TouchableOpacity
                                                     key={index}
                                                     onPress={() => handleOptionSelect(option)}
-                                                    style={styles.optionButton}
+                                                    style={[styles.optionButton, { backgroundColor: theme.primary + '15', borderColor: theme.primary + '30' }]}
                                                 >
-                                                    <View style={styles.optionGradient}>
-                                                        <Text style={styles.optionText}>{option}</Text>
-                                                    </View>
+                                                    <Text style={[styles.optionText, { color: theme.textAccent }]}>{option}</Text>
                                                 </TouchableOpacity>
                                             ))}
                                         </View>
                                     )}
 
                                     {message.type === 'video' && (
-                                        <View style={styles.videoContainer}>
+                                        <View style={[styles.videoContainer, { borderColor: theme.error + '30' }]}>
                                             <View style={styles.videoThumbnail}>
-                                                <Ionicons name="play-circle" size={48} color="rgba(255,255,255,0.8)" />
+                                                <Ionicons name="play-circle" size={48} color={theme.textAccent} />
                                             </View>
                                             <TouchableOpacity
-                                                style={styles.watchButton}
+                                                style={[styles.watchButton, { backgroundColor: theme.error }]}
                                                 onPress={() => {
                                                     // Extract URL from message text
                                                     const urlMatch = message.text.match(/https:\/\/[^\s]+/);
@@ -1192,7 +1103,7 @@ export default function BodyAnalysisScreen() {
                                     )}
                                 </View>
 
-                                <Text style={styles.timestamp}>
+                                <Text style={[styles.timestamp, { color: theme.textTertiary }]}>
                                     {message.timestamp.toLocaleTimeString([], {
                                         hour: '2-digit',
                                         minute: '2-digit'
@@ -1203,11 +1114,11 @@ export default function BodyAnalysisScreen() {
 
                         {isTyping && (
                             <View style={styles.typingContainer}>
-                                <View style={styles.botAvatar}>
+                                <View style={[styles.botAvatar, { backgroundColor: theme.primary }]}>
                                     <Ionicons name="sparkles" size={16} color="#fff" />
                                 </View>
-                                <View style={styles.typingBubble}>
-                                    <Text style={styles.typingText}>{CHATBOT_NAME} is typing...</Text>
+                                <View style={[styles.typingBubble, { backgroundColor: theme.card, borderColor: theme.borderLight, borderWidth: 1 }]}>
+                                    <Text style={[styles.typingText, { color: theme.textSecondary }]}>{CHATBOT_NAME} is typing...</Text>
                                 </View>
                             </View>
                         )}
@@ -1218,12 +1129,12 @@ export default function BodyAnalysisScreen() {
                 <KeyboardAvoidingView
                     behavior={Platform.OS === 'ios' ? 'padding' : undefined}
                     keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-                    style={[styles.inputContainer, { paddingBottom: Math.max(insets.bottom, 20) }]}
+                    style={[styles.inputContainer, { paddingBottom: Math.max(insets.bottom, 16) }]}
                 >
-                    <GlassCard style={styles.inputCard} intensity={60} tint="light">
+                    <View style={[styles.inputCard, { backgroundColor: theme.card, borderColor: theme.borderLight }]}>
                         <View style={styles.inputContent}>
                             <TextInput
-                                style={[styles.textInput, { color: theme.text }]}
+                                style={[styles.textInput, { color: theme.text, backgroundColor: theme.background, borderColor: theme.borderLight }]}
                                 value={inputText}
                                 onChangeText={(text) => {
                                     console.log('TextInput onChangeText:', text);
@@ -1232,7 +1143,7 @@ export default function BodyAnalysisScreen() {
                                 onFocus={() => console.log('TextInput focused')}
                                 onBlur={() => console.log('TextInput blurred')}
                                 placeholder="Type your height here..."
-                                placeholderTextColor="rgba(255,255,255,0.6)"
+                                placeholderTextColor={theme.textTertiary}
                                 multiline={false}
                                 maxLength={500}
                                 editable={true}
@@ -1250,7 +1161,7 @@ export default function BodyAnalysisScreen() {
                                 disabled={!inputText.trim()}
                             >
                                 <LinearGradient
-                                    colors={['#667eea', '#764ba2']}
+                                    colors={[theme.primary, theme.primaryDark]}
                                     style={styles.sendGradient}
                                     start={{ x: 0, y: 0 }}
                                     end={{ x: 1, y: 1 }}
@@ -1259,124 +1170,12 @@ export default function BodyAnalysisScreen() {
                                 </LinearGradient>
                             </TouchableOpacity>
                         </View>
-                    </GlassCard>
+                    </View>
                 </KeyboardAvoidingView>
             </SafeAreaView>
         </View>
-        </PremiumBackground>
     );
 }
-
-// Message Bubble Component
-const MessageBubble = ({ message, onOptionSelect, theme, onCopyMessage, onLinkPress, renderTextWithLinks }: any) => {
-    const slideAnim = useRef(new Animated.Value(50)).current;
-    const fadeAnim = useRef(new Animated.Value(0)).current;
-
-    useEffect(() => {
-        Animated.parallel([
-            Animated.timing(slideAnim, {
-                toValue: 0,
-                duration: 300,
-                easing: Easing.out(Easing.quad),
-                useNativeDriver: true,
-            }),
-            Animated.timing(fadeAnim, {
-                toValue: 1,
-                duration: 300,
-                useNativeDriver: true,
-            }),
-        ]).start();
-    }, []);
-
-    const handleLongPress = async () => {
-        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        Alert.alert(
-            'Message Options',
-            'What would you like to do?',
-            [
-                { text: 'Copy Message', onPress: () => onCopyMessage(message.text) },
-                { text: 'Cancel', style: 'cancel' }
-            ]
-        );
-    };
-
-    return (
-        <Animated.View style={[
-            styles.messageContainer,
-            message.isBot ? styles.botMessageContainer : styles.userMessageContainer,
-            {
-                opacity: fadeAnim,
-                transform: [{ translateY: slideAnim }]
-            }
-        ]}>
-            {message.isBot && (
-                <View style={styles.botAvatar}>
-                    <Ionicons name="sparkles" size={16} color="#fff" />
-                </View>
-            )}
-
-            <TouchableOpacity
-                onLongPress={handleLongPress}
-                activeOpacity={0.8}
-                style={{ flex: 1 }}
-            >
-                <GlassCard
-                    style={[
-                        styles.messageBubble,
-                        message.isBot ? styles.botBubble : styles.userBubble
-                    ]}
-                    intensity={message.isBot ? 40 : 60}
-                    tint={message.isBot ? 'light' : 'dark'}
-                >
-                    <View style={styles.messageContent}>
-                        {renderTextWithLinks(message.text, [
-                            styles.messageText,
-                            { color: message.isBot ? '#fff' : '#fff' }
-                        ])}
-
-                        {message.isBot && (
-                            <TouchableOpacity
-                                onPress={() => onCopyMessage(message.text)}
-                                style={styles.copyButton}
-                            >
-                                <Ionicons name="copy-outline" size={16} color="rgba(255,255,255,0.7)" />
-                            </TouchableOpacity>
-                        )}
-                    </View>
-
-                    {message.type === 'options' && message.options && (
-                        <View style={styles.optionsContainer}>
-                            {message.options.map((option: string, index: number) => (
-                                <TouchableOpacity
-                                    key={index}
-                                    onPress={() => {
-                                        console.log('Option pressed:', option);
-                                        onOptionSelect(option);
-                                    }}
-                                    style={styles.optionButton}
-                                >
-                                    <LinearGradient
-                                        colors={['rgba(255,255,255,0.2)', 'rgba(255,255,255,0.1)']}
-                                        style={styles.optionGradient}
-                                    >
-                                        <Text style={styles.optionText}>{option}</Text>
-                                    </LinearGradient>
-                                </TouchableOpacity>
-                            ))}
-                        </View>
-                    )}
-                </GlassCard>
-            </TouchableOpacity>
-
-            <Text style={styles.timestamp}>
-                {message.timestamp.toLocaleTimeString([], {
-                    hour: '2-digit',
-                    minute: '2-digit'
-                })}
-            </Text>
-        </Animated.View>
-    );
-};
 
 const styles = StyleSheet.create({
     container: {
@@ -1477,19 +1276,20 @@ const styles = StyleSheet.create({
         marginBottom: 20,
     },
     messageBubble: {
-        padding: 16,
+        padding: 14,
+        borderRadius: 12,
         backgroundColor: 'rgba(255,255,255,0.1)',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
+        shadowOpacity: 0.08,
         shadowRadius: 8,
-        elevation: 4,
+        elevation: 3,
     },
     botBubble: {
-        borderBottomLeftRadius: 8,
+        borderTopLeftRadius: 4,
     },
     userBubble: {
-        borderBottomRightRadius: 8,
+        borderBottomRightRadius: 4,
         backgroundColor: 'rgba(102, 126, 234, 0.3)',
     },
     videoBubble: {
@@ -1527,8 +1327,11 @@ const styles = StyleSheet.create({
         gap: 8,
     },
     optionButton: {
-        borderRadius: 12,
-        overflow: 'hidden',
+        borderRadius: 10,
+        borderWidth: 1,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        alignItems: 'center',
     },
     optionGradient: {
         paddingHorizontal: 16,
@@ -1622,7 +1425,11 @@ const styles = StyleSheet.create({
     },
     typingBubble: {
         backgroundColor: 'rgba(255,255,255,0.1)',
-        marginLeft: 40,
+        borderRadius: 12,
+        borderBottomLeftRadius: 4,
+        marginLeft: 8,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
     },
     typingContent: {
         flexDirection: 'row',
@@ -1717,8 +1524,8 @@ const styles = StyleSheet.create({
     },
     headerContent: {
         backgroundColor: 'rgba(255, 255, 255, 0.1)',
-        borderRadius: 16,
-        padding: 16,
+        borderRadius: 12,
+        padding: 14,
         flexDirection: 'row',
         alignItems: 'center',
     },
@@ -1735,13 +1542,16 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     headerTitle: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        color: '#fff',
+        fontFamily: 'PlayfairDisplay_700Bold',
+        fontSize: 22,
+        letterSpacing: -0.3,
     },
     headerSubtitle: {
-        fontSize: 14,
-        color: 'rgba(255, 255, 255, 0.8)',
+        fontFamily: 'Inter_600SemiBold',
+        fontSize: 10,
+        letterSpacing: 1.5,
+        textTransform: 'uppercase',
+        marginTop: 3,
     },
     languageSelector: {
         flexDirection: 'row',

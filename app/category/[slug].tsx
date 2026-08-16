@@ -18,7 +18,6 @@ import {
 import Animated, {
     useAnimatedStyle,
     useSharedValue,
-    withSpring,
     withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -39,6 +38,26 @@ const getResponsiveFontSize = (size: number) => {
   const scale = screenWidth / 375;
   const newSize = size * scale;
   return Math.max(12, Math.min(newSize, size * 1.3));
+};
+
+// Editorial line icon per category (replaces the old emoji headers). Every
+// category uses the SAME single lavender accent — no per-category rainbow.
+const CATEGORY_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
+  'todays-outfit': 'partly-sunny-outline',
+  'male-street-style': 'glasses-outline',
+  'male-formal-wear': 'shirt-outline',
+  'male-gym-wear': 'barbell-outline',
+  'male-date-night': 'heart-outline',
+  'male-party-wear': 'sparkles-outline',
+  'male-old-money': 'diamond-outline',
+  'male-twinning': 'people-outline',
+  'female-street-style': 'woman-outline',
+  'female-office-wear': 'briefcase-outline',
+  'female-gym-wear': 'fitness-outline',
+  'female-date-night': 'heart-outline',
+  'female-party-wear': 'sparkles-outline',
+  'female-elegant': 'star-outline',
+  'female-twinning': 'people-outline',
 };
 
 // PAGE_SIZE removed - no longer needed without dummy outfits
@@ -251,11 +270,8 @@ export default function CategoryScreen() {
   };
 
   const startEntranceAnimations = () => {
-    fadeAnim.value = withTiming(1, { duration: 600 });
-    slideAnim.value = withSpring(0, {
-      damping: 15,
-      stiffness: 150,
-    });
+    fadeAnim.value = withTiming(1, { duration: 450 });
+    slideAnim.value = withTiming(0, { duration: 450 });
   };
 
   const startExitAnimation = (callback: () => void) => {
@@ -282,6 +298,12 @@ export default function CategoryScreen() {
   };
 
   const category = categoryData[slug as string];
+
+  // Hook must run before any early return (rules-of-hooks) — independent of `category`.
+  const screenAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: screenOpacity.value,
+    transform: [{ translateY: screenTranslateY.value }],
+  }));
 
   // No more dummy outfits - focusing on AI advice only
 
@@ -319,25 +341,20 @@ export default function CategoryScreen() {
 
   // filterAdvice function removed - no longer using Firebase advice data
 
-  const screenAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: screenOpacity.value,
-    transform: [{ translateY: screenTranslateY.value }],
-  }));
-
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
       <Animated.View style={[styles.container, { backgroundColor: theme.background }, screenAnimatedStyle]}>
         <StatusBar
           barStyle={
-            theme.background === '#18181b' ? 'light-content' : 'dark-content'
+            theme.background === '#0e0e0e' ? 'light-content' : 'dark-content'
           }
           backgroundColor={theme.background}
         />
         {/* Header */}
         <View style={[styles.modernHeader, { paddingTop: insets.top + 8 }]}>
           <LinearGradient
-            colors={category.colors}
+            colors={theme.gradientHome as [string, string, string]}
             style={styles.headerGradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
@@ -345,7 +362,7 @@ export default function CategoryScreen() {
             <View style={styles.headerContent}>
               <Ionicons
                 name="arrow-back"
-                size={24}
+                size={22}
                 color="#fff"
                 onPress={() => {
                   if (isExiting) return;
@@ -353,24 +370,44 @@ export default function CategoryScreen() {
                     router.back();
                   });
                 }}
-                style={styles.backButton}
+                style={[
+                  styles.backButton,
+                  {
+                    backgroundColor: 'rgba(255,255,255,0.14)',
+                    borderColor: 'rgba(255,255,255,0.20)',
+                  },
+                ]}
               />
               <View style={styles.headerTitleSection}>
-                <Text style={styles.headerIcon}>{category.icon}</Text>
+                {/* Large editorial icon in a glass circle — bigger than the home rail */}
+                <View
+                  style={[
+                    styles.headerIconCircle,
+                    { borderColor: 'rgba(255,255,255,0.25)' },
+                  ]}
+                >
+                  <Ionicons
+                    name={CATEGORY_ICONS[slug as string] || 'shirt-outline'}
+                    size={32}
+                    color="#fff"
+                  />
+                </View>
                 <Text style={[styles.headerTitle, { color: '#fff' }]}>
                   {category.title}
                 </Text>
                 <Text
                   style={[
                     styles.headerDescription,
-                    { color: 'rgba(255,255,255,0.9)' },
+                    { color: 'rgba(255,255,255,0.85)' },
                   ]}
                 >
                   {category.description}
                 </Text>
               </View>
               <View style={styles.headerBadge}>
-                <Text style={styles.trendBadge}>{category.trend}</Text>
+                <View style={styles.trendBadge}>
+                  <Text style={styles.trendText}>{category.trend}</Text>
+                </View>
               </View>
             </View>
           </LinearGradient>
@@ -408,7 +445,7 @@ export default function CategoryScreen() {
                       AI service is temporarily busy. {'\n'}Showing fallback suggestions instead.
                     </Text>
                     <TouchableOpacity
-                      style={styles.retryButton}
+                      style={[styles.retryButton, { backgroundColor: theme.primary }]}
                       onPress={() => fetchOutfitSuggestions(true)}
                     >
                       <Ionicons name="refresh" size={18} color="#fff" />
@@ -499,38 +536,58 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   backButton: {
-    padding: 8,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    textAlign: 'center',
+    lineHeight: 40,
   },
   headerTitleSection: {
     flex: 1,
     alignItems: 'center',
     marginHorizontal: getResponsiveSize(15),
   },
-  headerIcon: {
-    fontSize: getResponsiveFontSize(40),
-    marginBottom: getResponsiveSize(8),
+  headerIconCircle: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    borderWidth: 1,
+    backgroundColor: 'rgba(255,255,255,0.10)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: getResponsiveSize(12),
   },
   headerTitle: {
-    fontSize: getResponsiveFontSize(24),
-    fontWeight: 'bold',
+    fontFamily: 'PlayfairDisplay_700Bold',
+    fontSize: getResponsiveFontSize(26),
     marginBottom: getResponsiveSize(4),
-    textShadowColor: 'rgba(0,0,0,0.3)',
+    textShadowColor: 'rgba(0,0,0,0.25)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
   },
   headerDescription: {
-    fontSize: getResponsiveFontSize(14),
+    fontFamily: 'Inter_400Regular',
+    fontSize: getResponsiveFontSize(13),
+    lineHeight: getResponsiveFontSize(20),
     textAlign: 'center',
+    marginTop: 2,
   },
   headerBadge: { alignItems: 'flex-end' },
   trendBadge: {
-    fontSize: 12,
-    fontWeight: 'bold',
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.20)',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 20,
+  },
+  trendText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 11,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
     color: '#fff',
-    backgroundColor: '#6366f1',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
   },
   scrollContent: {
     paddingTop: getResponsiveSize(16),
@@ -550,14 +607,15 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   categoryTitle: {
-    fontSize: getResponsiveFontSize(24),
-    fontWeight: 'bold',
+    fontFamily: 'PlayfairDisplay_700Bold',
+    fontSize: getResponsiveFontSize(20),
     marginBottom: getResponsiveSize(8),
     textAlign: 'center',
   },
   categoryDescription: {
-    fontSize: getResponsiveFontSize(16),
-    lineHeight: 24,
+    fontFamily: 'Inter_400Regular',
+    fontSize: getResponsiveFontSize(14),
+    lineHeight: getResponsiveFontSize(22),
     textAlign: 'center',
     marginBottom: getResponsiveSize(16),
   },
@@ -580,10 +638,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   retryButton: {
-    backgroundColor: '#6366f1',
-    paddingHorizontal: getResponsiveSize(20),
+    paddingHorizontal: getResponsiveSize(18),
     paddingVertical: getResponsiveSize(10),
-    borderRadius: getResponsiveSize(20),
+    borderRadius: 12,
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: getResponsiveSize(16),
@@ -646,8 +703,8 @@ const styles = StyleSheet.create({
     marginBottom: getResponsiveSize(12),
   },
   sectionTitle: {
+    fontFamily: 'PlayfairDisplay_700Bold',
     fontSize: getResponsiveFontSize(22),
-    fontWeight: 'bold',
     marginBottom: getResponsiveSize(12),
   },
   fallbackNotice: {

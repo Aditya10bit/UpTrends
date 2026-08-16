@@ -264,7 +264,7 @@ export default function MixMatchScreen() {
     <>
       <Stack.Screen options={{ headerShown: false }} />
       <View style={[styles.container, { backgroundColor: theme.background }]}>
-        <StatusBar barStyle={theme.background === '#18181b' ? 'light-content' : 'dark-content'} />
+        <StatusBar barStyle={theme.background === '#0e0e0e' ? 'light-content' : 'dark-content'} />
         
         {/* Header */}
         <View style={[styles.header, { paddingTop: insets.top + 10 }]}>

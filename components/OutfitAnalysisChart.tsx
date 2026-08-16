@@ -220,7 +220,7 @@ const ColorPalette: React.FC<{
     'black': '#000000',
     'white': '#ffffff',
     'off white': '#fafafa',
-    'jet black': '#0f172a',
+    'jet black': '#0e0e0e',
     'charcoal black': '#1f2937',
     
     // Pastels

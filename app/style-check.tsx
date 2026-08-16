@@ -35,7 +35,7 @@ const getResponsiveSize = (size: number) => (screenWidth / 375) * size;
 
 export default function StyleCheck() {
   const { theme } = useTheme();
-  const isDark = theme.background === '#0f172a';
+  const isDark = theme.background === '#0e0e0e';
   const { user } = useAuth();
   const [userProfile, setUserProfile] = useState<any>(null);
   const [outfitImage, setOutfitImage] = useState<string | null>(null);
@@ -207,7 +207,7 @@ export default function StyleCheck() {
   return (
     <PremiumBackground variant="styleCheck">
     <SafeAreaView style={[styles.container]}>
-      <StatusBar barStyle={theme.background === '#0f172a' ? 'light-content' : 'dark-content'} />
+      <StatusBar barStyle={theme.background === '#0e0e0e' ? 'light-content' : 'dark-content'} />
 
       {/* Header */}
       <Animated.View

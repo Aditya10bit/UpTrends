@@ -232,7 +232,7 @@ const AnimatedSplashInner: React.FC<AnimatedSplashProps> = ({ isDark, onFinish }
   if (done) return null;
 
   const gradientColors: [string, string, ...string[]] = isDark
-    ? ['#0f172a', '#1e1b4b', '#0f172a']
+    ? ['#0e0e0e', '#1e1b4b', '#0e0e0e']
     : ['#f0f4ff', '#e8eeff', '#f0f4ff'];
 
   return (

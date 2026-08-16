@@ -180,7 +180,7 @@ export default function MakeOutfit() {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsMultipleSelection: true,
       allowsEditing: false,
       quality: 0.8,
@@ -516,7 +516,7 @@ export default function MakeOutfit() {
   return (
     <PremiumBackground variant="makeOutfit">
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <StatusBar barStyle={theme.background === '#18181b' ? "light-content" : "dark-content"} backgroundColor={theme.background} />
+      <StatusBar barStyle={theme.background === '#0e0e0e' ? "light-content" : "dark-content"} backgroundColor={theme.background} />
 
       {/* Header */}
       <Animated.View style={[styles.header, { opacity: fadeAnim }]}>

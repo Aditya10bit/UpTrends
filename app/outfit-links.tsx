@@ -62,7 +62,7 @@ export default function OutfitLinksScreen() {
   if (!currentUrl) {
     return (
       <View style={[styles.container, { backgroundColor: theme.background }]}>
-        <StatusBar barStyle={theme.background === '#18181b' ? "light-content" : "dark-content"} />
+        <StatusBar barStyle={theme.background === '#0e0e0e' ? "light-content" : "dark-content"} />
         <View style={[styles.header, { paddingTop: insets.top }]}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color={theme.text} />
@@ -82,7 +82,7 @@ export default function OutfitLinksScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <StatusBar barStyle={theme.background === '#18181b' ? "light-content" : "dark-content"} />
+      <StatusBar barStyle={theme.background === '#0e0e0e' ? "light-content" : "dark-content"} />
 
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top, backgroundColor: theme.card }]}>

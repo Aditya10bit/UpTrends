@@ -1,119 +1,138 @@
 const lightTheme = {
-  // Ultra-modern backgrounds – slightly tinted base that lets the mesh shine
-  background: '#f0f4ff',
-  backgroundGradient: ['#f0f4ff', '#eef2ff', '#e8ecf8'],
-  card: 'rgba(255, 255, 255, 0.72)',
-  cardSecondary: 'rgba(248, 250, 252, 0.65)',
-  cardTertiary: 'rgba(241, 245, 249, 0.6)',
-  backgroundSecondary: 'rgba(241, 245, 249, 0.7)',
-  backgroundAccent: 'rgba(238, 242, 255, 0.6)',
-  surfaceElevated: 'rgba(255, 255, 255, 0.82)',
-  surfaceOverlay: 'rgba(255, 255, 255, 0.88)',
-  
-  // Premium text colors with enhanced readability
-  text: '#0f172a',
-  textSecondary: '#334155',
-  textTertiary: '#64748b',
-  textAccent: '#6366f1',
-  textMuted: '#94a3b8',
-  
-  // Ultra-refined border colors – frosted glass edges
-  border: 'rgba(203, 213, 225, 0.5)',
-  borderLight: 'rgba(241, 245, 249, 0.6)',
-  borderAccent: 'rgba(203, 213, 225, 0.65)',
-  borderGlass: 'rgba(255, 255, 255, 0.45)',
-  borderGlow: 'rgba(99, 102, 241, 0.3)',
-  
-  // Next-gen primary colors with enhanced vibrancy
-  primary: '#6366f1',        // Modern indigo with perfect saturation
-  primaryDark: '#4f46e5',    // Rich indigo for interactions
-  primaryLight: '#e0e7ff',   // Ultra-light indigo
-  primaryGlow: 'rgba(99, 102, 241, 0.15)',
-  secondary: '#8b5cf6',      // Vibrant purple for accents
-  secondaryLight: '#f3f4f6', // Neutral light
-  accent: '#10b981',         // Premium emerald for success
-  accentLight: '#ecfdf5',    // Light emerald background
-  accentGlow: 'rgba(16, 185, 129, 0.15)',
-  
-  // Premium status colors with enhanced visual hierarchy
-  success: '#059669',        // Rich emerald
-  successLight: '#ecfdf5',   // Ultra-light emerald
-  successGlow: 'rgba(5, 150, 105, 0.15)',
-  warning: '#f59e0b',        // Premium amber
-  warningLight: '#fffbeb',   // Light amber background
-  warningGlow: 'rgba(245, 158, 11, 0.15)',
-  error: '#dc2626',          // Modern red
-  errorLight: '#fef2f2',     // Light red background
-  errorGlow: 'rgba(220, 38, 38, 0.15)',
-  trending: '#ec4899',       // Vibrant pink
-  trendingLight: '#fdf2f8',  // Light pink background
-  trendingGlow: 'rgba(236, 72, 153, 0.15)',
-  
-  // Premium screen-specific colors with enhanced branding
-  homeAccent: '#6366f1',     // Modern indigo for home
-  profileAccent: '#06b6d4',  // Cyan for profile
-  wardrobeAccent: '#ec4899', // Hot pink for wardrobe
-  twinningAccent: '#f43f5e', // Rose for twinning/date
-  friendsAccent: '#3b82f6',  // Blue for friends
-  makeOutfitAccent: '#8b5cf6', // Purple for make outfit
-  fashionAccent: '#f59e0b',  // Amber for fashion
-  styleCheckAccent: '#10b981', // Emerald for style check
-  
-  // Premium shadows with glass morphism support
-  shadow: 'rgba(15, 23, 42, 0.06)',
-  shadowMedium: 'rgba(15, 23, 42, 0.1)',
-  shadowStrong: 'rgba(15, 23, 42, 0.14)',
-  shadowGlow: 'rgba(99, 102, 241, 0.2)',
-  shadowInset: 'inset 0 1px 0 rgba(255, 255, 255, 0.1)',
-  
-  // Next-gen gradients with enhanced visual impact
-  gradientStart: '#6366f1',
-  gradientEnd: '#8b5cf6',
-  gradientHome: ['#6366f1', '#8b5cf6', '#ec4899'],
-  gradientProfile: ['#06b6d4', '#3b82f6', '#8b5cf6'],
-  gradientWardrobe: ['#ec4899', '#f43f5e', '#f59e0b'],
-  gradientTwinning: ['#f43f5e', '#ec4899', '#8b5cf6'],
-  gradientFriends: ['#3b82f6', '#06b6d4', '#10b981'],
-  gradientMakeOutfit: ['#8b5cf6', '#ec4899', '#f59e0b'],
-  gradientFashion: ['#f59e0b', '#f97316', '#dc2626'],
-  gradientStyleCheck: ['#10b981', '#059669', '#047857'],
-  gradientGlass: ['rgba(255, 255, 255, 0.35)', 'rgba(255, 255, 255, 0.15)'],
-  
-  // Additional modern colors for enhanced UI
-  info: '#4299e1',           // Clear blue for information
-  infoLight: '#ebf8ff',      // Light blue background
-  
-  // Enhanced neutral grays with warmth (avoiding cold grays)
-  gray50: '#f9fafb',
-  gray100: '#f3f4f6',
-  gray200: '#e5e7eb',
-  gray300: '#d1d5db',
-  gray400: '#9ca3af',
-  gray500: '#6b7280',
-  gray600: '#4b5563',
-  gray700: '#374151',
-  gray800: '#1f2937',
-  gray900: '#111827',
-  
-  // Surface colors for layered UI – glassmorphic
-  surface: 'rgba(255, 255, 255, 0.75)',
-  surfaceSecondary: 'rgba(248, 250, 252, 0.65)',
-  surfaceTertiary: 'rgba(241, 245, 249, 0.55)',
-  
+  // Ivory "paper" editorial backgrounds — warm, gallery-like, lets photos lead
+  background: '#f4f1ec',
+  backgroundGradient: ['#f4f1ec', '#efeae2', '#e9e3d8'],
+  card: 'rgba(255, 255, 255, 0.82)',
+  cardSecondary: 'rgba(250, 248, 244, 0.9)',
+  cardTertiary: 'rgba(244, 241, 235, 0.92)',
+  backgroundSecondary: '#ece7de',
+  backgroundAccent: '#eeeaf4',
+  surfaceElevated: '#ffffff',
+  surfaceOverlay: 'rgba(255, 255, 255, 0.94)',
+
+  // Ink text with warm undertones (magazine print, not pure black)
+  text: '#1b1a17',
+  textSecondary: '#4a463f',
+  textTertiary: '#8a857c',
+  textAccent: '#5653c8',
+  textMuted: '#a49f94',
+
+  // Hairline borders — thin, editorial, low-contrast
+  border: 'rgba(27, 26, 23, 0.10)',
+  borderLight: 'rgba(27, 26, 23, 0.06)',
+  borderAccent: 'rgba(27, 26, 23, 0.14)',
+  borderGlass: 'rgba(255, 255, 255, 0.5)',
+  borderGlow: 'rgba(86, 83, 200, 0.30)', // the single "aura" accent
+
+  // One restrained lavender accent (the AI/aura color) — every other accent
+  // resolves here, killing the old rainbow.
+  primary: '#5653c8',
+  primaryDark: '#4441ab',
+  primaryLight: '#e3e1f6',
+  primaryGlow: 'rgba(86, 83, 200, 0.16)',
+  secondary: '#6f6c66',
+  secondaryLight: '#ece7de',
+  accent: '#4a46b0',
+  accentLight: '#e1def4',
+  accentGlow: 'rgba(74, 70, 176, 0.15)',
+
+  // Muted status colors — sage, amber, rose (no neon)
+  success: '#5f8f7d',
+  successLight: '#e3eee7',
+  successGlow: 'rgba(95, 143, 125, 0.18)',
+  warning: '#a8894f',
+  warningLight: '#f2ead9',
+  warningGlow: 'rgba(168, 137, 79, 0.18)',
+  error: '#b06565',
+  errorLight: '#f2e2e2',
+  errorGlow: 'rgba(176, 101, 101, 0.18)',
+  trending: '#8a76b3',
+  trendingLight: '#ebe6f2',
+  trendingGlow: 'rgba(138, 118, 179, 0.18)',
+
+  // Screen accents — ALL resolve to the single lavender accent
+  homeAccent: '#5653c8',
+  profileAccent: '#5653c8',
+  wardrobeAccent: '#5653c8',
+  twinningAccent: '#5653c8',
+  friendsAccent: '#5653c8',
+  makeOutfitAccent: '#5653c8',
+  fashionAccent: '#5653c8',
+  styleCheckAccent: '#5653c8',
+
+  // Warm shadows
+  shadow: 'rgba(27, 26, 23, 0.08)',
+  shadowMedium: 'rgba(27, 26, 23, 0.12)',
+  shadowStrong: 'rgba(27, 26, 23, 0.18)',
+  shadowGlow: 'rgba(86, 83, 200, 0.18)',
+  shadowInset: 'inset 0 1px 0 rgba(255, 255, 255, 0.6)',
+
+  // Gradients stay DARK (lavender family) so white text on headers keeps working
+  gradientStart: '#5653c8',
+  gradientEnd: '#4a46b0',
+  gradientHome: ['#5653c8', '#4a46b0', '#3b3a9e'],
+  gradientProfile: ['#5653c8', '#4a46b0', '#3b3a9e'],
+  gradientWardrobe: ['#5653c8', '#4a46b0', '#3b3a9e'],
+  gradientTwinning: ['#5653c8', '#4a46b0', '#3b3a9e'],
+  gradientFriends: ['#5653c8', '#4a46b0', '#3b3a9e'],
+  gradientMakeOutfit: ['#5653c8', '#4a46b0', '#3b3a9e'],
+  gradientFashion: ['#5653c8', '#4a46b0', '#3b3a9e'],
+  gradientStyleCheck: ['#5653c8', '#4a46b0', '#3b3a9e'],
+  gradientGlass: ['rgba(255, 255, 255, 0.6)', 'rgba(255, 255, 255, 0.2)'],
+
+  // Muted indigo-blue for information
+  info: '#6b7bbd',
+  infoLight: '#e6e9f6',
+
+  // Warm neutral grays (avoiding cool slate)
+  gray50: '#faf8f5',
+  gray100: '#f3f0ea',
+  gray200: '#e6e1d8',
+  gray300: '#d4cec2',
+  gray400: '#b3aca0',
+  gray500: '#8a857c',
+  gray600: '#6b675f',
+  gray700: '#4a463f',
+  gray800: '#2b2926',
+  gray900: '#1b1a17',
+
+  // Surface colors for layered UI
+  surface: 'rgba(255, 255, 255, 0.85)',
+  surfaceSecondary: 'rgba(250, 248, 244, 0.9)',
+  surfaceTertiary: 'rgba(244, 241, 235, 0.85)',
+
   // Interactive states
-  hover: 'rgba(102, 126, 234, 0.08)',
-  pressed: 'rgba(102, 126, 234, 0.12)',
-  focus: 'rgba(102, 126, 234, 0.16)',
-  
-  // Status bar colors for different screens
+  hover: 'rgba(86, 83, 200, 0.06)',
+  pressed: 'rgba(86, 83, 200, 0.10)',
+  focus: 'rgba(86, 83, 200, 0.14)',
+
+  // Status bar colors for different screens (single ivory tone)
   statusBar: {
-    home: '#667eea',
-    profile: '#38b2ac',
-    wardrobe: '#ed64a6',
-    twinning: '#ff6b9d',
-    friends: '#4facfe',
-    makeOutfit: '#f093fb',
-    default: '#667eea'
-  }
+    home: '#f4f1ec',
+    profile: '#f4f1ec',
+    wardrobe: '#f4f1ec',
+    twinning: '#f4f1ec',
+    friends: '#f4f1ec',
+    makeOutfit: '#f4f1ec',
+    default: '#f4f1ec'
+  },
+
+  // ---- NEW: typography + shape tokens (same in both modes) ----
+  fonts: {
+    display: 'PlayfairDisplay_700Bold',
+    displaySemibold: 'PlayfairDisplay_600SemiBold',
+    body: 'Inter_400Regular',
+    bodyMedium: 'Inter_500Medium',
+    bodySemiBold: 'Inter_600SemiBold',
+    bodyBold: 'Inter_700Bold',
+    label: 'Inter_500Medium',
+    labelCaps: 'Inter_600SemiBold',
+  },
+  radius: {
+    sm: 8,
+    md: 12,
+    lg: 16,
+    pill: 999,
+  },
 };
 export default lightTheme;

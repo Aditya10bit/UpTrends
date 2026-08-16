@@ -22,6 +22,9 @@ def reactNativeAndroidDir = new File(
 
 allprojects {
   ext {
+    // Pin the NDK to the version this project builds cleanly with. The Expo
+    // prebuild default (27.1.x) breaks react-native-screens' native link step
+    // (missing libc++ symbols) in non-new-arch mode, so keep 26.1.10909125.
     ndkVersion = "26.1.10909125"
   }
   repositories {

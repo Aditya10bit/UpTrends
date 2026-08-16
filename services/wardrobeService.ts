@@ -270,7 +270,7 @@ Make sure the response is valid JSON only, no additional text.
 };
 
 // Helper function to convert blob to base64
-const blobToBase64 = (blob: Blob): Promise<string> => {
+const blobToBase64 = (blob: any): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onloadend = () => resolve(reader.result as string);

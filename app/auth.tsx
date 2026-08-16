@@ -1,10 +1,12 @@
 // app/auth.tsx
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { createUserWithEmailAndPassword, sendPasswordResetEmail, signInWithEmailAndPassword } from 'firebase/auth';
 import React, { useState } from 'react';
 import { Alert, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import { auth, isFirebaseInitialized } from '../firebaseConfig';
+import { signInWithGoogle } from '../services/googleSignInService';
 import { checkUserProfile, createUserProfile } from '../services/userService';
 
 export default function AuthScreen() {
@@ -67,6 +69,22 @@ export default function AuthScreen() {
       Alert.alert('Success', 'Password reset email sent! Check your inbox! 📧');
     } catch (error: any) {
       Alert.alert('Error', error.message);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setLoading(true);
+    try {
+      const result = await signInWithGoogle();
+      if (result.status === 'success') {
+        router.replace('/');
+      } else if (result.status === 'cancelled') {
+        // User backed out of the Google account picker — do nothing.
+      } else {
+        Alert.alert('Google Sign-In Failed', result.message);
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -140,6 +158,36 @@ export default function AuthScreen() {
         >
           <Text style={{ color: '#fff', textAlign: 'center', fontWeight: 'bold', fontSize: 18 }}>
             {loading ? 'Loading...' : isLogin ? 'Sign In' : 'Sign Up'}
+          </Text>
+        </TouchableOpacity>
+
+        {/* OR divider */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 4 }}>
+          <View style={{ flex: 1, height: 1, backgroundColor: theme.border }} />
+          <Text style={{ color: theme.textTertiary, fontSize: 13, letterSpacing: 1 }}>OR</Text>
+          <View style={{ flex: 1, height: 1, backgroundColor: theme.border }} />
+        </View>
+
+        {/* Google sign-in (native SDK → Firebase credential swap) */}
+        <TouchableOpacity
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 10,
+            backgroundColor: theme.card,
+            borderWidth: 1,
+            borderColor: theme.borderLight,
+            borderRadius: 8,
+            paddingVertical: 14,
+            opacity: loading ? 0.5 : 1,
+          }}
+          onPress={handleGoogleSignIn}
+          disabled={loading}
+        >
+          <Ionicons name="logo-google" size={20} color={theme.text} />
+          <Text style={{ color: theme.text, textAlign: 'center', fontWeight: '600', fontSize: 16 }}>
+            Continue with Google
           </Text>
         </TouchableOpacity>
 

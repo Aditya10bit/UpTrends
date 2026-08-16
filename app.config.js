@@ -61,7 +61,8 @@ module.exports = {
                 }
             ],
             "expo-font",
-            "expo-web-browser"
+            "expo-web-browser",
+            "@react-native-google-signin/google-signin"
         ],
         extra: {
             router: {
@@ -77,7 +78,13 @@ module.exports = {
         EXPO_PUBLIC_FIREBASE_PROJECT_ID: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || 'uptrends-f893f',
         EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET || 'uptrends-f893f.firebasestorage.app',
         EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || '734945715091',
-        EXPO_PUBLIC_FIREBASE_APP_ID: process.env.EXPO_PUBLIC_FIREBASE_APP_ID || '1:734945715091:web:1a0157e8cf96e172fc7e66'
+        EXPO_PUBLIC_FIREBASE_APP_ID: process.env.EXPO_PUBLIC_FIREBASE_APP_ID || '1:734945715091:web:1a0157e8cf96e172fc7e66',
+        // Google Sign-In — Web client ID (from Firebase Console → Your apps → Web app).
+        // Required for the "Continue with Google" button; without it the screen shows a clear error.
+        EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || '',
+        EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || '',
+        // Cloudflare Worker AI Proxy (multi-provider fallback for shared keys)
+        EXPO_PUBLIC_AI_PROXY_URL: process.env.EXPO_PUBLIC_AI_PROXY_URL || '',
         },
         owner: "aditya10das"
     }

@@ -1,378 +1,372 @@
-# UpTrends - AI-Powered Fashion Assistant
+# UpTrends — AI-Powered Fashion Stylist
 
-A React Native app that provides personalized outfit recommendations using Google's Gemini AI, with body-type awareness and venue-specific styling suggestions.
-.AI-Powered Fashion Intelligence – Developed a personalized outfit recommendation system using Google Gemini AI and React Native, achieving body-type aware styling with 90%+ user satisfaction in beta testing across 15+ outfit categories.
-
-• Smart Wardrobe & Venue Analysis – Implemented advanced image processing features using Expo Image Picker and AI vision models, enabling users to upload wardrobe items and venue photos for contextual outfit suggestions; processed 500+ outfit combinations during testing.
-
-• Personalized Body-Type Matching – Built comprehensive user profiling system with Firebase Firestore integration, considering height, weight, skin tone, and body type parameters to deliver tailored fashion advice; improved outfit relevance by 85% compared to generic fashion apps.
-
-• Production-Ready Architecture – Engineered secure, scalable mobile app with TypeScript, rate-limited API usage (15 req/min), environment variable protection, and cross-platform compatibility; optimized for free-tier usage serving 3-4 users while staying under 1% quota utilization.
-
-Tech Stack: React Native, Expo Router, Google Gemini AI, Firebase (Auth/Firestore), TypeScript, NativeWind, Expo Image Picker, React Native Reanimated
-
-Problem Solved: Addresses the common struggle young adults face with outfit selection and fashion confidence by providing AI-powered, body-type specific styling advice that considers personal attributes, wardrobe items, and venue appropriateness – eliminating daily "what to wear" decisions and boosting fashion confidence.
-
-🌟 UpTrends - Your AI Fashion Stylist 🌟
-Transform your style with personalized AI that knows your body, location, and lifestyle
-
-🎯 What Makes UpTrends Special?
-UpTrends isn't just another fashion app - it's your personal AI stylist that creates outfits tailored specifically for YOU, your body, your location, and your lifestyle!
-
-🔥 Amazing Features That Will Transform Your Style:
-🌍 1. Smart Daily Outfits (Outfit of the Day)
-Never wonder "what to wear" again!
-
-📍 Location-Smart: Uses your exact location and local climate
-🌤️ Weather-Perfect: Considers temperature, humidity, and weather conditions
-🏙️ Culture-Aware: Adapts to your city's fashion trends and cultural style
-⏰ Instant Suggestions: Get perfect outfits for today's weather in seconds
-"Going to Mumbai in monsoon? Get breezy, rain-friendly outfits. Heading to Delhi winter? Get cozy, layered looks!"
-
-💕 2. Personalized Occasion Outfits
-Perfect outfits for every moment in your life!
-
-🌹 Twinning Date Outfits
-💑 Coordinated couple looks that complement each other
-🎨 Color harmony that makes you both look amazing
-📸 Instagram-worthy matching styles
-🎉 Party & Event Outfits
-✨ Stand-out looks for parties, celebrations, and special events
-🎭 Occasion-appropriate styling (casual party vs formal event)
-💃 Confidence-boosting outfits that make you shine
-👔 Formal & Professional
-💼 Sharp business looks that command respect
-🎓 Interview outfits that make great first impressions
-🏢 Office-appropriate styles that are both professional and stylish
-All personalized based on YOUR body type, skin tone, height, and style preferences!
-
-🤖 3. Style Buddy - Your AI Fashion Coach
-Like having a personal stylist in your pocket!
-
-🔍 Body Type Analysis: Understand your unique body shape
-💡 Smart Recommendations: Get styling tips that actually work for YOU
-🎨 Color Guidance: Discover which colors make you look amazing
-📚 Fashion Education: Learn styling secrets from fashion experts
-💬 24/7 Chat Support: Ask any fashion question, get instant expert advice
-"Should I wear horizontal stripes? What colors suit my skin tone? How to dress for my body type?" - Get all answers instantly!
-
-📸 4. Upload Aesthetic - Discover Your Style
-Turn inspiration into your personal style!
-
-🖼️ Photo Analysis: Upload any outfit photo you love
-🎯 Style Breakdown: Understand what makes that look work
-🛍️ Shopping Guidance: Get exact items to recreate the look
-💫 Personalized Adaptation: Modify the style to suit YOUR body and preferences
-"Saw a celebrity outfit you love? Upload it and get a personalized version that works for your body type!"
-
-⭐ 5. Style Check - Rate & Improve Your Outfits
-Get professional styling feedback instantly!
-
-📊 AI Rating System: Get honest scores on your outfit choices
-🎯 Detailed Feedback: Understand what works and what doesn't
-💡 Improvement Tips: Get specific suggestions to enhance your look
-🏆 Style Progress: Track how your fashion sense improves over time
-"Take a selfie in your outfit, get a professional stylist's opinion in seconds!"
-
-👗 6. Make Me an Outfit - Your Wardrobe Wizard
-Create amazing outfits from clothes you already own!
-
-📱 Wardrobe Scan: Upload photos of your clothes
-🎨 Smart Combinations: AI creates multiple outfit options
-🔄 Mix & Match: Discover new ways to wear your existing clothes
-💰 Save Money: Maximize your wardrobe without buying new clothes
-✨ Missing Item Alerts: Know exactly what to buy to complete perfect looks
-"Upload 10 clothing items, get 20+ different outfit combinations!"
-
-🛡️ 7. Robust AI Image Validation - Prevents hallucinations!
-Smart guardrails to protect your experience!
-
-✅ Context-Aware Validation: AI checks if your uploaded image matches the feature you're using.
-🚫 Anti-Spam: Blocks irrelevant images (like random objects, food, memes) from being processed.
-💡 Helpful Feedback: Instantly tells you why an image was rejected instead of failing silently.
-"Upload a picture of a coffee mug to your wardrobe? The AI will catch it and ask for a real clothing item!"
-
-🛍️ Smart Shopping Features
-🔗 Instant Shopping Links
-🛒 Amazon Integration: Direct links to buy recommended items
-📌 Pinterest Inspiration: Visual styling ideas and outfit boards
-🔍 Google Shopping: Compare prices across multiple stores
-💳 Smart Recommendations: Only suggest items that fit your budget and style
-💡 Personalized Shopping Lists
-🎯 Priority Items: Know which pieces will unlock the most outfit combinations
-💰 Budget-Friendly: Get options for every price range
-🌟 Versatile Pieces: Focus on items that work with multiple outfits
-🚀 Why UpTrends is Revolutionary:
-🧠 AI That Actually Knows Fashion
-Trained on thousands of fashion combinations
-Understands body types, color theory, and style principles
-Learns from your preferences and feedback
-🌍 Location-Aware Styling
-Considers your local climate and culture
-Adapts to regional fashion trends
-Weather-appropriate recommendations
-👤 Truly Personal
-Analyzes YOUR specific body type, skin tone, and preferences
-Creates outfits that flatter YOUR unique features
-Grows smarter as it learns your style
-💸 Money-Smart
-Maximizes your existing wardrobe
-Suggests strategic purchases that unlock multiple looks
-Prevents impulse buying with smart recommendations
-🎉 The UpTrends Promise:
-"Never have a 'nothing to wear' moment again. Get personalized, weather-perfect, occasion-appropriate outfits that make you look and feel amazing - all powered by AI that truly understands fashion and YOUR unique style!"
-
-🌟 Ready to Transform Your Style?
-Download UpTrends and discover:
-
-✅ Outfits that actually suit YOUR body
-✅ Weather-perfect daily recommendations
-✅ Professional styling advice 24/7
-✅ Smart shopping that saves money
-✅ Confidence in every outfit choice
-Your personal AI stylist is waiting! 💫
-
-## 🛡️ Security Features
-
-- Environment variable protection for API keys
-- Rate limiting to prevent API quota exhaustion
-- Input validation and sanitization
-- Secure error handling without exposing sensitive data
-
-## 📱 Screens
-
-1. **Authentication**: Secure login/signup
-2. **Home Dashboard**: Navigation to main features
-3. **Fashion Explorer**: Browse outfit categories
-4. **Upload Aesthetic**: Venue-based outfit suggestions
-5. **Make Outfit**: Wardrobe-based outfit generation
-6. **Profile Management**: User preferences and body measurements
-
-## 🔧 Setup Instructions
-
-### Prerequisites
-
-- Node.js (v16 or higher)
-- Expo CLI
-- React Native development environment
-
-### Installation
-
-1. **Clone the repository**
-   ```bash
-   git clone <your-repo-url>
-   cd uptrends
-   ```
-
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
-
-3. **Environment Setup**
-   Create a `.env` file in the root directory:
-   ```env
-   EXPO_PUBLIC_GEMINI_API_KEY=your_gemini_api_key_here
-   ```
-
-4. **Firebase Configuration**
-   - Create a Firebase project
-   - Enable Authentication and Firestore
-   - Download the configuration file
-   - Update `firebaseConfig.ts` with your credentials
-
-5. **Start the development server**
-   ```bash
-   npm start
-   ```
-
-## 🔑 Security & API Setup
-
-### 🛡️ Security First
-This app implements comprehensive security measures. Before setup, please review our [Security Guide](SECURITY.md).
-
-### Getting API Keys
-
-1. **Gemini API Key**
-   - Go to [Google AI Studio](https://makersuite.google.com/app/apikey)
-   - Create a new API key
-   - The free tier includes:
-     - 15 requests per minute
-     - 1,500 requests per day
-     - 1 million tokens per month
-
-2. **Firebase Configuration**
-   - Create a Firebase project at [Firebase Console](https://console.firebase.google.com)
-   - Enable Authentication and Firestore
-   - Get your Firebase configuration values
-
-### 🔒 Secure Environment Setup
-
-1. Copy the environment template:
-   ```bash
-   cp .env.example .env
-   ```
-
-2. Fill in your actual API keys in `.env`:
-   ```env
-   EXPO_PUBLIC_GEMINI_API_KEY=your_actual_gemini_key
-   FIREBASE_API_KEY=your_firebase_api_key
-   FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
-   # ... other Firebase values
-   ```
-
-3. **Validate Security** (Important!):
-   ```bash
-   node scripts/validate-security.js
-   ```
-
-### 🎨 Enhanced Theme System
-
-The app now features a dynamic theme system with:
-- **Enhanced Light Mode**: Modern colors, gradients, and dynamic status bar
-- **Rich Dark Mode**: Comfortable dark backgrounds with vibrant accents
-- **Screen-Specific Colors**: Different accent colors for each screen
-- **Dynamic Status Bar**: Changes color based on current screen
-
-### Security Best Practices
-
-- ✅ All credentials secured in environment variables
-- ✅ Comprehensive security validation script
-- ✅ No hardcoded API keys in source code
-- ✅ Proper .gitignore configuration
-- ✅ Rate limiting and error handling
-- Use HTTPS for all network requests
-
-## 📊 Usage Optimization
-
-The app is optimized for free tier usage:
-
-- **Efficient Prompting**: Minimizes token usage
-- **Smart Caching**: Reduces redundant API calls
-- **Rate Limiting**: Prevents quota exhaustion
-- **Fallback Responses**: Handles API failures gracefully
-
-**Estimated Usage for 3-4 Users:**
-- Daily requests: ~15-20
-- Monthly requests: ~450-600
-- Quota utilization: <1% of free tier
-
-## 🎨 Key Technologies
-
-- **React Native**: Cross-platform mobile development
-- **Expo**: Development platform and tools
-- **Google Gemini AI**: Advanced AI for image and text analysis
-- **Firebase**: Authentication and database
-- **TypeScript**: Type-safe development
-- **Animated API**: Smooth animations and transitions
-
-## 🧠 AI Intelligence Features
-
-### Body Type Analysis
-- **Slim**: Volume-adding layers, horizontal patterns
-- **Athletic**: Waist emphasis, softer fabrics
-- **Heavy**: Monochromatic looks, vertical lines
-- **Average**: Versatile styling options
-
-### Skin Tone Matching
-- **Fair**: Pastels, jewel tones, navy
-- **Wheatish**: Earth tones, warm colors
-- **Dusky**: Rich vibrant colors, jewel tones
-- **Dark**: Bright bold colors, high contrast
-
-### Height Considerations
-- **Petite**: High-waisted pieces, vertical lines
-- **Average**: Balanced proportions
-- **Tall**: Longer pieces, horizontal elements
-
-## 🔒 Security Measures
-
-1. **API Key Protection**
-   - Environment variables only
-   - Validation on startup
-   - No hardcoded keys in source
-
-2. **Rate Limiting**
-   - 15 calls per minute maximum
-   - Automatic throttling
-   - User-friendly error messages
-
-3. **Input Validation**
-   - Sanitized user inputs
-   - Image format validation
-   - Prompt length limits
-
-4. **Error Handling**
-   - Graceful degradation
-   - No sensitive data exposure
-   - Fallback responses
-
-## 📝 Development Notes
-
-- All sensitive data is in environment variables
-- Rate limiting prevents API quota issues
-- Comprehensive error handling for production use
-- Optimized for free tier usage patterns
-- Ready for GitHub deployment
-
-## 🚀 Deployment
-
-The app is configured for secure deployment:
-
-1. All API keys are in environment variables
-2. `.gitignore` excludes sensitive files
-3. Rate limiting prevents quota exhaustion
-4. Error handling is production-ready
-
-## 📞 Support
-
-For issues or questions:
-1. Check the error logs for rate limiting messages
-2. Verify environment variables are set correctly
-3. Ensure Firebase configuration is complete
-4. Monitor API usage in Google Cloud Console
+A React Native (Expo SDK 53) app that acts as your personal AI fashion stylist. Upload photos of your wardrobe, get body-type-aware outfit recommendations, discover your style from inspiration photos, and shop the look — all powered by Google Gemini AI with a multi-provider fallback chain.
 
 ---
 
-**Note**: This app is optimized for small user groups (3-4 people) and will stay well within free tier limits. The AI provides sophisticated fashion advice while maintaining cost efficiency.
+## ✨ Core Features
 
+### 🎨 Style Shazam (Style Check + Inspiration)
+Upload any outfit photo and the AI breaks it down into components (top, bottom, outerwear, shoes, accessories). It then matches each piece against your **digital closet** — telling you what you already own (`exact` / `similar` match) and generating precise shopping queries for missing items (`missing` with `searchQuery`). Works for venue vibes, celebrity looks, or Pinterest saves.
 
+### 👗 My Closet (Digital Wardrobe)
+- **Add items** by photo — AI analyzes garment type, colors, pattern, fabric, season, occasion
+- **Organize** by category (tops, bottoms, dresses, outerwear, shoes, accessories)
+- **Wardrobe analytics** — completeness score, missing categories, outfit potential count
+- **AI stylist chat** — ask "what goes with this blazer?" and get contextual answers
+- **Persisted** to Firestore + local AsyncStorage cache for offline access
 
+### 🧵 Make Me an Outfit
+Select items from your closet (or upload new ones) and the AI generates **multiple complete outfit combinations** with:
+- Occasion tags (casual, date night, formal, party, gym)
+- Weather awareness (via cached weather API)
+- Shopping links for any missing pieces
+- Compatibility scoring
 
-![WhatsApp Image 2025-09-20 at 20 16 34_a16435e0](https://github.com/user-attachments/assets/96c47ccf-c25b-40ea-a5e1-88f941d5c29d)
+### 📸 Upload Aesthetic
+Upload a venue/setting photo (restaurant, beach, office, party) and get **outfit recommendations tailored to that vibe**. Each suggested item now gets its **own dedicated shopping link** (Amazon, Myntra, Pinterest, Google Shopping) — no more combined "shirt pants" queries.
 
-![WhatsApp Image 2025-09-20 at 20 16 39_1d540214](https://github.com/user-attachments/assets/3de322a5-ccd5-46ca-a3a4-dea07c8ad3d7)
+### ⭐ Style Check
+Rate your own outfit selfie. AI scores fit, color harmony, occasion appropriateness, and gives **specific improvement tips** (e.g., "swap black shoes for brown to warm up the look"). Tracks your style progress over time.
 
-![WhatsApp Image 2025-09-20 at 20 16 34_029aac03](https://github.com/user-attachments/assets/d59e8a3a-a6ee-409b-b66c-6666f3a0b3ca)
+### 👫 Twinning (Couples & Friends)
+- **Date Mode** — upload two photos, get coordinated couple outfits with color harmony
+- **Friends Mode** — group outfit coordination for events/weddings
+- Shared shopping lists so everyone buys the right pieces
 
-![WhatsApp Image 2025-09-20 at 20 16 35_f84b50b7](https://github.com/user-attachments/assets/44c13298-0f75-429d-b6e2-d33eb028b25f)
+### 🌤️ Today's Outfit (Weather + Location Aware)
+Open the app → instant outfit for **right now**. Uses your GPS location (optional) + cached weather + cultural topography data to suggest what to wear today. No manual input needed.
 
-![WhatsApp Image 2025-09-20 at 20 16 35_2a462004](https://github.com/user-attachments/assets/0f9567ae-b603-42ed-9b43-20d5ed73354a)
+### 🧠 Body Analysis
+Upload a full-body photo → AI estimates body type (slim, athletic, heavy, average, pear, hourglass, rectangle, inverted triangle), suggests flattering silhouettes, neckline recommendations, and color palettes for your skin tone.
 
-![WhatsApp Image 2025-09-20 at 20 16 36_a9043afa](https://github.com/user-attachments/assets/cec510cd-3699-4ad8-b307-c51c5071b228)
+### 💬 Aria — Your AI Stylist Chat
+Persistent chat with **saved history** (up to 5 conversations in Firestore, synced across devices). Ask follow-ups: "make it more formal", "I hate yellow", "what shoes?". Context-aware because it knows your closet, body type, and preferences.
 
-![WhatsApp Image 2025-09-20 at 20 16 36_f2086b5a](https://github.com/user-attachments/assets/26fb1ad3-92fe-4d32-af91-f2741efed983)
+### 🎯 Mix & Match
+Interactive lane picker: lock tops / bottoms / shoes individually, shuffle the rest. Great for "I have this skirt, what top works?"
 
-![WhatsApp Image 2025-09-20 at 20 16 37_b4f8641d](https://github.com/user-attachments/assets/a922b419-0d27-4640-a524-41b1e6724779)
+### 🔐 Auth & Profile
+- Email/password + **Google Sign-In** (native module, SHA-1 registered)
+- Profile stores gender, height, weight, skin tone, body type, city
+- **Fuzzy body-type matcher** on edit — type "athlet" → suggests "Athletic"
 
-![WhatsApp Image 2025-09-20 at 20 16 37_8cbbfb7f](https://github.com/user-attachments/assets/e7206bbd-8b01-43f3-b76e-c5a50ab2a1a5)
+---
 
-![WhatsApp Image 2025-09-20 at 20 16 38_c377f02e](https://github.com/user-attachments/assets/269378b1-a24b-4a4f-9bea-4e0fc0981759)
+## 🛡️ AI Resilience Architecture
 
-![WhatsApp Image 2025-09-20 at 20 16 38_5edf49d5](https://github.com/user-attachments/assets/231d2f88-bdd4-4866-8933-e38635a2bdb3)
+The app never crashes on AI failures. Layered fallback chain:
 
-![WhatsApp Image 2025-09-20 at 20 16 38_e83ba37e](https://github.com/user-attachments/assets/1f8e7d30-1b14-4a18-9660-2381c261ef09)
+| Layer | What it does |
+|-------|--------------|
+| **User's own Gemini key** | Unlimited, direct API (stored in AsyncStorage) |
+| **Shared Gemini (proxy)** | 20 req/day per model via Cloudflare Worker |
+| **Grok (proxy)** | 25 req/day |
+| **DeepSeek (proxy)** | 50 req/day |
+| **Groq → Mistral → OpenRouter → Cohere** | Sequential fallback in worker |
+| **Cached responses** | 30-min in-memory cache on repeated prompts |
+| **Local fallbacks** | Every screen returns sensible defaults if all AI fails |
 
-![WhatsApp Image 2025-09-20 at 20 16 39_fecc51bc](https://github.com/user-attachments/assets/e35fd956-53d3-4548-ace0-fb58bcdf866f)
+**Image analysis** (Style Check, Upload Aesthetic, Body Analysis, Wardrobe upload) always uses **direct Gemini** (multimodal required). **Text-only** calls (chat, outfit generation, shopping links) go through the proxy for multi-provider resilience.
 
+---
 
+## 🛍️ Shopping Links (Verified on Android APK)
 
+| Platform | URL Format | Opens In |
+|----------|------------|----------|
+| Amazon | `https://www.amazon.com/s?k=QUERY` | Chrome Custom Tab |
+| Myntra | `https://www.myntra.com/QUERY` | Chrome Custom Tab |
+| Pinterest | `https://www.pinterest.com/search/pins/?q=QUERY` | Chrome Custom Tab |
+| Google Shopping | `https://www.google.com/search?tbm=shop&q=QUERY` | Chrome Custom Tab |
 
+All links open via `expo-web-browser` → `Linking` fallback → Chrome intent on Android. Per-item links on Upload Aesthetic; combined links on other screens.
 
+---
 
+## 🔔 Smart Notifications
+Local notifications (expo-notifications) for:
+- Daily outfit reminder (configurable time)
+- Weather change alerts ("rain expected — bring a jacket")
+- Event countdowns (plans persisted to AsyncStorage)
+- **Deep links** — tap notification → opens exact event plan screen
 
+---
 
+## 🎨 Theme System
+- **Obsidian Editorial** design language: Playfair Display (headings) + Inter (body)
+- Light / Dark modes with **per-screen accent colors**:
+  - `homeAccent` (lavender), `wardrobeAccent` (rose), `twinningAccent` (pink), `styleCheckAccent` (emerald), `bodyAnalysisAccent` (amber), `uploadAestheticAccent` (violet), `makeOutfitAccent` (indigo), `fashionAccent` (teal), `mixMatchAccent` (orange), `profileAccent` (slate)
+- Glassmorphism cards, gradient status bars, spring animations (Reanimated 3)
 
+---
 
+## ⚙️ Tech Stack
 
+| Category | Tech |
+|----------|------|
+| Framework | Expo SDK 53, React Native 0.79.6, React 19 |
+| Navigation | Expo Router v5 (file-based) |
+| AI | Google Gemini (`@google/generative-ai`) + Cloudflare Worker proxy (7 providers) |
+| Backend | Firebase Auth / Firestore / Storage |
+| Persistence | AsyncStorage (React Native persistence for Auth) |
+| Styling | `StyleSheet.create` + `useTheme()` context (no NativeWind) |
+| Animations | React Native Reanimated 3 |
+| Image | expo-image-picker, expo-file-system (base64 conversion) |
+| Notifications | expo-notifications ~0.31.5 (local only) |
+| Browser | expo-web-browser + Linking fallback |
+| Linting | `expo lint` (ESLint) |
 
+---
+
+## 📁 Project Structure (Key Files)
+
+```
+app/
+  _layout.tsx           # All routes declared here (Stack screens)
+  index.tsx             # Home dashboard
+  auth.tsx              # Login / signup / Google Sign-In
+  fashion.tsx           # Category explorer (Today's Outfit, Street, Formal, etc.)
+  style-shazam.tsx      # Upload photo → component breakdown + closet match
+  upload-aesthetic.tsx  # Venue photo → per-item outfit + shop links
+  make-outfit.tsx       # Closet items → multiple outfit combos
+  mix-match.tsx         # Interactive lane picker
+  style-check.tsx       # Outfit selfie → AI rating + tips
+  body-analysis.tsx     # Full-body photo → body type + recommendations
+  twinning/date.tsx     # Couple coordination
+  twinning/friends.tsx  # Group coordination
+  profile.tsx           # Profile + analytics + AI key management
+  profile-edit/[uid].tsx # Edit profile (fuzzy body-type matcher)
+  stylist-chat.tsx      # Aria chat with saved history sidebar
+  category/[slug].tsx   # Dynamic category detail
+
+services/
+  geminiService.ts      # ~4250 lines — hub for all AI calls, cache, retry, proxy fallback
+  aiProxyService.ts     # Cloudflare Worker wrapper (text-only)
+  digitalWardrobeService.ts # Closet CRUD, AI analysis, outfit generation, chat
+  wardrobeService.ts    # Legacy closet service (being phased out)
+  outfitService.ts      # Today's Outfit logic (weather + topography)
+  twinningService.ts    # Couple/friend matching + shopping links
+  styleCheckService.ts  # Outfit scoring, color palettes
+  weatherService.ts     # Cached weather API
+  topographyService.ts  # Cached location/culture data
+  userService.ts        # Firestore profile CRUD
+  analyticsService.ts   # AI request counters (local + Firestore sync)
+  googleSignInService.ts # Native Google Sign-In
+  notificationService.ts # Local notification scheduling
+
+contexts/
+  AuthContext.tsx       # Auto-redirects: signed in → /, signed out → /auth
+  ThemeContext.tsx      # Light/dark + per-screen accents
+
+components/
+  AnimatedSplash.tsx    # Custom splash (logo swap, theme colors, timeline)
+  ShoppingLinks.tsx     # Renders platform links, opens via WebBrowser
+  OutfitCard.tsx        # Outfit display with shop buttons
+  StyleRatingCard.tsx   # Style Check result card
+  OutfitAnalysisChart.tsx # Wardrobe analytics visualization
+  PremiumBackground.tsx # Gradient mesh background
+  KeyUpgradeModal.tsx   # Prompt to add own Gemini key
+  SavedChatsSidebar.tsx # Drawer for stylist chat history
+
+config/
+  security.ts           # Rate limiter, API key validation
+  firebaseConfig.ts     # Firebase init (guarded, degraded mode OK)
+
+utils/
+  apiSafeguards.ts      # Circuit breaker, request queue, timeout, safeApiCall
+  displayName.ts        # Username helpers
+  openExternalUrl.ts    # Linking → WebBrowser → Chrome intent chain
+  colorResolver.ts      # Color name → hex / HSL mapping
+```
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+- Node.js 20.x (pinned in `eas.json`)
+- Expo CLI (`npm i -g expo-cli`)
+- Android Studio / Xcode for native builds
+- Firebase project (Auth + Firestore + Storage enabled)
+- Google AI Studio API key (Gemini)
+
+### Install & Run
+
+```bash
+# 1. Clone & install
+git clone <your-repo-url>
+cd uptrends
+npm install
+
+# 2. Environment
+cp .env.example .env
+# Edit .env with your keys (see .env.example for all required vars)
+
+# 3. Start dev server
+npm start
+
+# 4. Run on device/emulator
+npm run android   # or: npx expo run:android
+npm run ios       # or: npx expo run:ios
+npm run web       # Expo web build
+```
+
+### Required `.env` Variables
+
+```env
+# Gemini (user can also add their own in-app via Profile → API Key)
+EXPO_PUBLIC_GEMINI_API_KEY=your_gemini_key
+
+# Firebase (client-safe — also hardcoded in app.config.js for EAS builds)
+EXPO_PUBLIC_FIREBASE_API_KEY=...
+EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=...
+EXPO_PUBLIC_FIREBASE_PROJECT_ID=...
+EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=...
+EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=...
+EXPO_PUBLIC_FIREBASE_APP_ID=...
+
+# Optional: Cloudflare Worker AI Proxy (enables 7-provider fallback)
+EXPO_PUBLIC_AI_PROXY_URL=https://uptrends-ai-proxy.<subdomain>.workers.dev
+
+# Optional: Google Sign-In web client ID (for native auth)
+EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=...
+```
+
+### Validate Before Commit
+
+```bash
+npm run lint              # ESLint via expo lint
+npm run security-check    # Scans for hardcoded keys / misconfigured env
+npm run pre-deploy        # Runs both (do this before EAS builds)
+```
+
+---
+
+## 🏗️ Building APK / IPA
+
+### Local Build (fastest iteration)
+
+```bash
+# Debug APK
+npx expo run:android --variant debug
+
+# Release APK (unsigned)
+npx expo run:android --variant release
+
+# Signed release (requires keystore in gradle.properties)
+cd android && ./gradlew assembleRelease
+```
+
+### EAS Cloud Build
+
+```bash
+# Preview (internal distribution)
+eas build -p android --profile preview
+
+# Production (Play Store ready)
+eas build -p android --profile production
+```
+
+**Profiles in `eas.json`:**
+- `development` — dev client
+- `preview` — internal APK, cache disabled
+- `production` — Play Store AAB, cache disabled, Node 20.19.4 pinned
+- `android-stable` — stable release branch
+
+---
+
+## 🔧 Cloudflare Worker Proxy (Optional — Multi-Provider Fallback)
+
+The proxy gives you **7 AI providers** behind one endpoint. Deploy once, add URL to `.env`.
+
+### Deploy Worker
+
+```bash
+cd ai-proxy
+npm install -g wrangler
+wrangler login
+wrangler init uptrends-ai-proxy   # No git, Hello World, No deploy
+```
+
+Create `wrangler.toml`:
+```toml
+name = "uptrends-ai-proxy"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+```
+
+Add secrets (one-time):
+```powershell
+wrangler secret put GEMINI_API_KEY
+wrangler secret put GROK_API_KEY
+wrangler secret put DEEPSEEK_API_KEY
+wrangler secret put GROQ_API_KEY
+wrangler secret put MISTRAL_API_KEY
+wrangler secret put OPENROUTER_API_KEY
+wrangler secret put COHERE_API_KEY
+```
+
+Deploy:
+```bash
+wrangler deploy
+```
+
+Copy the worker URL → `.env` as `EXPO_PUBLIC_AI_PROXY_URL`.
+
+**Provider limits (shared keys):**
+| Provider | Daily Limit |
+|----------|-------------|
+| Gemini Flash / Flash-Lite | 20 / model |
+| Grok | 25 |
+| DeepSeek | 50 |
+| Groq | 30 |
+| Mistral | 30 |
+| OpenRouter | Varies |
+| Cohere | 20 |
+
+---
+
+## 🧪 Testing & Quality
+
+- **No test suite** — `expo lint` is the only automated gate
+- TypeScript `strict: false` — runtime resilience over compile-time strictness
+- Manual verification checklist before release:
+  - [ ] `npm run pre-deploy` passes
+  - [ ] App launches on Android + iOS
+  - [ ] Auth flow works (email + Google)
+  - [ ] Each AI screen returns fallback data when offline
+  - [ ] Shopping links open in Chrome on device
+  - [ ] Notifications fire + deep link works
+  - [ ] Theme toggle persists + per-screen accents render
+
+---
+
+## 📸 Screenshots
+
+<!-- Add screenshots here: home, style-shazam, upload-aesthetic, my-closet, stylist-chat, twinning, profile -->
+
+---
+
+## 🤝 Contributing
+
+1. Fork → feature branch → PR
+2. Run `npm run pre-deploy` before pushing
+3. Keep AI calls in `services/` — screens stay thin
+4. Follow the fallback pattern: **never let an AI error crash the UI**
+
+---
+
+## 📄 License
+
+MIT — free for personal and commercial use.
+
+---
+
+## 🙏 Acknowledgements
+
+- Google Gemini AI for multimodal fashion understanding
+- Firebase for zero-config backend
+- Expo team for the best RN developer experience
+- Cloudflare Workers for the proxy infrastructure
+- All open-source libraries that make this possible

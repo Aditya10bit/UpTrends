@@ -92,7 +92,7 @@ export default function StyleShazamScreen() {
           return;
         }
         pickerResult = await ImagePicker.launchCameraAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          mediaTypes: ['images'],
           allowsEditing: true,
           aspect: [4, 5],
           quality: 0.8,
@@ -104,7 +104,7 @@ export default function StyleShazamScreen() {
           return;
         }
         pickerResult = await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          mediaTypes: ['images'],
           allowsEditing: true,
           aspect: [4, 5],
           quality: 0.8,
