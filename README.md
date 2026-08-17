@@ -32,7 +32,7 @@ Rate your own outfit selfie. AI scores fit, color harmony, occasion appropriaten
 ### 👫 Twinning (Couples & Friends)
 - **Date Mode** — upload two photos, get coordinated couple outfits with color harmony
 - **Friends Mode** — group outfit coordination for events/weddings
-- Shared shopping lists so everyone buys the right pieces
+- Shared shopping lists so everyone buys the right pieces(future update)
 
 ### 🌤️ Today's Outfit (Weather + Location Aware)
 Open the app → instant outfit for **right now**. Uses your GPS location (optional) + cached weather + cultural topography data to suggest what to wear today. No manual input needed.
