@@ -851,72 +851,106 @@ export default function WardrobeScreen() {
             </View>
 
             {/* Item Details */}
-            <View style={[styles.detailSection, { backgroundColor: theme.card }]}>
-              <Text style={[styles.detailTitle, { color: theme.text }]}>Details</Text>
+            {(() => {
+              const formatValue = (val: any): string => {
+                if (val === null || val === undefined) return 'N/A';
+                if (typeof val === 'string') return val.replace(/_/g, ' ');
+                if (typeof val === 'number' || typeof val === 'boolean') return String(val);
+                if (Array.isArray(val)) {
+                  return val.map(v => (typeof v === 'object' ? (v?.name || JSON.stringify(v)) : String(v))).join(', ');
+                }
+                if (typeof val === 'object') {
+                  const vals = Object.values(val);
+                  if (vals.length > 0) {
+                    return vals.map(v => (typeof v === 'object' ? (v?.name || JSON.stringify(v)) : String(v))).join(', ');
+                  }
+                }
+                return 'N/A';
+              };
 
-              <View style={styles.detailGrid}>
-                {[
-                  { icon: '👕', label: 'Type', value: selectedItem.subType || 'N/A' },
-                  { icon: '🎨', label: 'Color', value: Array.isArray(selectedItem.colors) ? selectedItem.colors.join(', ') : (selectedItem.colors || 'N/A') },
-                  { icon: '🔲', label: 'Pattern', value: selectedItem.pattern || 'N/A' },
-                  { icon: '🧵', label: 'Fabric', value: selectedItem.fabric || 'N/A' },
-                  { icon: '👔', label: 'Formality', value: selectedItem.formality ? String(selectedItem.formality).replace(/_/g, ' ') : 'N/A' },
-                  { icon: '🌤️', label: 'Seasons', value: Array.isArray(selectedItem.seasons) ? selectedItem.seasons.join(', ') : (selectedItem.seasons || 'N/A') },
-                  { icon: '🎭', label: 'Style', value: selectedItem.stylePersonality || 'N/A' },
-                  { icon: '📊', label: 'Condition', value: selectedItem.condition || 'N/A' },
-                ].map((detail, i) => (
-                  <View key={i} style={styles.detailRow}>
-                    <Text style={styles.detailIcon}>{detail.icon}</Text>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.detailLabel, { color: theme.textTertiary }]}>{detail.label}</Text>
-                      <Text style={[styles.detailValue, { color: theme.text }]}>{detail.value}</Text>
+              const occList = Array.isArray(selectedItem.occasions)
+                ? selectedItem.occasions
+                : typeof selectedItem.occasions === 'object' && selectedItem.occasions !== null
+                ? Object.values(selectedItem.occasions)
+                : [];
+
+              const tipsList = Array.isArray(selectedItem.pairsWellWith)
+                ? selectedItem.pairsWellWith
+                : typeof selectedItem.pairsWellWith === 'object' && selectedItem.pairsWellWith !== null
+                ? Object.values(selectedItem.pairsWellWith)
+                : [];
+
+              return (
+                <>
+                  <View style={[styles.detailSection, { backgroundColor: theme.card }]}>
+                    <Text style={[styles.detailTitle, { color: theme.text }]}>Details</Text>
+
+                    <View style={styles.detailGrid}>
+                      {[
+                        { icon: '👕', label: 'Type', value: formatValue(selectedItem.subType) },
+                        { icon: '🎨', label: 'Color', value: formatValue(selectedItem.colors) },
+                        { icon: '🔲', label: 'Pattern', value: formatValue(selectedItem.pattern) },
+                        { icon: '🧵', label: 'Fabric', value: formatValue(selectedItem.fabric) },
+                        { icon: '👔', label: 'Formality', value: formatValue(selectedItem.formality) },
+                        { icon: '🌤️', label: 'Seasons', value: formatValue(selectedItem.seasons) },
+                        { icon: '🎭', label: 'Style', value: formatValue(selectedItem.stylePersonality) },
+                        { icon: '📊', label: 'Condition', value: formatValue(selectedItem.condition) },
+                      ].map((detail, i) => (
+                        <View key={i} style={styles.detailRow}>
+                          <Text style={styles.detailIcon}>{detail.icon}</Text>
+                          <View style={{ flex: 1 }}>
+                            <Text style={[styles.detailLabel, { color: theme.textTertiary }]}>{detail.label}</Text>
+                            <Text style={[styles.detailValue, { color: theme.text }]}>{detail.value}</Text>
+                          </View>
+                        </View>
+                      ))}
                     </View>
+
+                    {selectedItem.brand && (
+                      <View style={[styles.brandBadge, { backgroundColor: theme.primary + '15' }]}>
+                        <Text style={[styles.brandText, { color: theme.primary }]}>🏷️ {formatValue(selectedItem.brand)}</Text>
+                      </View>
+                    )}
                   </View>
-                ))}
-              </View>
 
-              {selectedItem.brand && (
-                <View style={[styles.brandBadge, { backgroundColor: theme.primary + '15' }]}>
-                  <Text style={[styles.brandText, { color: theme.primary }]}>🏷️ {selectedItem.brand}</Text>
-                </View>
-              )}
-            </View>
-
-            {/* Occasions */}
-            {Array.isArray(selectedItem.occasions) && selectedItem.occasions.length > 0 && (
-              <View style={[styles.detailSection, { backgroundColor: theme.card }]}>
-                <Text style={[styles.detailTitle, { color: theme.text }]}>Best For</Text>
-                <View style={styles.chipRow}>
-                  {selectedItem.occasions.map((occ, i) => (
-                    <View key={i} style={[styles.occasionChip, { backgroundColor: theme.accent + '15' }]}>
-                      <Text style={[styles.chipText, { color: theme.accent }]}>
-                        {String(occ).replace(/_/g, ' ')}
-                      </Text>
+                  {/* Occasions */}
+                  {occList.length > 0 && (
+                    <View style={[styles.detailSection, { backgroundColor: theme.card }]}>
+                      <Text style={[styles.detailTitle, { color: theme.text }]}>Best For</Text>
+                      <View style={styles.chipRow}>
+                        {occList.map((occ: any, i: number) => (
+                          <View key={i} style={[styles.occasionChip, { backgroundColor: theme.accent + '15' }]}>
+                            <Text style={[styles.chipText, { color: theme.accent }]}>
+                              {formatValue(occ)}
+                            </Text>
+                          </View>
+                        ))}
+                      </View>
                     </View>
-                  ))}
-                </View>
-              </View>
-            )}
+                  )}
 
-            {/* Pairing Suggestions */}
-            {itemPairings.length > 0 && (
-              <View style={[styles.detailSection, { backgroundColor: theme.card }]}>
-                <Text style={[styles.detailTitle, { color: theme.text }]}>✨ Goes Great With</Text>
-                {itemPairings.map((combo, i) => renderOutfitCombo(combo, i))}
-              </View>
-            )}
+                  {/* Pairing Suggestions */}
+                  {itemPairings.length > 0 && (
+                    <View style={[styles.detailSection, { backgroundColor: theme.card }]}>
+                      <Text style={[styles.detailTitle, { color: theme.text }]}>✨ Goes Great With</Text>
+                      {itemPairings.map((combo, i) => renderOutfitCombo(combo, i))}
+                    </View>
+                  )}
 
-            {/* Styling Tips */}
-            {Array.isArray(selectedItem.pairsWellWith) && selectedItem.pairsWellWith.length > 0 && (
-              <View style={[styles.detailSection, { backgroundColor: theme.card }]}>
-                <Text style={[styles.detailTitle, { color: theme.text }]}>💡 Pairs Well With</Text>
-                {selectedItem.pairsWellWith.map((tip, i) => (
-                  <Text key={i} style={[styles.pairTip, { color: theme.textSecondary }]}>
-                    • {tip}
-                  </Text>
-                ))}
-              </View>
-            )}
+                  {/* Styling Tips */}
+                  {tipsList.length > 0 && (
+                    <View style={[styles.detailSection, { backgroundColor: theme.card }]}>
+                      <Text style={[styles.detailTitle, { color: theme.text }]}>💡 Pairs Well With</Text>
+                      {tipsList.map((tip: any, i: number) => (
+                        <Text key={i} style={[styles.pairTip, { color: theme.textSecondary }]}>
+                          • {formatValue(tip)}
+                        </Text>
+                      ))}
+                    </View>
+                  )}
+                </>
+              );
+            })()}
 
             <View style={{ height: 50 }} />
           </ScrollView>

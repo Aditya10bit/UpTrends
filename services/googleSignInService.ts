@@ -127,7 +127,7 @@ export const signInWithGoogle = async (): Promise<GoogleSignInResult> => {
         message: 'Google Sign-In requires a custom development build.\n\nIt does NOT work in Expo Go. Build an APK with `eas build` or `cd android && ./gradlew assembleRelease` to test this feature.',
       };
     }
-    const codes = mod?.statusCodes || {};
+    const codes: Record<string, any> = (mod as any)?.statusCodes || {};
     if (error?.code === codes.SIGN_IN_CANCELLED) {
       return { status: 'cancelled' };
     }
