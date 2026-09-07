@@ -856,14 +856,14 @@ export default function WardrobeScreen() {
 
               <View style={styles.detailGrid}>
                 {[
-                  { icon: '👕', label: 'Type', value: selectedItem.subType },
-                  { icon: '🎨', label: 'Color', value: selectedItem.colors.join(', ') },
-                  { icon: '🔲', label: 'Pattern', value: selectedItem.pattern },
-                  { icon: '🧵', label: 'Fabric', value: selectedItem.fabric },
-                  { icon: '👔', label: 'Formality', value: selectedItem.formality.replace('_', ' ') },
-                  { icon: '🌤️', label: 'Seasons', value: selectedItem.seasons.join(', ') },
-                  { icon: '🎭', label: 'Style', value: selectedItem.stylePersonality },
-                  { icon: '📊', label: 'Condition', value: selectedItem.condition },
+                  { icon: '👕', label: 'Type', value: selectedItem.subType || 'N/A' },
+                  { icon: '🎨', label: 'Color', value: Array.isArray(selectedItem.colors) ? selectedItem.colors.join(', ') : (selectedItem.colors || 'N/A') },
+                  { icon: '🔲', label: 'Pattern', value: selectedItem.pattern || 'N/A' },
+                  { icon: '🧵', label: 'Fabric', value: selectedItem.fabric || 'N/A' },
+                  { icon: '👔', label: 'Formality', value: selectedItem.formality ? String(selectedItem.formality).replace(/_/g, ' ') : 'N/A' },
+                  { icon: '🌤️', label: 'Seasons', value: Array.isArray(selectedItem.seasons) ? selectedItem.seasons.join(', ') : (selectedItem.seasons || 'N/A') },
+                  { icon: '🎭', label: 'Style', value: selectedItem.stylePersonality || 'N/A' },
+                  { icon: '📊', label: 'Condition', value: selectedItem.condition || 'N/A' },
                 ].map((detail, i) => (
                   <View key={i} style={styles.detailRow}>
                     <Text style={styles.detailIcon}>{detail.icon}</Text>
@@ -883,18 +883,20 @@ export default function WardrobeScreen() {
             </View>
 
             {/* Occasions */}
-            <View style={[styles.detailSection, { backgroundColor: theme.card }]}>
-              <Text style={[styles.detailTitle, { color: theme.text }]}>Best For</Text>
-              <View style={styles.chipRow}>
-                {selectedItem.occasions.map((occ, i) => (
-                  <View key={i} style={[styles.occasionChip, { backgroundColor: theme.accent + '15' }]}>
-                    <Text style={[styles.chipText, { color: theme.accent }]}>
-                      {occ.replace('_', ' ')}
-                    </Text>
-                  </View>
-                ))}
+            {Array.isArray(selectedItem.occasions) && selectedItem.occasions.length > 0 && (
+              <View style={[styles.detailSection, { backgroundColor: theme.card }]}>
+                <Text style={[styles.detailTitle, { color: theme.text }]}>Best For</Text>
+                <View style={styles.chipRow}>
+                  {selectedItem.occasions.map((occ, i) => (
+                    <View key={i} style={[styles.occasionChip, { backgroundColor: theme.accent + '15' }]}>
+                      <Text style={[styles.chipText, { color: theme.accent }]}>
+                        {String(occ).replace(/_/g, ' ')}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
               </View>
-            </View>
+            )}
 
             {/* Pairing Suggestions */}
             {itemPairings.length > 0 && (
@@ -905,7 +907,7 @@ export default function WardrobeScreen() {
             )}
 
             {/* Styling Tips */}
-            {selectedItem.pairsWellWith.length > 0 && (
+            {Array.isArray(selectedItem.pairsWellWith) && selectedItem.pairsWellWith.length > 0 && (
               <View style={[styles.detailSection, { backgroundColor: theme.card }]}>
                 <Text style={[styles.detailTitle, { color: theme.text }]}>💡 Pairs Well With</Text>
                 {selectedItem.pairsWellWith.map((tip, i) => (

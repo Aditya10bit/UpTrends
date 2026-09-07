@@ -352,7 +352,7 @@ export default function MixMatchScreen() {
                     {tops[topIdx]?.name}
                   </Text>
                   <View style={styles.colorRow}>
-                    {tops[topIdx]?.colors.map((c, i) => (
+                    {tops[topIdx]?.colors?.map((c, i) => (
                       <View 
                         key={i} 
                         style={[styles.colorIndicator, { backgroundColor: getColorCode(c) }]} 
@@ -375,8 +375,8 @@ export default function MixMatchScreen() {
             <View style={[styles.laneCard, { backgroundColor: theme.card, borderColor: theme.borderLight }]}>
               <View style={styles.laneHeader}>
                 <View style={styles.laneTitleRow}>
-                  <Ionicons name="body-outline" size={18} color={theme.primary} />
-                  <Text style={[styles.laneTitle, { color: theme.text }]}>Bottoms</Text>
+                  <Ionicons name="sparkles-outline" size={18} color={theme.primary} />
+                  <Text style={[styles.laneTitle, { color: theme.text }]}>Bottoms / Pants</Text>
                 </View>
                 <TouchableOpacity 
                   onPress={() => {
@@ -407,7 +407,7 @@ export default function MixMatchScreen() {
                     {bottoms[bottomIdx]?.name}
                   </Text>
                   <View style={styles.colorRow}>
-                    {bottoms[bottomIdx]?.colors.map((c, i) => (
+                    {bottoms[bottomIdx]?.colors?.map((c, i) => (
                       <View 
                         key={i} 
                         style={[styles.colorIndicator, { backgroundColor: getColorCode(c) }]} 
@@ -462,7 +462,7 @@ export default function MixMatchScreen() {
                     {shoes[shoeIdx]?.name}
                   </Text>
                   <View style={styles.colorRow}>
-                    {shoes[shoeIdx]?.colors.map((c, i) => (
+                    {shoes[shoeIdx]?.colors?.map((c, i) => (
                       <View 
                         key={i} 
                         style={[styles.colorIndicator, { backgroundColor: getColorCode(c) }]} 
