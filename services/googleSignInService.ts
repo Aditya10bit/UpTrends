@@ -10,7 +10,6 @@
 // .env). Without it GoogleSignIn has nothing to match and fails — so we surface
 // a clear error instead of a cryptic one.
 
-import { statusCodes } from '@react-native-google-signin/google-signin';
 import Constants from 'expo-constants';
 import { GoogleAuthProvider, signInWithCredential } from 'firebase/auth';
 import { auth, isFirebaseInitialized } from '../firebaseConfig';
@@ -128,13 +127,14 @@ export const signInWithGoogle = async (): Promise<GoogleSignInResult> => {
         message: 'Google Sign-In requires a custom development build.\n\nIt does NOT work in Expo Go. Build an APK with `eas build` or `cd android && ./gradlew assembleRelease` to test this feature.',
       };
     }
-    if (error?.code === statusCodes.SIGN_IN_CANCELLED) {
+    const codes = mod?.statusCodes || {};
+    if (error?.code === codes.SIGN_IN_CANCELLED) {
       return { status: 'cancelled' };
     }
-    if (error?.code === statusCodes.IN_PROGRESS) {
+    if (error?.code === codes.IN_PROGRESS) {
       return { status: 'error', message: 'A sign-in is already in progress.' };
     }
-    if (error?.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+    if (error?.code === codes.PLAY_SERVICES_NOT_AVAILABLE) {
       return { status: 'error', message: 'Google Play services is not available on this device.' };
     }
     return {
