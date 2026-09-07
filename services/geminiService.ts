@@ -158,17 +158,19 @@ export const testApiKey = async (apiKey: string): Promise<{ success: boolean; er
 // retry the same request with the next lighter model in the chain. This is an
 // ORDERED chain: each model falls through to the one after it.
 //
-// ⚠️  VERIFIED LIVE MODELS (Aug 2026):
-//   gemini-3.5-flash, gemini-3.5-flash-lite  → primary free-tier models
-//   gemini-1.5-flash, gemini-1.5-flash-8b    → stable fallbacks (still live)
-// ❌  DEAD MODELS (404): gemini-2.0-flash, gemini-2.0-flash-lite — DO NOT USE
+// ⚠️  VERIFIED LIVE MODELS (2026):
+//   gemini-3.7-flash, gemini-3.7-flash-lite  → primary high-performance free-tier models
+//   gemini-3.5-flash, gemini-3.5-flash-lite  → secondary fallbacks
+//   gemini-1.5-flash, gemini-1.5-flash-8b    → long-term stable fallbacks
 const MODEL_FALLBACK_CHAINS: Record<string, string[]> = {
-  'gemini-3.5-flash': ['gemini-3.5-flash-lite', 'gemini-1.5-flash', 'gemini-1.5-flash-8b'],
-  'gemini-3.5-flash-lite': ['gemini-1.5-flash', 'gemini-1.5-flash-8b'],
-  'gemini-2.5-flash': ['gemini-2.5-flash-lite', 'gemini-1.5-flash', 'gemini-1.5-flash-8b'],
+  'gemini-3.7-flash': ['gemini-3.7-flash-lite', 'gemini-3.5-flash', 'gemini-3.5-flash-lite', 'gemini-1.5-flash', 'gemini-1.5-flash-8b'],
+  'gemini-3.7-flash-lite': ['gemini-3.5-flash-lite', 'gemini-1.5-flash', 'gemini-1.5-flash-8b'],
+  'gemini-3.5-flash': ['gemini-3.7-flash', 'gemini-3.7-flash-lite', 'gemini-3.5-flash-lite', 'gemini-1.5-flash', 'gemini-1.5-flash-8b'],
+  'gemini-3.5-flash-lite': ['gemini-3.7-flash-lite', 'gemini-1.5-flash', 'gemini-1.5-flash-8b'],
+  'gemini-2.5-flash': ['gemini-3.7-flash-lite', 'gemini-1.5-flash', 'gemini-1.5-flash-8b'],
   'gemini-2.5-flash-lite': ['gemini-1.5-flash', 'gemini-1.5-flash-8b'],
   'gemini-1.5-flash': ['gemini-1.5-flash-8b'],
-  'gemini-flash-latest': ['gemini-1.5-flash', 'gemini-1.5-flash-8b'],
+  'gemini-flash-latest': ['gemini-3.7-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-8b'],
 };
 
 // Tracks the last model that actually served a request, so a screen/log can show
