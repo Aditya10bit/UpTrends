@@ -27,6 +27,8 @@ import PremiumBackground from '../components/PremiumBackground';
 import { isFirebaseInitialized, storage } from '../firebaseConfig';
 import { testApiKey, invalidateApiKeyCache, getActiveKeySource } from '../services/geminiService';
 import KeyUpgradeModal from '../components/KeyUpgradeModal';
+import AppTourModal from '../components/AppTourModal';
+import * as Haptics from 'expo-haptics';
 
 import Animated, {
   useAnimatedStyle,
@@ -95,6 +97,7 @@ export default function ProfileScreen() {
   const [activeKeySource, setActiveKeySource] = useState<'custom' | 'default'>('default');
   const [showApiKey, setShowApiKey] = useState(false);
   const [showKeyInfoModal, setShowKeyInfoModal] = useState(false);
+  const [showTourModal, setShowTourModal] = useState(false);
   // Auto-show the "why your own key?" modal only once per app session to avoid nagging.
   const hasAutoShownKeyInfo = useRef(false);
 
@@ -1033,9 +1036,30 @@ export default function ProfileScreen() {
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'space-between',
-              paddingVertical: 16,
+              paddingVertical: 14,
               borderBottomWidth: 1,
               borderBottomColor: theme.borderLight,
+            }}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setShowTourModal(true);
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Ionicons name="sparkles-outline" size={24} color={theme.primary} />
+              <Text style={{ marginLeft: 12, fontSize: 16, fontWeight: '500', color: theme.text }}>
+                Replay App Feature Tour
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={theme.textTertiary} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingVertical: 14,
             }}
             onPress={handleLogout}
           >
@@ -1054,6 +1078,10 @@ export default function ProfileScreen() {
         visible={showKeyInfoModal}
         onClose={() => setShowKeyInfoModal(false)}
         theme={theme}
+      />
+      <AppTourModal
+        visible={showTourModal}
+        onClose={() => setShowTourModal(false)}
       />
     </Animated.View>
     </PremiumBackground>

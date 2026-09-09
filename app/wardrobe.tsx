@@ -857,12 +857,12 @@ export default function WardrobeScreen() {
                 if (typeof val === 'string') return val.replace(/_/g, ' ');
                 if (typeof val === 'number' || typeof val === 'boolean') return String(val);
                 if (Array.isArray(val)) {
-                  return val.map(v => (typeof v === 'object' ? (v?.name || JSON.stringify(v)) : String(v))).join(', ');
+                  return val.map(v => (v && typeof v === 'object' ? ((v as any)?.name || JSON.stringify(v)) : String(v))).join(', ');
                 }
                 if (typeof val === 'object') {
                   const vals = Object.values(val);
                   if (vals.length > 0) {
-                    return vals.map(v => (typeof v === 'object' ? (v?.name || JSON.stringify(v)) : String(v))).join(', ');
+                    return vals.map(v => (v && typeof v === 'object' ? ((v as any)?.name || JSON.stringify(v)) : String(v))).join(', ');
                   }
                 }
                 return 'N/A';

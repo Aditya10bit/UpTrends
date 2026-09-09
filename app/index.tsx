@@ -20,6 +20,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { getUserProfile } from '../services/userService';
 import { resolveDisplayName } from '../utils/displayName';
+import AppTourModal, { HAS_SEEN_TOUR_STORAGE_KEY } from '../components/AppTourModal';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // "Obsidian Editorial" home — calm, magazine-grade launcher.
 // Playfair display type, Inter body, monochrome glass cards, one lavender
@@ -58,6 +60,22 @@ export default function MainScreen() {
 
   const [navigating, setNavigating] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<any>(null);
+  const [showTour, setShowTour] = useState(false);
+
+  // Check if user has seen app tour on launch
+  React.useEffect(() => {
+    const checkTour = async () => {
+      try {
+        const hasSeen = await AsyncStorage.getItem(HAS_SEEN_TOUR_STORAGE_KEY);
+        if (!hasSeen) {
+          setShowTour(true);
+        }
+      } catch (e) {
+        console.warn('[Home] Error checking tour status:', e);
+      }
+    };
+    checkTour();
+  }, []);
 
   // One calm entrance — fade + gentle rise, no bounce.
   const intro = useRef(new Animated.Value(0)).current;
@@ -100,6 +118,7 @@ export default function MainScreen() {
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={theme.background} />
+      <AppTourModal visible={showTour} onClose={() => setShowTour(false)} />
 
       {loading ? (
         <View style={styles.loading}>

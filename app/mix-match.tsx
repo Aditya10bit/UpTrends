@@ -248,9 +248,22 @@ export default function MixMatchScreen() {
 
   const handleShopSelection = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const genderTerm = userProfile?.gender === 'female' ? 'women' : 'men';
     const topName = tops[topIdx]?.name || '';
     const bottomName = bottoms[bottomIdx]?.name || '';
-    const query = `men ${topName} ${bottomName} outfit`;
+    const shoeName = shoes[shoeIdx]?.name || '';
+
+    const topColors = tops[topIdx]?.colors || [];
+    const bottomColors = bottoms[bottomIdx]?.colors || [];
+    const shoeColors = shoes[shoeIdx]?.colors || [];
+
+    const rawColors = [...topColors, ...bottomColors, ...shoeColors];
+    const uniqueColors = Array.from(new Set(rawColors.map(c => String(c).trim()))).filter(Boolean);
+    const colorQuery = uniqueColors.length > 0 ? uniqueColors.join(' ') : '';
+
+    const queryParts = [genderTerm, colorQuery, topName, bottomName, shoeName, 'outfit'].filter(Boolean);
+    const query = queryParts.join(' ');
+
     const searchUrl = `https://www.pinterest.com/search/pins/?q=${encodeURIComponent(query)}`;
     await openExternalUrl(searchUrl);
   };
