@@ -1,5 +1,7 @@
 import { analyzeBodyImage, analyzePersonComprehensively, generateOutfitsFromPrompt, generateTwinningOutfits, validateImageContext } from './geminiService';
 import { getCurrentWeather, WeatherData } from './weatherService';
+import { handleNsfwViolation } from './userService';
+import { auth } from '../firebaseConfig';
 import * as Location from 'expo-location';
 
 export interface PersonAnalysis {
@@ -127,8 +129,17 @@ export const analyzeTwinningPhotos = async (
       confidence: number;
       reasoning: string;
       suggestedItems?: string[];
+      isNsfw?: boolean;
     }>;
     const weatherData = validationsAndWeather[3] as WeatherData;
+
+    // Check for explicit content first
+    if (validations.some(v => v.isNsfw)) {
+      if (auth.currentUser) {
+        await handleNsfwViolation(auth.currentUser.uid);
+      }
+      throw new Error("NSFW_VIOLATION");
+    }
 
     if (!validations[0].isValid) throw new Error(`Invalid photo for ${names.person1}: ${validations[0].reasoning}`);
     if (!validations[1].isValid) throw new Error(`Invalid photo for ${names.person2}: ${validations[1].reasoning}`);
@@ -525,7 +536,7 @@ const analyzePersonFromName = (name: string): { gender: 'male' | 'female', trait
   };
 
   const gender = detectGender(name);
-  const traits = gender === 'male'
+  const traits = (gender || '').toLowerCase() === 'male'
     ? ['confident', 'modern', 'practical']
     : ['elegant', 'stylish', 'graceful'];
 
@@ -996,7 +1007,7 @@ const createOutfitSuggestions = (
   context?: any,
   geminiOutfit?: string
 ): OutfitSuggestion[] => {
-  const isMale = personAnalysis.gender === 'male';
+  const isMale = (personAnalysis.gender || "").toLowerCase() === 'male';
   const bodyType = personAnalysis.bodyType;
   const skinTone = personAnalysis.skinTone;
 
@@ -1170,30 +1181,30 @@ const getMockTwinningAnalysis = (
     outfitSuggestions: {
       person1: [
         {
-          category: person1Analysis.gender === 'male' ? "Smart Casual" : "Chic Coordination",
-          items: person1Analysis.gender === 'male'
+          category: (person1Analysis.gender || "").toLowerCase() === 'male' ? "Smart Casual" : "Chic Coordination",
+          items: (person1Analysis.gender || "").toLowerCase() === 'male'
             ? ["Tailored blazer", "Fitted chinos", "Clean sneakers"]
             : ["Silk blouse", "High-waisted trousers", "Block heels"],
-          colors: person1Analysis.gender === 'male'
+          colors: (person1Analysis.gender || "").toLowerCase() === 'male'
             ? ["Navy blue", "White", "Tan accents"]
             : ["Soft blue", "Cream", "Gold accents"],
-          accessories: person1Analysis.gender === 'male'
+          accessories: (person1Analysis.gender || "").toLowerCase() === 'male'
             ? ["Leather watch", "Minimalist wallet"]
             : ["Delicate earrings", "Structured handbag"],
-          styling_tips: person1Analysis.gender === 'male'
+          styling_tips: (person1Analysis.gender || "").toLowerCase() === 'male'
             ? ["Roll up blazer sleeves", "Keep fit tailored"]
             : ["Tuck blouse into trousers", "Add a belt for definition"],
           why_this_works: geminiOutfit ||
             (context?.venue ? `Perfect for ${context.venue} setting` :
               context?.atmosphere ? `Matches the ${context.atmosphere} vibe` :
-                person1Analysis.gender === 'male'
+                (person1Analysis.gender || "").toLowerCase() === 'male'
                   ? "Balances casual and polished elements for modern men"
                   : "Creates elegant silhouette with contemporary flair"),
           shopping_links: generateSpecificShoppingLinks(
-            person1Analysis.gender === 'male'
+            (person1Analysis.gender || "").toLowerCase() === 'male'
               ? ["Tailored blazer", "Fitted chinos", "Clean sneakers"]
               : ["Silk blouse", "High-waisted trousers", "Block heels"],
-            person1Analysis.gender === 'male'
+            (person1Analysis.gender || "").toLowerCase() === 'male'
               ? ["Navy", "Khaki", "White"]
               : ["Blush", "Cream", "Gold"],
             person1Analysis.gender
@@ -1202,29 +1213,29 @@ const getMockTwinningAnalysis = (
       ],
       person2: [
         {
-          category: person2Analysis.gender === 'male' ? "Modern Casual" : "Elegant Coordination",
-          items: person2Analysis.gender === 'male'
+          category: (person2Analysis.gender || "").toLowerCase() === 'male' ? "Modern Casual" : "Elegant Coordination",
+          items: (person2Analysis.gender || "").toLowerCase() === 'male'
             ? ["Cotton shirt", "Dark jeans", "Casual loafers"]
             : ["Flowy top", "Midi skirt", "Comfortable flats"],
-          colors: person2Analysis.gender === 'male'
+          colors: (person2Analysis.gender || "").toLowerCase() === 'male'
             ? ["Light blue", "Charcoal", "Brown accents"]
             : ["Soft pink", "Beige", "Rose gold accents"],
-          accessories: person2Analysis.gender === 'male'
+          accessories: (person2Analysis.gender || "").toLowerCase() === 'male'
             ? ["Simple watch", "Canvas bag"]
             : ["Statement necklace", "Crossbody bag"],
-          styling_tips: person2Analysis.gender === 'male'
+          styling_tips: (person2Analysis.gender || "").toLowerCase() === 'male'
             ? ["Keep shirt untucked", "Roll sleeves for casual look"]
             : ["Let top flow naturally", "Add layers for depth"],
           why_this_works: context?.activities ? `Great for ${context.activities} activities` :
             context?.styleGoals ? `Achieves your ${context.styleGoals} goals` :
-              person2Analysis.gender === 'male'
+              (person2Analysis.gender || "").toLowerCase() === 'male'
                 ? "Comfortable yet put-together for any occasion"
                 : "Feminine and graceful while staying coordinated",
           shopping_links: generateSpecificShoppingLinks(
-            person2Analysis.gender === 'male'
+            (person2Analysis.gender || "").toLowerCase() === 'male'
               ? ["Cotton shirt", "Dark jeans", "Casual loafers"]
               : ["Flowy top", "Midi skirt", "Comfortable flats"],
-            person2Analysis.gender === 'male'
+            (person2Analysis.gender || "").toLowerCase() === 'male'
               ? ["Light blue", "Charcoal", "Brown"]
               : ["Soft pink", "Beige", "Rose gold"],
             person2Analysis.gender
@@ -1296,7 +1307,7 @@ export const generateSpecificShoppingLinks = (
   gender: 'male' | 'female',
   coordinationColors?: string[]
 ) => {
-  const genderTerm = gender === 'male' ? 'men' : 'women';
+  const genderTerm = (gender || '').toLowerCase() === 'male' ? 'men' : 'women';
   
   // Clean items for search
   const cleanItems = outfitItems.map(item => 
@@ -1347,7 +1358,7 @@ const extractGenderFromAnalysis = (analysis: string): 'male' | 'female' | null =
 const extractBodyTypeFromAnalysis = (analysis: string, gender: 'male' | 'female'): string => {
   if (!analysis || typeof analysis !== 'string') {
     console.warn('⚠️ No analysis data for body type extraction');
-    return gender === 'male' ? 'Average' : 'Rectangle';
+    return (gender || '').toLowerCase() === 'male' ? 'Average' : 'Rectangle';
   }
 
   // Try multiple patterns to extract body type
@@ -1368,7 +1379,7 @@ const extractBodyTypeFromAnalysis = (analysis: string, gender: 'male' | 'female'
 
   console.log(`🔍 Extracted body type: "${bodyType}" for ${gender} from analysis`);
 
-  if (gender === 'male') {
+  if ((gender || '').toLowerCase() === 'male') {
     if (bodyType.includes('athletic') || bodyType.includes('muscular') || bodyType.includes('fit')) return 'Athletic';
     if (bodyType.includes('slim') || bodyType.includes('lean') || bodyType.includes('thin')) return 'Slim';
     if (bodyType.includes('heavy') || bodyType.includes('large') || bodyType.includes('broad')) return 'Heavy';
@@ -1386,15 +1397,15 @@ const extractBodyTypeFromAnalysis = (analysis: string, gender: 'male' | 'female'
 
 const extractStyleFromAnalysis = (analysis: string, gender: 'male' | 'female'): string => {
   if (!analysis || typeof analysis !== 'string') {
-    return gender === 'male' ? 'Smart-casual and confident' : 'Chic and contemporary';
+    return (gender || '').toLowerCase() === 'male' ? 'Smart-casual and confident' : 'Chic and contemporary';
   }
 
   const styleMatch = analysis.match(/style[:\s]*([^.!,\n]+)/i);
   if (styleMatch) {
-    return styleMatch[1].trim() || (gender === 'male' ? 'Smart-casual and confident' : 'Chic and contemporary');
+    return styleMatch[1].trim() || ((gender || '').toLowerCase() === 'male' ? 'Smart-casual and confident' : 'Chic and contemporary');
   }
 
-  return gender === 'male' ? 'Smart-casual and confident' : 'Chic and contemporary';
+  return (gender || '').toLowerCase() === 'male' ? 'Smart-casual and confident' : 'Chic and contemporary';
 };
 
 const extractTraitsFromAnalysis = (analysis: string): string[] => {
@@ -1652,9 +1663,9 @@ const getFallbackPersonAnalysis = (name: string) => {
   return {
     name: name || 'Person',
     gender: nameAnalysis.gender,
-    bodyType: nameAnalysis.gender === 'male' ? 'Average' : 'Rectangle',
+    bodyType: (nameAnalysis.gender || "").toLowerCase() === 'male' ? 'Average' : 'Rectangle',
     skinTone: 'Fair',
-    style: nameAnalysis.gender === 'male' ? 'Smart-casual and confident' : 'Chic and contemporary',
+    style: (nameAnalysis.gender || "").toLowerCase() === 'male' ? 'Smart-casual and confident' : 'Chic and contemporary',
     traits: nameAnalysis.traits || ['Confident', 'Stylish', 'Modern'],
     physicalFeatures: ['Natural build', 'Good proportions', 'Confident presence'],
     confidence: 75,
@@ -1862,7 +1873,7 @@ const createEnhancedOutfitSuggestions = (
   context?: any,
   personOutfits?: any[] // Already person-specific from the new API
 ): OutfitSuggestion[] => {
-  const isMale = personAnalysis.gender === 'male';
+  const isMale = (personAnalysis.gender || "").toLowerCase() === 'male';
   const baseColors = getColorsForSkinTone(personAnalysis.skinTone);
   const venueColors = placeAnalysis.dominantColors;
 

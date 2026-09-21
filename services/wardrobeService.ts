@@ -165,7 +165,7 @@ export const generateWardrobeOutfits = async (
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.8-flash' });
 
     // Convert images to base64
     const imageParts = await Promise.all(

@@ -28,6 +28,7 @@ import { isFirebaseInitialized, storage } from '../firebaseConfig';
 import { testApiKey, invalidateApiKeyCache, getActiveKeySource } from '../services/geminiService';
 import KeyUpgradeModal from '../components/KeyUpgradeModal';
 import AppTourModal from '../components/AppTourModal';
+import DeleteAccountModal from '../components/DeleteAccountModal';
 import * as Haptics from 'expo-haptics';
 
 import Animated, {
@@ -38,7 +39,7 @@ import Animated, {
   withTiming
 } from 'react-native-reanimated';
 import { getUserAnalytics, syncAnalyticsWithFirebase, UserAnalytics } from '../services/analyticsService';
-import { getUserProfile, updateUserProfile } from '../services/userService';
+import { getUserProfile, updateUserProfile, deleteUserAccount } from '../services/userService';
 
 const { width } = Dimensions.get('window');
 
@@ -98,6 +99,7 @@ export default function ProfileScreen() {
   const [showApiKey, setShowApiKey] = useState(false);
   const [showKeyInfoModal, setShowKeyInfoModal] = useState(false);
   const [showTourModal, setShowTourModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   // Auto-show the "why your own key?" modal only once per app session to avoid nagging.
   const hasAutoShownKeyInfo = useRef(false);
 
@@ -282,6 +284,17 @@ export default function ProfileScreen() {
         { text: 'Logout', style: 'destructive', onPress: logout },
       ]
     );
+  };
+
+  const handleConfirmDeleteAccount = async () => {
+    const success = await deleteUserAccount();
+    if (success) {
+      setShowDeleteModal(false);
+      logout();
+    } else {
+      Alert.alert('Error', 'Failed to delete account. Please try logging in again.');
+      setShowDeleteModal(false);
+    }
   };
 
   const animatedStyle = useAnimatedStyle(() => {
@@ -1060,13 +1073,33 @@ export default function ProfileScreen() {
               alignItems: 'center',
               justifyContent: 'space-between',
               paddingVertical: 14,
+              borderBottomWidth: 1,
+              borderBottomColor: theme.borderLight,
             }}
             onPress={handleLogout}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Ionicons name="log-out-outline" size={24} color={theme.error} />
+              <Ionicons name="log-out-outline" size={24} color={theme.textSecondary} />
               <Text style={{ marginLeft: 12, fontSize: 16, fontWeight: '500', color: theme.text }}>
                 Logout
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={theme.textTertiary} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingVertical: 14,
+            }}
+            onPress={() => setShowDeleteModal(true)}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Ionicons name="trash-outline" size={24} color={theme.error} />
+              <Text style={{ marginLeft: 12, fontSize: 16, fontWeight: '500', color: theme.error }}>
+                Delete Account
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={theme.textTertiary} />
@@ -1082,6 +1115,11 @@ export default function ProfileScreen() {
       <AppTourModal
         visible={showTourModal}
         onClose={() => setShowTourModal(false)}
+      />
+      <DeleteAccountModal
+        visible={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={handleConfirmDeleteAccount}
       />
     </Animated.View>
     </PremiumBackground>

@@ -20,7 +20,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { getUserProfile } from '../services/userService';
 import { resolveDisplayName } from '../utils/displayName';
-import AppTourModal, { HAS_SEEN_TOUR_STORAGE_KEY } from '../components/AppTourModal';
+import AppTourModal from '../components/AppTourModal';
+import AIPrivacyConsentModal, { HAS_SEEN_AI_PRIVACY_KEY } from '../components/AIPrivacyConsentModal';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // "Obsidian Editorial" home — calm, magazine-grade launcher.
@@ -52,6 +53,7 @@ const TILES: Tile[] = [
   { key: 'mix', route: '/mix-match', title: 'Mix & Match', desc: 'Pair pieces together', icon: 'color-palette-outline' },
   { key: 'scanner', route: '/shopping-scanner', title: 'Will It Match', desc: 'Scan & compare', icon: 'scan-outline' },
   { key: 'shazam', route: '/style-shazam', title: 'Steal the Look', desc: 'Find outfits like yours', icon: 'flash-outline' },
+  { key: 'alter', route: '/alter-shop', title: 'Alter Shop', desc: 'AI Tailor Adjustments', icon: 'cut-outline' },
 ];
 
 export default function MainScreen() {
@@ -61,21 +63,53 @@ export default function MainScreen() {
   const [navigating, setNavigating] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [showTour, setShowTour] = useState(false);
+  const [showPrivacy, setShowPrivacy] = useState(false);
 
-  // Check if user has seen app tour on launch
+  // Show the tour only when auth.tsx has flagged this as a brand-new account.
+  // Also check if the user has seen the AI privacy consent.
   React.useEffect(() => {
-    const checkTour = async () => {
+    const checkModals = async () => {
       try {
-        const hasSeen = await AsyncStorage.getItem(HAS_SEEN_TOUR_STORAGE_KEY);
-        if (!hasSeen) {
+        const pendingTour = await AsyncStorage.getItem('show_tour_pending_v1');
+        if (pendingTour === 'true') {
+          await AsyncStorage.removeItem('show_tour_pending_v1'); // clear so it never repeats
           setShowTour(true);
+        } else {
+          // If no tour, check privacy consent directly
+          const hasSeenPrivacy = await AsyncStorage.getItem(HAS_SEEN_AI_PRIVACY_KEY);
+          if (!hasSeenPrivacy) {
+            setShowPrivacy(true);
+          }
         }
       } catch (e) {
-        console.warn('[Home] Error checking tour status:', e);
+        console.warn('[Home] Error checking modal status:', e);
       }
     };
-    checkTour();
+    checkModals();
   }, []);
+
+  const handleTourClose = async () => {
+    setShowTour(false);
+    // After tour closes, check if they need privacy consent
+    try {
+      const hasSeenPrivacy = await AsyncStorage.getItem(HAS_SEEN_AI_PRIVACY_KEY);
+      if (!hasSeenPrivacy) {
+        setShowPrivacy(true);
+      }
+    } catch(e) {}
+  };
+
+  const handlePrivacyAccept = async () => {
+    await AsyncStorage.setItem(HAS_SEEN_AI_PRIVACY_KEY, 'true');
+    await AsyncStorage.setItem('ai_privacy_consent_v1', 'true'); // They accepted
+    setShowPrivacy(false);
+  };
+
+  const handlePrivacyDecline = async () => {
+    await AsyncStorage.setItem(HAS_SEEN_AI_PRIVACY_KEY, 'true');
+    // We don't set 'ai_privacy_consent_v1' so they don't have consent
+    setShowPrivacy(false);
+  };
 
   // One calm entrance — fade + gentle rise, no bounce.
   const intro = useRef(new Animated.Value(0)).current;
@@ -118,7 +152,12 @@ export default function MainScreen() {
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={theme.background} />
-      <AppTourModal visible={showTour} onClose={() => setShowTour(false)} />
+      <AppTourModal visible={showTour} onClose={handleTourClose} />
+      <AIPrivacyConsentModal
+        visible={showPrivacy}
+        onAccept={handlePrivacyAccept}
+        onDecline={handlePrivacyDecline}
+      />
 
       {loading ? (
         <View style={styles.loading}>

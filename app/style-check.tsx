@@ -180,13 +180,17 @@ export default function StyleCheck() {
       }).start();
 
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error analyzing style:', error);
-      let errorMessage = 'Unable to analyze your style. Please try again.';
-      if (error instanceof Error && error.message.includes('Invalid Image')) {
-        errorMessage = error.message.replace('Error: ', '');
+      if (error?.message === 'NSFW_VIOLATION') {
+        Alert.alert('Warning', 'Explicit content detected. Repeated violations will result in an account ban.');
+      } else {
+        let errorMessage = 'Unable to analyze your style. Please try again.';
+        if (error instanceof Error && error.message.includes('Invalid Image')) {
+          errorMessage = error.message.replace('Error: ', '');
+        }
+        Alert.alert('Analysis Failed', errorMessage);
       }
-      Alert.alert('Analysis Failed', errorMessage);
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setIsAnalyzing(false);

@@ -9,6 +9,8 @@ import { AuthProvider } from '../contexts/AuthContext';
 import { ThemeProvider, useTheme } from '../contexts/ThemeContext';
 import AnimatedSplash from '../components/AnimatedSplash';
 import DefaultKeyPrompt from '../components/DefaultKeyPrompt';
+import { useAuth } from '../contexts/AuthContext';
+import { Ionicons } from '@expo/vector-icons';
 
 // Minimal error boundary for startup crashes
 import React, { useCallback, useEffect, useState } from 'react';
@@ -56,6 +58,27 @@ try {
   console.warn('Polyfills not loaded:', error);
 }
 
+function GlobalBanGuard({ children }: { children: React.ReactNode }) {
+  const { isBanned } = useAuth();
+  const { theme } = useTheme();
+
+  if (isBanned) {
+    return (
+      <View style={{ flex: 1, backgroundColor: theme.background, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+        <Ionicons name="warning" size={64} color={theme.error} style={{ marginBottom: 16 }} />
+        <Text style={{ fontSize: 24, fontWeight: 'bold', color: theme.text, marginBottom: 12, textAlign: 'center' }}>
+          Account Banned
+        </Text>
+        <Text style={{ fontSize: 16, color: theme.textSecondary, textAlign: 'center', lineHeight: 24 }}>
+          Your account has been suspended due to repeated violations of our community guidelines regarding explicit content.
+        </Text>
+      </View>
+    );
+  }
+
+  return <>{children}</>;
+}
+
 // Inner layout that has access to useTheme (must be inside ThemeProvider).
 function RootLayoutContent() {
   const { theme } = useTheme();
@@ -98,19 +121,20 @@ function RootLayoutContent() {
         <AnimatedSplash isDark={isDark} onFinish={handleSplashFinish} />
       )}
 
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          animation: 'slide_from_right',
-          gestureEnabled: true,
-        }}
-      >
-        <Stack.Screen
-          name="index"
-          options={{
-            title: 'UpTrends',
+      <GlobalBanGuard>
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            animation: 'slide_from_right',
+            gestureEnabled: true,
           }}
-        />
+        >
+          <Stack.Screen
+            name="index"
+            options={{
+              title: 'UpTrends',
+            }}
+          />
         <Stack.Screen
           name="auth"
           options={{
@@ -157,6 +181,13 @@ function RootLayoutContent() {
           name="make-outfit"
           options={{
             title: 'Make Outfit',
+            presentation: 'card'
+          }}
+        />
+        <Stack.Screen
+          name="alter-shop"
+          options={{
+            title: 'Alter Shop',
             presentation: 'card'
           }}
         />
@@ -218,6 +249,7 @@ function RootLayoutContent() {
         />
 
       </Stack>
+      </GlobalBanGuard>
 
       {/* Auto-dismissing "add your own AI key" nudge — only when on the default key */}
       {!showSplash && <DefaultKeyPrompt />}

@@ -3,16 +3,19 @@ import { router, useRootNavigationState } from 'expo-router';
 import { User, onAuthStateChanged, signOut } from 'firebase/auth';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { auth, isFirebaseInitialized } from '../firebaseConfig';
+import { checkBanStatus } from '../services/userService';
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
+  isBanned: boolean;
   logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
+  isBanned: false,
   logout: async () => { },
 });
 
@@ -27,6 +30,7 @@ export const useAuth = () => {
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isBanned, setIsBanned] = useState(false);
   const [hasNavigated, setHasNavigated] = useState(false);
   const rootNavigationState = useRootNavigationState();
 
@@ -38,13 +42,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
 
-      const unsubscribe = onAuthStateChanged(auth, (user) => {
+      const unsubscribe = onAuthStateChanged(auth, async (user) => {
         console.log('Auth state changed:', user ? 'User logged in' : 'User logged out');
+        if (user) {
+          const banned = await checkBanStatus();
+          setIsBanned(banned);
+        } else {
+          setIsBanned(false);
+        }
         setUser(user);
         setLoading(false);
       }, (error) => {
         console.error('Firebase auth error:', error);
         setUser(null);
+        setIsBanned(false);
         setLoading(false);
       });
 
@@ -97,6 +108,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const value = {
     user,
     loading,
+    isBanned,
     logout,
   };
 

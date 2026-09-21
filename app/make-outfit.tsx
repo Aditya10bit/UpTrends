@@ -211,20 +211,42 @@ export default function MakeOutfit() {
       setIsValidatingImages(true);
       try {
         const results = await validateMultipleImagesContext(newImages, 'clothing items on a flat surface or hanger');
-        if (results.invalidImages.length > 0) {
-          // Remove invalid images automatically
-          const invalidUris = new Set(results.invalidImages.map(img => img.uri));
+        
+        // Handle NSFW images first — remove them and record violation
+        const nsfwResults = results.validationResults.filter(r => r.isNsfw);
+        if (nsfwResults.length > 0) {
+          const nsfwUris = new Set(nsfwResults.map(r => r.uri));
+          setSelectedImages(prev => prev.filter(uri => !nsfwUris.has(uri)));
+          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+          try {
+            const { handleNsfwViolation } = require('../services/userService');
+            const { auth } = require('../firebaseConfig');
+            if (auth.currentUser) await handleNsfwViolation(auth.currentUser.uid);
+          } catch (e) { /* silent */ }
+          Alert.alert('Warning', 'Explicit content detected. Repeated violations will result in an account ban.');
+        }
+
+        // Handle other invalid (non-NSFW) images
+        const nonNsfwInvalid = results.invalidImages.filter(img => !nsfwResults.find(n => n.uri === img.uri));
+        if (nonNsfwInvalid.length > 0) {
+          const invalidUris = new Set(nonNsfwInvalid.map(img => img.uri));
           setSelectedImages(prev => prev.filter(uri => !invalidUris.has(uri)));
           await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
           Alert.alert(
             '⚠️ Non-Clothing Images Removed',
-            `${results.invalidImages.length} image${results.invalidImages.length > 1 ? 's were' : ' was'} removed because ${results.invalidImages.length > 1 ? 'they don\'t' : 'it doesn\'t'} appear to be clothing items. Please upload clear photos of clothes only.`,
+            `${nonNsfwInvalid.length} image${nonNsfwInvalid.length > 1 ? 's were' : ' was'} removed because ${nonNsfwInvalid.length > 1 ? 'they don\'t' : 'it doesn\'t'} appear to be clothing items. Please upload clear photos of clothes only.`,
             [{ text: 'OK' }]
           );
         }
-      } catch (error) {
-        console.warn('Auto-validation failed, allowing images:', error);
-        // If validation itself fails (rate limit, etc.), keep the images
+      } catch (error: any) {
+        if (error?.message === 'NSFW_VIOLATION') {
+          Alert.alert('Warning', 'Explicit content detected. Repeated violations will result in an account ban.');
+          // Remove all recently added images since one was NSFW
+          setSelectedImages(prev => prev.filter(uri => !newImages.includes(uri)));
+        } else {
+          console.warn('Auto-validation failed, allowing images:', error);
+          // If validation itself fails (rate limit, etc.), keep the images
+        }
       } finally {
         setIsValidatingImages(false);
       }
@@ -470,33 +492,38 @@ export default function MakeOutfit() {
     } catch (error: any) {
       console.error('Error generating outfit:', error);
       const errorMsg = error?.message || '';
-      const isQuotaError = errorMsg.includes('429') || errorMsg.includes('Quota') || errorMsg.includes('Too Many Requests') || errorMsg.includes('Max retries exceeded');
 
-      if (isQuotaError) {
-        // Check if user already has a custom key
-        const keySource = await getActiveKeySource();
-        if (keySource === 'default') {
-          Alert.alert(
-            'AI Limit Reached \u26a1',
-            'The shared AI quota has been reached. Set up your own free API key for unlimited access!\n\nIt only takes 1 minute.',
-            [
-              { text: 'Later', style: 'cancel' },
-              { text: 'Set Up My Key', onPress: () => router.push('/profile') }
-            ]
-          );
+      if (errorMsg === 'NSFW_VIOLATION') {
+        Alert.alert('Warning', 'Explicit content detected. Repeated violations will result in an account ban.');
+      } else {
+        const isQuotaError = errorMsg.includes('429') || errorMsg.includes('Quota') || errorMsg.includes('Too Many Requests') || errorMsg.includes('Max retries exceeded');
+
+        if (isQuotaError) {
+          // Check if user already has a custom key
+          const keySource = await getActiveKeySource();
+          if (keySource === 'default') {
+            Alert.alert(
+              'AI Limit Reached \u26a1',
+              'The shared AI quota has been reached. Set up your own free API key for unlimited access!\n\nIt only takes 1 minute.',
+              [
+                { text: 'Later', style: 'cancel' },
+                { text: 'Set Up My Key', onPress: () => router.push('/profile') }
+              ]
+            );
+          } else {
+            Alert.alert(
+              'Quota Exceeded',
+              'Your API key has hit its rate limit. Please wait a moment and try again.',
+              [{ text: 'OK' }]
+            );
+          }
         } else {
           Alert.alert(
-            'Quota Exceeded',
-            'Your API key has hit its rate limit. Please wait a moment and try again.',
+            'Generation Failed',
+            'Unable to generate outfit combinations. Please try again.',
             [{ text: 'OK' }]
           );
         }
-      } else {
-        Alert.alert(
-          'Generation Failed',
-          'Unable to generate outfit combinations. Please try again.',
-          [{ text: 'OK' }]
-        );
       }
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {

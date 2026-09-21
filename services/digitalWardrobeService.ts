@@ -168,13 +168,21 @@ export const analyzeClothingItem = async (
   try {
     // 1. Validate image content before processing
     const validation = await validateImageContext(imageUri, 'a single clothing item or accessory');
+    if (validation.isNsfw) {
+      if (auth.currentUser) {
+        // dynamic import or require to avoid circular dependencies if any, but regular import is fine.
+        const { handleNsfwViolation } = require('./userService');
+        await handleNsfwViolation(auth.currentUser.uid);
+      }
+      throw new Error("NSFW_VIOLATION");
+    }
     if (!validation.isValid) {
       throw new Error(`Invalid Image: ${validation.reasoning}`);
     }
 
     const { base64, mimeType } = await compressAndConvertImage(imageUri);
     
-    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.8-flash' });
 
     const prompt = `You are a professional fashion analyst. Analyze this clothing item photo with extreme detail.
 
@@ -622,7 +630,7 @@ export const generateOutfitsFromWardrobe = async (
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.8-flash' });
 
     // Build wardrobe summary for the prompt
     const wardrobeSummary = items.map((item, i) => 
@@ -715,7 +723,7 @@ export const getItemPairings = async (
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.8-flash' });
 
     const othersSummary = otherItems.map((i, idx) =>
       `[${idx + 1}] ${i.name} — ${i.type}/${i.subType}, Colors: ${fmtList(i.colors)}, Pattern: ${i.pattern}, Formality: ${i.formality}`
@@ -1032,7 +1040,7 @@ export const analyzeWardrobeIntelligence = async (
   if (!geminiRateLimiter.canMakeCall()) return fallback;
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.8-flash' });
 
     const prompt = `You are a world-class fashion director auditing a user's full clothing inventory (AI-detected metadata). Return ONLY valid JSON with these EXACT fields:
 
@@ -1151,7 +1159,7 @@ export const checkShoppingItemMatch = async (
 
   try {
     const { base64, mimeType } = await compressAndConvertImage(imageUri);
-    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.8-flash' });
 
     // Build wardrobe inventory summary for prompt
     const wardrobeSummary = wardrobeItems.length > 0
@@ -1204,6 +1212,9 @@ RULES:
   - BUY: Scanned item matches 3+ wardrobe items beautifully, highly versatile.
   - CONSIDER: Scanned item matches 1 or 2 wardrobe items, or matches style but has color/type overlap.
   - SKIP: Scanned item matches nothing, overlaps with too many duplicates, or doesn't suit user profile.
+- MATCHING OUTFITS RULES:
+  - Each outfit MUST be a valid wear-able combination (e.g., 1 top + 1 bottom). 
+  - NEVER combine the scanned item with a wardrobe item of the EXACT SAME category (e.g., NEVER pair a scanned bottom with a wardrobe bottom, or a scanned top with a wardrobe top).
 - Only return JSON, no markdown blocks, no extra text.`;
 
     const result = await model.generateContent([
@@ -1320,7 +1331,7 @@ export const sendMessageToStylist = async (
   try {
     // Cap output tokens so long replies don't blow through the free tier
     const model = genAI.getGenerativeModel({
-      model: 'gemini-3.5-flash',
+      model: 'gemini-3.8-flash',
       generationConfig: {
         temperature: 0.7,
         maxOutputTokens: 2048,
@@ -1571,7 +1582,7 @@ export const analyzeArTryon = async (
 
   try {
     const { base64, mimeType } = await compressAndConvertImage(imageUri);
-    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.8-flash' });
 
     const gender = userProfile?.gender || 'male';
     const bodyType = userProfile?.bodyType || 'average';

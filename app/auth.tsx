@@ -1,4 +1,5 @@
 // app/auth.tsx
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { createUserWithEmailAndPassword, sendPasswordResetEmail, signInWithEmailAndPassword } from 'firebase/auth';
@@ -8,6 +9,9 @@ import { useTheme } from '../contexts/ThemeContext';
 import { auth, isFirebaseInitialized } from '../firebaseConfig';
 import { signInWithGoogle } from '../services/googleSignInService';
 import { checkUserProfile, createUserProfile } from '../services/userService';
+
+// Written on new account creation — home screen reads + clears it to show tour once
+const SHOW_TOUR_PENDING_KEY = 'show_tour_pending_v1';
 
 export default function AuthScreen() {
   const { theme } = useTheme();
@@ -43,6 +47,9 @@ export default function AuthScreen() {
         await createUserProfile({
           username: email.split('@')[0]
         });
+
+        // Mark that the onboarding tour should play for this brand-new user
+        await AsyncStorage.setItem(SHOW_TOUR_PENDING_KEY, 'true');
       }
 
       router.replace('/');
@@ -77,6 +84,11 @@ export default function AuthScreen() {
     try {
       const result = await signInWithGoogle();
       if (result.status === 'success') {
+        // If this Google user had no profile, treat them as brand-new
+        const profileExisted = await checkUserProfile();
+        if (!profileExisted) {
+          await AsyncStorage.setItem(SHOW_TOUR_PENDING_KEY, 'true');
+        }
         router.replace('/');
       } else if (result.status === 'cancelled') {
         // User backed out of the Google account picker — do nothing.

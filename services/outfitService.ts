@@ -74,38 +74,37 @@ export const getOutfitSuggestions = async (
       });
     }
 
-    // If we got suggestions, enhance them with shopping and reference links
-    if (suggestions && suggestions.length > 0) {
-      // Validate that suggestions are gender-appropriate
-      const userGender = userProfile?.gender?.toLowerCase();
-      const expectedGender = userGender || 'male';
-
-      console.log('🔍 Validating outfit suggestions for gender:', expectedGender);
-      console.log('🔍 GENDER COMPARISON:', {
-        promptGender: finalGender,
-        expectedGender,
-        userProfileGender: userGender,
-        match: finalGender === expectedGender
-      });
-
-      // Check for potential cross-gender items in suggestions
-      suggestions.forEach((outfit, index) => {
-        const outfitText = JSON.stringify(outfit).toLowerCase();
-        if (expectedGender === 'male') {
-          if (outfitText.includes('dress') || outfitText.includes('skirt') || outfitText.includes('heels') ||
-            outfitText.includes('blouse') || outfitText.includes('feminine') || outfitText.includes('women')) {
-            console.warn(`⚠️ POTENTIAL CROSS-GENDER ITEM DETECTED in outfit ${index + 1} for MALE user:`, outfit);
-          }
-        } else if (expectedGender === 'female') {
-          if (outfitText.includes('tie') || outfitText.includes('masculine') || outfitText.includes('men\'s')) {
-            console.warn(`⚠️ POTENTIAL CROSS-GENDER ITEM DETECTED in outfit ${index + 1} for FEMALE user:`, outfit);
-          }
+    // === STRICT GENDER FILTER ===
+    // Last line of defense regardless of which model served the request.
+    // If the AI hallucinated cross-gender clothing, drop those outfits.
+    const womenKeywords = ['dress', 'skirt', 'heels', 'blouse', 'feminine', 'women\'s', 'women\'', 'handbag', 'purse', 'saree', 'kurta'];
+    const menKeywords = ['men\'s suit', 'necktie', 'men\'s tie'];
+    
+    const filteredSuggestions = suggestions.filter((outfit) => {
+      const text = JSON.stringify(outfit).toLowerCase();
+      if (finalGender === 'male') {
+        const hasFemaleItem = womenKeywords.some(kw => text.includes(kw));
+        if (hasFemaleItem) {
+          console.warn('🚫 Dropped cross-gender outfit for MALE user:', outfit.title);
+          return false;
         }
-      });
+      } else if (finalGender === 'female') {
+        const hasMaleItem = menKeywords.some(kw => text.includes(kw));
+        if (hasMaleItem) {
+          console.warn('🚫 Dropped cross-gender outfit for FEMALE user:', outfit.title);
+          return false;
+        }
+      }
+      return true;
+    });
 
+    // If all suggestions were filtered out (bad AI response), use fallback
+    const validSuggestions = filteredSuggestions.length > 0 ? filteredSuggestions : suggestions;
+
+    // If we got suggestions, enhance them with shopping and reference links
+    if (validSuggestions && validSuggestions.length > 0) {
       const enhancedSuggestions = await Promise.all(
-        suggestions.map(async (outfit) => {
-          // Pass the same finalGender that was used for the prompt to ensure consistency
+        validSuggestions.map(async (outfit) => {
           const links = await generateOutfitLinks(outfit, { ...userProfile, gender: finalGender }, category);
           return {
             ...outfit,

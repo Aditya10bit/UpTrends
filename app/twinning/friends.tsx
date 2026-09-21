@@ -248,16 +248,20 @@ export default function FriendsTwinningScreen() {
 
       await new Promise(resolve => setTimeout(resolve, 1000));
       setAnalysis(result);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Analysis error:', error);
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       
-      let errorMessage = 'Failed to analyze photos. Please try again.';
-      if (error instanceof Error) {
-        errorMessage = error.message.replace('Error: ', '');
+      if (error?.message === 'NSFW_VIOLATION') {
+        Alert.alert('Warning', 'Explicit content detected. Repeated violations will result in an account ban.');
+      } else {
+        let errorMessage = 'Failed to analyze photos. Please try again.';
+        if (error instanceof Error) {
+          errorMessage = error.message.replace('Error: ', '');
+        }
+        
+        Alert.alert('Analysis Error', errorMessage);
       }
-      
-      Alert.alert('Analysis Error', errorMessage);
       setShowResults(false);
     } finally {
       setAnalyzing(false);

@@ -111,9 +111,9 @@ function isQuotaOrOverloaded(errorMsg) {
 // Gemini (Google)
 async function callGemini(env, prompt, modelType, image) {
   const models = {
-    fast: 'gemini-3.7-flash-lite',
-    balanced: 'gemini-3.7-flash',
-    quality: 'gemini-3.5-pro'
+    fast: 'gemini-3.7-flash',
+    balanced: 'gemini-3.8-flash',
+    quality: 'gemini-3.8-flash'
   };
 
   const model = models[modelType] || models.balanced;

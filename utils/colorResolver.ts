@@ -15,7 +15,7 @@ export const colorMap: { [key: string]: string } = {
   grey: '#6b7280',
   brown: '#92400e',
   navy: '#1e3a8a',
-  
+
   // Earthy / Tonal / Pastel neutrals
   beige: '#d2b48c',
   cream: '#fffdd0',
@@ -79,13 +79,28 @@ export const colorMap: { [key: string]: string } = {
   fuchsia: '#ff00ff',
   magenta: '#ff00ff',
   violet: '#ee82ee',
+
+  // Premium & Fashion Specific
+  rust: '#b7410e',
+  'off-white': '#f8f8ff',
+  'off white': '#f8f8ff',
+  'light blue': '#add8e6',
+  'matte black': '#28282b',
+  'jet black': '#343434',
+  cherry: '#de3163',
+  wine: '#722f37',
+  caramel: '#af6f09',
+  mocha: '#493d26',
+  bone: '#e3dac9',
+  cognac: '#9a463d',
+  sage: '#9cac9a',
 };
 
 export const getColorCode = (colorName: string): string => {
   if (!colorName) return '#6b7280';
-  
+
   const normalized = colorName.toLowerCase().trim();
-  
+
   // 1. Direct match
   if (colorMap[normalized]) {
     return colorMap[normalized];
@@ -186,7 +201,7 @@ export const hexToHSL = (hex: string): HSL => {
 
 export const detectHarmony = (colors: string[]): { type: string; description: string } => {
   const hslList = colors.map(c => hexToHSL(getColorCode(c)));
-  
+
   // Filter out neutral/grayscale colors (saturation < 15 or lightness < 15 or lightness > 85)
   const vibrantHues = hslList
     .filter(hsl => hsl.s > 15 && hsl.l > 15 && hsl.l < 85)
@@ -194,16 +209,16 @@ export const detectHarmony = (colors: string[]): { type: string; description: st
     .sort((a, b) => a - b);
 
   if (vibrantHues.length === 0) {
-    return { 
-      type: 'Neutral Harmony', 
-      description: 'Sophisticated, classic look styled with clean, timeless neutrals (black, white, gray, or soft earthy beige).' 
+    return {
+      type: 'Neutral Harmony',
+      description: 'Sophisticated, classic look styled with clean, timeless neutrals (black, white, gray, or soft earthy beige).'
     };
   }
 
   if (vibrantHues.length === 1) {
-    return { 
-      type: 'Minimalist Pop', 
-      description: 'A clean neutral palette anchored by a single vibrant accent color to focus visual attention.' 
+    return {
+      type: 'Minimalist Pop',
+      description: 'A clean neutral palette anchored by a single vibrant accent color to focus visual attention.'
     };
   }
 
@@ -212,15 +227,15 @@ export const detectHarmony = (colors: string[]): { type: string; description: st
     const diff = Math.abs(vibrantHues[0] - vibrantHues[1]);
     const shortestDiff = Math.min(diff, 360 - diff);
     if (shortestDiff > 140 && shortestDiff < 220) {
-      return { 
-        type: 'Complementary Harmony', 
-        description: 'Opposite colors on the wheel, creating a high-energy, high-contrast look that highlights both shades.' 
+      return {
+        type: 'Complementary Harmony',
+        description: 'Opposite colors on the wheel, creating a high-energy, high-contrast look that highlights both shades.'
       };
     }
     if (shortestDiff < 60) {
-      return { 
-        type: 'Analogous Harmony', 
-        description: 'Adjacent colors on the wheel, offering a highly harmonious, naturally cohesive, and calming look.' 
+      return {
+        type: 'Analogous Harmony',
+        description: 'Adjacent colors on the wheel, offering a highly harmonious, naturally cohesive, and calming look.'
       };
     }
   }
@@ -233,9 +248,9 @@ export const detectHarmony = (colors: string[]): { type: string; description: st
     const shortestDiff1 = Math.min(diff1, 360 - diff1);
     const shortestDiff2 = Math.min(diff2, 360 - diff2);
     if (shortestDiff1 > 90 && shortestDiff1 < 150 && shortestDiff2 > 90 && shortestDiff2 < 150) {
-      return { 
-        type: 'Triadic Harmony', 
-        description: 'Three vibrant colors spaced evenly around the wheel, creating a bold, playful, and balanced outfit.' 
+      return {
+        type: 'Triadic Harmony',
+        description: 'Three vibrant colors spaced evenly around the wheel, creating a bold, playful, and balanced outfit.'
       };
     }
     // Check analogous
@@ -247,15 +262,15 @@ export const detectHarmony = (colors: string[]): { type: string; description: st
       maxInterval = Math.max(maxInterval, interval);
     }
     if (maxInterval < 75) {
-      return { 
-        type: 'Analogous Harmony', 
-        description: 'Adjacent shades blending smoothly together for a sophisticated, unified aesthetic.' 
+      return {
+        type: 'Analogous Harmony',
+        description: 'Adjacent shades blending smoothly together for a sophisticated, unified aesthetic.'
       };
     }
   }
 
-  return { 
-    type: 'Tonal Contrast Harmony', 
-    description: 'A carefully curated contrast of warm and cool shades that balance and elevate each other.' 
+  return {
+    type: 'Tonal Contrast Harmony',
+    description: 'A carefully curated contrast of warm and cool shades that balance and elevate each other.'
   };
 };

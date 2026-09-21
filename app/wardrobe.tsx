@@ -244,11 +244,15 @@ export default function WardrobeScreen() {
         [{ text: 'Nice!' }]
       );
     } catch (error: any) {
-      let errorMessage = error.message || 'Failed to add item';
-      if (errorMessage.includes('Invalid Image')) {
-        errorMessage = errorMessage.replace('Error: ', '');
+      if (error?.message === 'NSFW_VIOLATION') {
+        Alert.alert('Warning', 'Explicit content detected. Repeated violations will result in an account ban.');
+      } else {
+        let errorMessage = error?.message || 'Failed to add item';
+        if (errorMessage.includes('Invalid Image')) {
+          errorMessage = errorMessage.replace('Error: ', '');
+        }
+        Alert.alert('Error', errorMessage);
       }
-      Alert.alert('Error', errorMessage);
     } finally {
       setAdding(false);
     }
@@ -286,11 +290,15 @@ export default function WardrobeScreen() {
         [{ text: 'Nice!' }]
       );
     } catch (error: any) {
-      let errorMessage = error.message || 'Failed to add item';
-      if (errorMessage.includes('Invalid Image')) {
-        errorMessage = errorMessage.replace('Error: ', '');
+      if (error?.message === 'NSFW_VIOLATION') {
+        Alert.alert('Warning', 'Explicit content detected. Repeated violations will result in an account ban.');
+      } else {
+        let errorMessage = error?.message || 'Failed to add item';
+        if (errorMessage.includes('Invalid Image')) {
+          errorMessage = errorMessage.replace('Error: ', '');
+        }
+        Alert.alert('Error', errorMessage);
       }
-      Alert.alert('Error', errorMessage);
     } finally {
       setAdding(false);
     }

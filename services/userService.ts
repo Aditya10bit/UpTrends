@@ -1,6 +1,7 @@
 // services/userService.ts
 
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { deleteUser } from 'firebase/auth';
 import { auth, db } from '../firebaseConfig';
 
 // --- Types ---
@@ -100,3 +101,65 @@ export const checkUserProfile = async (): Promise<boolean> => {
   }
 };
 
+// --- NSFW Violation Handling ---
+export const handleNsfwViolation = async (userId: string): Promise<void> => {
+  try {
+    const userRef = doc(db, 'users', userId);
+    const userDoc = await getDoc(userRef);
+    if (userDoc.exists()) {
+      const data = userDoc.data();
+      const currentWarnings = data.nsfwWarnings || 0;
+      const newWarnings = currentWarnings + 1;
+      
+      const updateData: any = {
+        nsfwWarnings: newWarnings,
+      };
+
+      // Ban after 2 warnings (meaning the 3rd strike)
+      if (newWarnings >= 3) {
+        updateData.isBanned = true;
+        updateData.bannedAt = new Date();
+      }
+
+      await updateDoc(userRef, updateData);
+    }
+  } catch (error) {
+    console.error('Error handling NSFW violation:', error);
+  }
+};
+
+// --- Check Ban Status ---
+export const checkBanStatus = async (): Promise<boolean> => {
+  const user = auth.currentUser;
+  if (!user) return false;
+  try {
+    const userRef = doc(db, 'users', user.uid);
+    const userDoc = await getDoc(userRef);
+    if (userDoc.exists()) {
+      return !!userDoc.data().isBanned;
+    }
+    return false;
+  } catch (error) {
+    console.error('Error checking ban status:', error);
+    return false;
+  }
+};
+
+// --- Delete User Account ---
+export const deleteUserAccount = async (): Promise<boolean> => {
+  const user = auth.currentUser;
+  if (!user) return false;
+  try {
+    // Delete profile doc (and any other root-level user docs if known)
+    const userRef = doc(db, 'users', user.uid);
+    await deleteDoc(userRef);
+    
+    // Delete Auth User
+    await deleteUser(user);
+    console.log('User account and profile deleted successfully');
+    return true;
+  } catch (error) {
+    console.error('Error deleting user account:', error);
+    return false;
+  }
+};

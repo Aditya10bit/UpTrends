@@ -1,13 +1,14 @@
 // Temporarily disable to prevent startup crashes
 // import { checkMemoryPressure } from '../utils/apiSafeguards';
+import { auth } from '@/firebaseConfig';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system';
 import { geminiRateLimiter, getSecureApiKey } from '../config/security';
 import { isModelExhaustedToday, markModelExhausted } from '../utils/aiQuotaTracker';
+import { callAIProxy, isProxyConfigured } from './aiProxyService';
 import { trackAIRequest } from './analyticsService';
 import { TopographyData } from './topographyService';
-import { callAIProxy, isProxyConfigured } from './aiProxyService';
 
 /**
  * Robust JSON extractor. Finds the first '{' or '[' and the last '}' or ']'
@@ -103,6 +104,10 @@ export const invalidateApiKeyCache = () => {
   cachedCustomKey = undefined;
   cachedGenAIInstance = null;
   lastKeySource = 'default';
+
+  // Reset the alter shop quota whenever the API key changes so the usage bar resets
+  AsyncStorage.removeItem('@uptrends_alter_shop_quota').catch(e => console.error('Failed to reset alter shop quota', e));
+
   console.log('[Gemini] API key cache invalidated — will re-resolve on next request');
 };
 
@@ -131,7 +136,7 @@ export const testApiKey = async (apiKey: string): Promise<{ success: boolean; er
       return { success: false, error: 'API key is too short. Please provide a valid Gemini API key.' };
     }
     const testGenAI = new GoogleGenerativeAI(trimmedKey);
-    const testModel = testGenAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
+    const testModel = testGenAI.getGenerativeModel({ model: 'gemini-3.8-flash' });
     const result = await testModel.generateContent('Respond with exactly one word: Ready');
     const text = result.response?.text?.();
     if (text) {
@@ -158,20 +163,17 @@ export const testApiKey = async (apiKey: string): Promise<{ success: boolean; er
 // retry the same request with the next lighter model in the chain. This is an
 // ORDERED chain: each model falls through to the one after it.
 //
-// ⚠️  VERIFIED LIVE MODELS (2026):
-//   gemini-3.7-flash, gemini-3.7-flash-lite  → primary high-performance free-tier models
-//   gemini-3.5-flash, gemini-3.5-flash-lite  → secondary fallbacks
-//   gemini-1.5-flash, gemini-1.5-flash-8b    → long-term stable fallbacks
+// ⚠️  VERIFIED LIVE MODELS (September 2026):
+//   gemini-3.8-flash                          → latest high-performance free-tier model (20 RPD)
+//   gemini-3.7-flash                          → stable fast model, excellent multimodal (20 RPD)
+//   gemini-3.5-flash-lite                     → workhorse stable fallback (500 RPD)
 const MODEL_FALLBACK_CHAINS: Record<string, string[]> = {
-  'gemini-3.7-flash': ['gemini-3.7-flash-lite', 'gemini-3.5-flash', 'gemini-3.5-flash-lite', 'gemini-1.5-flash', 'gemini-1.5-flash-8b'],
-  'gemini-3.7-flash-lite': ['gemini-3.5-flash-lite', 'gemini-1.5-flash', 'gemini-1.5-flash-8b'],
-  'gemini-3.5-flash': ['gemini-3.7-flash', 'gemini-3.7-flash-lite', 'gemini-3.5-flash-lite', 'gemini-1.5-flash', 'gemini-1.5-flash-8b'],
-  'gemini-3.5-flash-lite': ['gemini-3.7-flash-lite', 'gemini-1.5-flash', 'gemini-1.5-flash-8b'],
-  'gemini-2.5-flash': ['gemini-3.7-flash-lite', 'gemini-1.5-flash', 'gemini-1.5-flash-8b'],
-  'gemini-2.5-flash-lite': ['gemini-1.5-flash', 'gemini-1.5-flash-8b'],
-  'gemini-1.5-flash': ['gemini-1.5-flash-8b'],
-  'gemini-flash-latest': ['gemini-3.7-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-8b'],
+  'gemini-3.8-flash': ['gemini-3.7-flash', 'gemini-3.5-flash-lite'],
+  'gemini-3.7-flash': ['gemini-3.5-flash-lite'],
+  'gemini-3.5-flash-lite': [],
+  'gemini-flash-latest': ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.5-flash-lite'],
 };
+
 
 // Tracks the last model that actually served a request, so a screen/log can show
 // "running on flash-lite" when the free-tier fallback kicked in.
@@ -285,6 +287,12 @@ export const genAI = {
               const lower = msg.toLowerCase();
               const isQuota = msg.includes('429') || lower.includes('quota') || msg.includes('Too Many Requests') || msg.includes('RESOURCE_EXHAUSTED');
               const isOverloaded = msg.includes('503') || lower.includes('overloaded') || msg.includes('UNAVAILABLE') || msg.includes('500');
+              const isNotFound = msg.includes('404') || lower.includes('not found') || lower.includes('is not supported');
+
+              if (isNotFound) {
+                console.warn(`[AI] ${modelName} not found or unsupported (${msg}). Skipping to next model.`);
+                break; // next model in chain
+              }
 
               if (isQuota) {
                 // Daily quota hit — don't keep hammering this model; mark it and move on
@@ -305,6 +313,7 @@ export const genAI = {
                 break;
               }
 
+              console.error(`[AI] Unhandled error for model ${modelName}:`, msg);
               throw error;
             }
           }
@@ -323,34 +332,25 @@ const getModel = (config: any) => genAI.getGenerativeModel(config);
 const models = {
   get fast() {
     return getModel({
-      model: 'gemini-3.5-flash',
+      model: 'gemini-3.5-flash-lite',
       generationConfig: {
-        temperature: 0.7,
-        topK: 40,
-        topP: 0.95,
-        maxOutputTokens: 2048,
+        thinking_level: 'low'
       }
     });
   },
   get balanced() {
     return getModel({
-      model: 'gemini-3.5-flash',
+      model: 'gemini-3.8-flash',
       generationConfig: {
-        temperature: 0.8,
-        topK: 40,
-        topP: 0.95,
-        maxOutputTokens: 4096,
+        thinking_level: 'medium'
       }
     });
   },
   get quality() {
     return getModel({
-      model: 'gemini-3.5-flash',
+      model: 'gemini-3.8-flash',
       generationConfig: {
-        temperature: 0.9,
-        topK: 40,
-        topP: 0.95,
-        maxOutputTokens: 8192,
+        thinking_level: 'high'
       }
     });
   }
@@ -556,6 +556,13 @@ export const analyzeImageAndGenerateOutfits = async (
 ): Promise<StyleAnalysisResult> => {
   // 1. Validate image content before processing
   const validation = await validateImageContext(imageUri, 'an outfit, a fashion moodboard, or an aesthetic venue');
+  if (validation.isNsfw) {
+    if (auth.currentUser) {
+      const { handleNsfwViolation } = require('./userService');
+      await handleNsfwViolation(auth.currentUser.uid);
+    }
+    throw new Error("NSFW_VIOLATION");
+  }
   if (!validation.isValid) {
     throw new Error(`Invalid Image: ${validation.reasoning}`);
   }
@@ -912,7 +919,7 @@ ${person1Name}'s items should be completely different from ${person2Name}'s item
 Respond with ONLY the JSON object, no other text.`;
 
     const model = genAI.getGenerativeModel({
-      model: 'gemini-3.5-flash',
+      model: 'gemini-3.8-flash',
       generationConfig: {
         temperature: 0.8,
         topK: 40,
@@ -934,7 +941,7 @@ Respond with ONLY the JSON object, no other text.`;
 
       // Retry with quality model
       const qualityModel = genAI.getGenerativeModel({
-        model: 'gemini-3.5-flash',
+        model: 'gemini-3.8-flash',
         generationConfig: {
           temperature: 0.8,
           topK: 40,
@@ -1668,7 +1675,7 @@ export const getChatbotResponse = async (prompt: string): Promise<string> => {
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.8-flash' });
 
     const chatPrompt = `
 You are StyleBuddy, a friendly and knowledgeable fashion chatbot assistant. You help users understand their body type and provide personalized fashion advice.
@@ -1715,7 +1722,7 @@ export const analyzeBodyImage = async (imageUri: string, customPrompt?: string):
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.8-flash' });
 
     // Convert image to base64
     const response = await fetch(imageUri);
@@ -1783,7 +1790,7 @@ export const analyzeVenueComprehensively = async (imageUri: string, category: st
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.8-flash' });
 
     // Convert image to base64
     const response = await fetch(imageUri);
@@ -1862,7 +1869,7 @@ export const analyzeProfileBodyTypeFromImage = async (imageUri: string, gender?:
   const normalizedGender = gender ? gender.toLowerCase().trim() : 'unknown';
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.8-flash' });
 
     // Convert image to base64
     const { base64, mimeType } = await imageUriToBase64(imageUri);
@@ -1986,7 +1993,7 @@ export const analyzeBodyTypeFromImage = async (imageUri: string, gender?: string
   const normalizedGender = gender ? gender.toLowerCase().trim() : 'unknown';
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' }); // Use Flash for better reliability
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.8-flash' }); // Use Flash for better reliability
 
     // Convert image to base64
     const { base64, mimeType } = await imageUriToBase64(imageUri);
@@ -2109,7 +2116,7 @@ export const generatePersonalizedFashionTips = async (
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.8-flash' });
 
     const tipsPrompt = `
 You are StyleBuddy, a friendly fashion assistant. Provide personalized fashion advice for this user:
@@ -2203,7 +2210,7 @@ export
     }
 
     try {
-      const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
+      const model = genAI.getGenerativeModel({ model: 'gemini-3.8-flash' });
 
       const result = await model.generateContent(prompt);
       const responseText = result.response.text();
@@ -2306,7 +2313,7 @@ const generateFallbackOutfitSuggestions = (category?: string, userProfile?: any)
 
   // Category-specific fallback suggestions with strict gender filtering
   if (categoryLower.includes('gym')) {
-    if (gender === 'male') {
+    if ((gender || '').toLowerCase() === 'male') {
       return [
         {
           id: "fallback_gym_male_1",
@@ -2468,7 +2475,7 @@ const generateFallbackOutfitSuggestions = (category?: string, userProfile?: any)
   }
 
   if (categoryLower.includes('formal')) {
-    if (gender === 'male') {
+    if ((gender || '').toLowerCase() === 'male') {
       return [
         {
           id: "fallback_formal_male_1",
@@ -2546,7 +2553,7 @@ const generateFallbackOutfitSuggestions = (category?: string, userProfile?: any)
   }
 
   if (categoryLower.includes('street')) {
-    if (gender === 'male') {
+    if ((gender || '').toLowerCase() === 'male') {
       return [
         {
           id: "fallback_street_male_1",
@@ -2624,7 +2631,7 @@ const generateFallbackOutfitSuggestions = (category?: string, userProfile?: any)
   }
 
   if (categoryLower.includes('ethnic')) {
-    if (gender === 'male') {
+    if ((gender || '').toLowerCase() === 'male') {
       return [
         {
           id: "fallback_ethnic_male_1",
@@ -2702,7 +2709,7 @@ const generateFallbackOutfitSuggestions = (category?: string, userProfile?: any)
   }
 
   if (categoryLower.includes('party')) {
-    if (gender === 'male') {
+    if ((gender || '').toLowerCase() === 'male') {
       return [
         {
           id: "fallback_party_male_1",
@@ -2780,7 +2787,7 @@ const generateFallbackOutfitSuggestions = (category?: string, userProfile?: any)
   }
 
   // Default fallback for other categories
-  if (gender === 'male') {
+  if ((gender || '').toLowerCase() === 'male') {
     return [
       {
         id: "fallback_general_male_1",
@@ -2831,7 +2838,7 @@ export const generateTodaysOutfit = async (userProfile: any, weather: any): Prom
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' }); // Using Pro model for better results
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.8-flash' }); // Using Pro model for better results
 
     const prompt = `
 You are a professional fashion stylist and weather expert. Create the perfect outfit recommendation for today based on the weather and user's profile.
@@ -2855,7 +2862,7 @@ WEATHER CONDITIONS:
 - Evening Temperature: ${weather.forecast.evening.temp}°C
 
 REQUIREMENTS:
-1. Create ONE perfect outfit specifically for a ${userProfile.gender} — ONLY ${userProfile.gender === 'male' ? 'menswear: shirts, t-shirts, trousers, chinos, jeans, shorts, blazers, jackets, sneakers, loafers, boots' : 'womenswear: dresses, skirts, blouses, tops, jeans, leggings, heels, sandals'}
+1. Create ONE perfect outfit specifically for a ${userProfile.gender} — ONLY ${(userProfile?.gender || '').toLowerCase() === 'male' ? 'menswear: shirts, t-shirts, trousers, chinos, jeans, shorts, blazers, jackets, sneakers, loafers, boots' : 'womenswear: dresses, skirts, blouses, tops, jeans, leggings, heels, sandals'}
 2. Consider the weather conditions and temperature changes throughout the day
 3. Ensure the outfit is appropriate for their body type and skin tone
 4. Include practical weather-appropriate items
@@ -2868,11 +2875,11 @@ FORMAT YOUR RESPONSE AS JSON:
   "title": "Weather-appropriate outfit name",
   "description": "Brief description of why this outfit is perfect for today",
   "items": [
-    "Specific ${userProfile.gender === 'male' ? 'menswear' : 'womenswear'} item 1 (e.g., ${userProfile.gender === 'male' ? "'Navy polo shirt', 'White button-down shirt', 'Light blue linen shirt'" : "'Floral summer dress', 'Silk blouse', 'Cotton midi skirt'"})",
-    "Specific clothing item 2 (e.g., ${userProfile.gender === 'male' ? "'Khaki chinos', 'Dark slim-fit jeans', 'Beige linen trousers'" : "'High-waist jeans', 'Pleated trousers', 'Denim skirt'"})",
-    "Specific clothing item 3 (e.g., ${userProfile.gender === 'male' ? "'Lightweight bomber jacket', 'Cotton blazer', 'Denim jacket'" : "'Cardigan', 'Cropped jacket', 'Trench coat'"})",
-    "Footwear recommendation (e.g., ${userProfile.gender === 'male' ? "'White leather sneakers', 'Suede loafers', 'Desert boots'" : "'Block heel sandals', 'White sneakers', 'Ankle boots'"})",
-    "Accessories if needed (e.g., ${userProfile.gender === 'male' ? "'Leather watch', 'Sunglasses', 'Belt'" : "'Tote bag', 'Gold earrings', 'Scarf'"})"
+    "Specific ${(userProfile?.gender || '').toLowerCase() === 'male' ? 'menswear' : 'womenswear'} item 1 (e.g., ${(userProfile?.gender || '').toLowerCase() === 'male' ? "'Navy polo shirt', 'White button-down shirt', 'Light blue linen shirt'" : "'Floral summer dress', 'Silk blouse', 'Cotton midi skirt'"})",
+    "Specific clothing item 2 (e.g., ${(userProfile?.gender || '').toLowerCase() === 'male' ? "'Khaki chinos', 'Dark slim-fit jeans', 'Beige linen trousers'" : "'High-waist jeans', 'Pleated trousers', 'Denim skirt'"})",
+    "Specific clothing item 3 (e.g., ${(userProfile?.gender || '').toLowerCase() === 'male' ? "'Lightweight bomber jacket', 'Cotton blazer', 'Denim jacket'" : "'Cardigan', 'Cropped jacket', 'Trench coat'"})",
+    "Footwear recommendation (e.g., ${(userProfile?.gender || '').toLowerCase() === 'male' ? "'White leather sneakers', 'Suede loafers', 'Desert boots'" : "'Block heel sandals', 'White sneakers', 'Ankle boots'"})",
+    "Accessories if needed (e.g., ${(userProfile?.gender || '').toLowerCase() === 'male' ? "'Leather watch', 'Sunglasses', 'Belt'" : "'Tote bag', 'Gold earrings', 'Scarf'"})"
   ],
   "colors": [
     "Primary color that suits ${userProfile.skinTone} skin tone",
@@ -2889,21 +2896,21 @@ FORMAT YOUR RESPONSE AS JSON:
     {
       "item": "First clothing item name from items array above",
       "platform": "Amazon Fashion",
-      "url": "https://www.amazon.com/s?k=<URL_ENCODED: ${userProfile.gender === 'male' ? 'men' : 'women'} + first item name>",
+      "url": "https://www.amazon.com/s?k=<URL_ENCODED: ${(userProfile?.gender || '').toLowerCase() === 'male' ? 'men' : 'women'} + first item name>",
       "description": "Shop this specific item",
       "icon": "bag"
     },
     {
       "item": "Second clothing item name from items array above",
       "platform": "Amazon Fashion",
-      "url": "https://www.amazon.com/s?k=<URL_ENCODED: ${userProfile.gender === 'male' ? 'men' : 'women'} + second item name>",
+      "url": "https://www.amazon.com/s?k=<URL_ENCODED: ${(userProfile?.gender || '').toLowerCase() === 'male' ? 'men' : 'women'} + second item name>",
       "description": "Shop this specific item",
       "icon": "bag"
     },
     {
       "item": "Third clothing item name (generate one per item in the items array)",
       "platform": "Amazon Fashion",
-      "url": "https://www.amazon.com/s?k=<URL_ENCODED: ${userProfile.gender === 'male' ? 'men' : 'women'} + third item name>",
+      "url": "https://www.amazon.com/s?k=<URL_ENCODED: ${(userProfile?.gender || '').toLowerCase() === 'male' ? 'men' : 'women'} + third item name>",
       "description": "Shop this specific item",
       "icon": "bag"
     },
@@ -2920,7 +2927,7 @@ FORMAT YOUR RESPONSE AS JSON:
 }
 
 IMPORTANT GUIDELINES:
-- ABSOLUTELY CRITICAL: This outfit is for a ${userProfile.gender}. Every clothing item MUST be ${userProfile.gender === 'male' ? 'a menswear item (no dresses, skirts, heels, women\'s blouses, women\'s accessories)' : 'a womenswear item'}. For a MALE user, think: polo shirts, button-downs, chinos, jeans, blazers, sneakers, loafers. NEVER generate feminine clothing for a male user.
+- ABSOLUTELY CRITICAL: This outfit is for a ${userProfile.gender}. Every clothing item MUST be ${(userProfile?.gender || '').toLowerCase() === 'male' ? 'a menswear item (no dresses, skirts, heels, women\'s blouses, women\'s accessories)' : 'a womenswear item'}. For a MALE user, think: polo shirts, button-downs, chinos, jeans, blazers, sneakers, loafers. NEVER generate feminine clothing for a male user.
 - Consider temperature fluctuations throughout the day
 - Include layering options if temperature varies significantly
 - Ensure colors complement ${userProfile.skinTone} skin tone
@@ -2944,7 +2951,7 @@ Return ONLY the JSON object, no additional text.
       const parsed = JSON.parse(cleanedResponse);
 
       // Programmatically override shopping links to guarantee correctness
-      const genderTerm = userProfile?.gender === 'male' ? 'men' : 'women';
+      const genderTerm = (userProfile?.gender || '').toLowerCase() === 'male' ? 'men' : 'women';
       const itemsQuery = parsed.items?.join(' ') || '';
 
       const amazonLinks = (parsed.items || []).map((item: string) => ({
@@ -3168,7 +3175,7 @@ const generateGenderSpecificLinks = (
   shopping_links: Array<{ platform: string, url: string, description: string, icon: string }>,
   reference_links: Array<{ platform: string, url: string, description: string, icon: string }>
 } => {
-  const genderTerm = gender === 'male' ? 'men' : 'women';
+  const genderTerm = (gender || '').toLowerCase() === 'male' ? 'men' : 'women';
   const mainSearchTerm = `${genderTerm} ${category} ${searchTerms.join(' ')}`;
 
   return {
@@ -3223,11 +3230,11 @@ export const generateTopographyAwareOutfits = async (
       // Try different models based on attempt
       let model;
       if (attempt === 1) {
-        model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
+        model = genAI.getGenerativeModel({ model: 'gemini-3.8-flash' });
       } else if (attempt === 2) {
-        model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
+        model = genAI.getGenerativeModel({ model: 'gemini-3.8-flash' });
       } else {
-        model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
+        model = genAI.getGenerativeModel({ model: 'gemini-3.8-flash' });
       }
 
       // Convert image to base64
@@ -3388,11 +3395,11 @@ export const generateWeatherAwareOutfits = async (
       // Try different models based on attempt
       let model;
       if (attempt === 1) {
-        model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
+        model = genAI.getGenerativeModel({ model: 'gemini-3.8-flash' });
       } else if (attempt === 2) {
-        model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
+        model = genAI.getGenerativeModel({ model: 'gemini-3.8-flash' });
       } else {
-        model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
+        model = genAI.getGenerativeModel({ model: 'gemini-3.8-flash' });
       }
 
       // Convert image to base64
@@ -4076,7 +4083,7 @@ const generateWeatherConsiderations = (weather: any): string => {
   return considerations;
 };
 
-export const validateImageContext = async (imageUri: string, expectedContext: string): Promise<{ isValid: boolean; confidence: number; reasoning: string; suggestedItems?: string[] }> => {
+export const validateImageContext = async (imageUri: string, expectedContext: string): Promise<{ isValid: boolean; confidence: number; reasoning: string; suggestedItems?: string[]; isNsfw?: boolean }> => {
   // Check rate limit
   if (!geminiRateLimiter.canMakeCall()) {
     const waitTime = Math.ceil(geminiRateLimiter.getTimeUntilNextCall() / 1000);
@@ -4084,7 +4091,7 @@ export const validateImageContext = async (imageUri: string, expectedContext: st
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.8-flash' });
 
     // Convert image to base64
     const { base64, mimeType } = await imageUriToBase64(imageUri);
@@ -4097,24 +4104,27 @@ export const validateImageContext = async (imageUri: string, expectedContext: st
     };
 
     const validationPrompt = `
-Analyze this image to determine if it matches the expected context.
+Analyze this image to determine if it matches the expected context and check for explicit content.
 
 EXPECTED CONTEXT: ${expectedContext}
 
 REQUIRED ANALYSIS:
 1. Does this image clearly represent the expected context? (Yes/No)
 2. What is visible in the image? (List key elements)
-3. Confidence level (1-100%)
-4. Reasoning for your assessment
+3. Is there explicit, severely inappropriate, or sexually suggestive NSFW content? Note: Standard fashion photography (e.g. swimwear, crop tops, fitting clothes) is acceptable and NOT explicit. Only flag true nudity or highly explicit material. (Yes/No)
+4. Confidence level (1-100%)
+5. Reasoning for your assessment
 
 FORMAT YOUR RESPONSE EXACTLY AS:
 VALID_IMAGE: [Yes/No]
+NSFW: [Yes/No]
 CONFIDENCE: [percentage]%
 REASONING: [Brief explanation of why this does or doesn't match the expected context]
 ITEMS: [List of key visible items, or "None"]
 
 IMPORTANT GUIDELINES:
-- Be strict - if unsure, classify as invalid.
+- Be strict about context - if unsure, classify as invalid.
+- Be forgiving about clothing - do not flag normal body exposure (like crop tops or swimwear) as NSFW. Only flag genuine explicit material.
 - Reject images of: screenshots of text, completely unrelated objects, or blank screens.
 - Focus on whether the image matches the EXPECTED CONTEXT.
 
@@ -4126,11 +4136,13 @@ Make sure the response is in the exact format specified above, no additional tex
 
     // Parse the response
     const validMatch = responseText.match(/VALID_IMAGE:\s*(Yes|No)/i);
+    const nsfwMatch = responseText.match(/NSFW:\s*(Yes|No)/i);
     const confidenceMatch = responseText.match(/CONFIDENCE:\s*(\d+)%/i);
     const reasoningMatch = responseText.match(/REASONING:\s*([^\n]+)/i);
     const itemsMatch = responseText.match(/ITEMS:\s*([^\n]+)/i);
 
     const isValid = validMatch ? validMatch[1].toLowerCase() === 'yes' : false;
+    const isNsfw = nsfwMatch ? nsfwMatch[1].toLowerCase() === 'yes' : false;
     const confidence = confidenceMatch ? parseInt(confidenceMatch[1]) : 0;
     const reasoning = reasoningMatch ? reasoningMatch[1].trim() : 'Unable to determine image content';
     const suggestedItems = itemsMatch && itemsMatch[1] !== 'None' ?
@@ -4140,7 +4152,8 @@ Make sure the response is in the exact format specified above, no additional tex
       isValid,
       confidence,
       reasoning,
-      suggestedItems: suggestedItems.length > 0 ? suggestedItems : undefined
+      suggestedItems: suggestedItems.length > 0 ? suggestedItems : undefined,
+      isNsfw,
     };
 
   } catch (error: any) {
@@ -4156,6 +4169,7 @@ Make sure the response is in the exact format specified above, no additional tex
         isValid: true,
         confidence: 50,
         reasoning: 'AI validation temporarily unavailable — proceeding with image as-is.',
+        isNsfw: false,
       };
     }
 
@@ -4165,14 +4179,15 @@ Make sure the response is in the exact format specified above, no additional tex
       isValid: false,
       confidence: 0,
       reasoning: 'Unable to validate image due to a processing error. Please upload a clear photo.',
+      isNsfw: false,
     };
   }
 };
 
 export const validateMultipleImagesContext = async (imageUris: string[], expectedContext: string): Promise<{
   validImages: string[];
-  invalidImages: Array<{ uri: string; reason: string }>;
-  validationResults: Array<{ uri: string; isValid: boolean; confidence: number; reasoning: string }>;
+  invalidImages: Array<{ uri: string; reason: string; isNsfw?: boolean }>;
+  validationResults: Array<{ uri: string; isValid: boolean; confidence: number; reasoning: string; isNsfw?: boolean }>;
 }> => {
   const validationResults = await Promise.all(
     imageUris.map(async (uri) => {
@@ -4182,7 +4197,8 @@ export const validateMultipleImagesContext = async (imageUris: string[], expecte
           uri,
           isValid: result.isValid,
           confidence: result.confidence,
-          reasoning: result.reasoning
+          reasoning: result.reasoning,
+          isNsfw: result.isNsfw
         };
       } catch (error) {
         console.error(`Error validating image ${uri}:`, error);
@@ -4190,7 +4206,8 @@ export const validateMultipleImagesContext = async (imageUris: string[], expecte
           uri,
           isValid: false,
           confidence: 0,
-          reasoning: "Validation failed due to processing error"
+          reasoning: "Validation failed due to processing error",
+          isNsfw: false
         };
       }
     })
@@ -4250,7 +4267,7 @@ export const generateWardrobeBasedOutfits = async (
   trackAIRequest();
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.8-flash' });
 
     const imageParts = await Promise.all(
       clothingImages.map(async (imageUri) => {
@@ -4362,7 +4379,7 @@ export const analyzeOutfitCompatibility = async (
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.8-flash' });
 
     const imageParts = await Promise.all(
       clothingImages.map(async (imageUri) => {
@@ -4465,7 +4482,7 @@ export const analyzeStyleInspiration = async (
       throw new Error('Rate limit exceeded. Please wait a moment.');
     }
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-3.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-3.8-flash' });
 
     let imagePart;
     if (imageUri.startsWith('data:')) {

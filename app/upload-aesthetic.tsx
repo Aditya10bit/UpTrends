@@ -216,30 +216,35 @@ export default function UploadAesthetic() {
     } catch (error: any) {
       console.error('Error generating suggestions:', error);
       const errorMsg = error?.message || '';
-      const isQuotaError = errorMsg.includes('429') || errorMsg.includes('Quota') || errorMsg.includes('Too Many Requests') || errorMsg.includes('Max retries exceeded');
-
-      if (isQuotaError) {
-        const keySource = await getActiveKeySource();
-        if (keySource === 'default') {
-          Alert.alert(
-            'AI Limit Reached \u26a1',
-            'The shared AI quota has been reached. Set up your own free API key for unlimited access!\n\nIt only takes 1 minute.',
-            [
-              { text: 'Later', style: 'cancel' },
-              { text: 'Set Up My Key', onPress: () => router.push('/profile') }
-            ]
-          );
-        } else {
-          Alert.alert('Quota Exceeded', 'Your API key has hit its rate limit. Please wait a moment and try again.', [{ text: 'OK' }]);
-        }
-      } else if (errorMsg.includes('Invalid Image')) {
-        Alert.alert('Invalid Image', errorMsg.replace('Error: ', ''), [{ text: 'OK' }]);
+      
+      if (errorMsg === 'NSFW_VIOLATION') {
+        Alert.alert('Warning', 'Explicit content detected. Repeated violations will result in an account ban.');
       } else {
-        Alert.alert(
-          'Generation Failed',
-          'Unable to generate outfit suggestions. Please try again.',
-          [{ text: 'OK' }]
-        );
+        const isQuotaError = errorMsg.includes('429') || errorMsg.includes('Quota') || errorMsg.includes('Too Many Requests') || errorMsg.includes('Max retries exceeded');
+
+        if (isQuotaError) {
+          const keySource = await getActiveKeySource();
+          if (keySource === 'default') {
+            Alert.alert(
+              'AI Limit Reached \u26a1',
+              'The shared AI quota has been reached. Set up your own free API key for unlimited access!\n\nIt only takes 1 minute.',
+              [
+                { text: 'Later', style: 'cancel' },
+                { text: 'Set Up My Key', onPress: () => router.push('/profile') }
+              ]
+            );
+          } else {
+            Alert.alert('Quota Exceeded', 'Your API key has hit its rate limit. Please wait a moment and try again.', [{ text: 'OK' }]);
+          }
+        } else if (errorMsg.includes('Invalid Image')) {
+          Alert.alert('Invalid Image', errorMsg.replace('Error: ', ''), [{ text: 'OK' }]);
+        } else {
+          Alert.alert(
+            'Generation Failed',
+            'Unable to generate outfit suggestions. Please try again.',
+            [{ text: 'OK' }]
+          );
+        }
       }
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
