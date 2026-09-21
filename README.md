@@ -370,3 +370,35 @@ MIT — free for personal and commercial use.
 - Expo team for the best RN developer experience
 - Cloudflare Workers for the proxy infrastructure
 - All open-source libraries that make this possible
+
+
+## 📱 App Highlights & Visual Tour
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/cba0d307-50dd-4b2e-804f-e2c711898bf9" width="200" alt="App Screen 1" />
+  <img src="https://github.com/user-attachments/assets/d97699b3-07cc-4f87-83dd-48027c7dfeb5" width="200" alt="App Screen 2" />
+  <img src="https://github.com/user-attachments/assets/3a332dbc-c208-488a-9f99-bff6b521604b" width="200" alt="App Screen 3" />
+  <img src="https://github.com/user-attachments/assets/55dec287-7251-4923-90dc-da5a1638be06" width="200" alt="App Screen 4" />
+</p>
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/01907359-f785-4c67-930f-8bea34dd35a3" width="200" alt="App Screen 5" />
+  <img src="https://github.com/user-attachments/assets/bba20fc6-8611-492e-95fd-c11a50438af0" width="200" alt="App Screen 6" />
+  <img src="https://github.com/user-attachments/assets/7fc629ff-fcd9-4e48-9e9b-44a0948f08aa" width="200" alt="App Screen 7" />
+  <img src="https://github.com/user-attachments/assets/1f52ef9d-ab1d-4ded-aa55-f9f68ab2133c" width="200" alt="App Screen 8" />
+</p>
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/70b86289-61d7-4c2c-af73-0ce73253f9a5" width="200" alt="App Screen 9" />
+  <img src="https://github.com/user-attachments/assets/48dd4195-8173-4a54-8861-1ab40d99fb4f" width="200" alt="App Screen 10" />
+  <img src="https://github.com/user-attachments/assets/c43f8fda-dc58-406d-b0a6-03f6525fc434" width="200" alt="App Screen 11" />
+  <img src="https://github.com/user-attachments/assets/f59f7593-8897-494d-8042-b0c756d16713" width="200" alt="App Screen 12" />
+</p>
+
+
+
+
+
+
+
+
